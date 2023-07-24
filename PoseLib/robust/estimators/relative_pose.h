@@ -124,7 +124,8 @@ class OneFocalFundamentalEstimator {
 
     void generate_models(std::vector<Eigen::Matrix3d> *models);
     double score_model(const Eigen::Matrix3d &F, size_t *inlier_count) const;
-    void refine_model(Eigen::Matrix3d *focal_pose) const;
+    void refine_model(Eigen::Matrix3d *focal_pose);
+    double calc_sq_focal(Eigen::Matrix3d F);
 
     const size_t sample_sz = 7;
     const size_t num_data;

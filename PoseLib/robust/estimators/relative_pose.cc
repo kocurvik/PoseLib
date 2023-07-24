@@ -138,6 +138,27 @@ void RelativeOneFocalPoseEstimator::refine_model(CameraOneFocalPose *focal_pose)
     refine_onefocal_relpose(f2, x1_inlier, x2_inlier, focal_pose, bundle_opt);    
 }
 
+double OneFocalFundamentalEstimator::calc_sq_focal(Eigen::Matrix3d F) {
+    Eigen::JacobiSVD<Eigen::Matrix3d> svd(K2 * F, Eigen::ComputeFullV);
+    svd.computeV();
+
+    double v_13 = svd.matrixV()(2, 0);
+    double v_23 = svd.matrixV()(2, 1);
+
+    double a, b, v;
+
+    if (std::fabs(v_13) > std::fabs(v_23)) {
+        a = svd.singularValues()(0);
+        b = svd.singularValues()(1);
+        v = v_13;
+    } else {
+        a = svd.singularValues()(1);
+        b = svd.singularValues()(0);
+        v = v_23;
+    }
+
+    return a * a * v * v / (a * a * v * v - a * a + b * b);    
+}
 
 void OneFocalFundamentalEstimator::generate_models(std::vector<Eigen::Matrix3d> *models) {
     std::vector<Eigen::Matrix3d> F_models;
@@ -150,25 +171,7 @@ void OneFocalFundamentalEstimator::generate_models(std::vector<Eigen::Matrix3d> 
     relpose_7pt(x1s, x2s, &F_models);
 
     for (Eigen::Matrix3d F : F_models) {
-        Eigen::JacobiSVD<Eigen::Matrix3d> svd(K2 * F, Eigen::ComputeFullV);
-        svd.computeV();
-        
-        double v_13 = svd.matrixV()(2, 0);
-        double v_23 = svd.matrixV()(2, 1);
-
-        double a, b, v;
-
-        if (std::fabs(v_13) > std::fabs(v_23)) {
-            a = svd.singularValues()(0);
-            b = svd.singularValues()(1);
-            v = v_13;
-        } else {
-            a = svd.singularValues()(1);
-            b = svd.singularValues()(0);
-            v = v_23;
-        }
-        
-        double f_sq = a * a * v * v /  (a * a * v * v - a * a + b * b);
+        double f_sq = this->calc_sq_focal(F);
 
         if (f_sq <= 0.0) {
             continue;
@@ -229,13 +232,17 @@ double OneFocalFundamentalEstimator::score_model(const Eigen::Matrix3d &F, size_
     refine_onefocal_relpose(f2, x1_inlier, x2_inlier, focal_pose, bundle_opt);
 }*/
 
-void OneFocalFundamentalEstimator::refine_model(Eigen::Matrix3d *F) const {
+void OneFocalFundamentalEstimator::refine_model(Eigen::Matrix3d *F) {
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
     bundle_opt.max_iterations = 25;
 
-    refine_fundamental(x1, x2, F, bundle_opt);
+    Eigen::Matrix3d FF = *F;
+    refine_fundamental(x1, x2, &FF, bundle_opt);
+    if (this->calc_sq_focal(FF) > 0) {
+        (*F) = FF;
+    }
 }
 
 

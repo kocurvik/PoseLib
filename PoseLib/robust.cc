@@ -276,6 +276,7 @@ RansacStats estimate_onefocal_fundamental(const double f2, const std::vector<Poi
 
     RansacStats stats = ransac_onefocal_fundamental(f2, points2D_1, points2D_2, ransac_opt, F, inliers);
 
+    /* This is useless as refinement always happens for the best model anyways
     if (stats.num_inliers > 7) {
         // Collect inlier for additional bundle adjustment
         // TODO: use camera models for this refinement!
@@ -292,7 +293,7 @@ RansacStats estimate_onefocal_fundamental(const double f2, const std::vector<Poi
         }
 
         refine_fundamental(x1_inliers, x2_inliers, F, bundle_opt);
-    }
+    }*/
 
     *F /= F->norm();
 
