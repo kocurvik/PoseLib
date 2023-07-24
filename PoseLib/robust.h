@@ -81,7 +81,7 @@ RansacStats estimate_onefocal_relative_pose(const double f2, const std::vector<P
 // Estimates fundamental matrix but checks for meaningful focal length, LO also optimizes onefocal
 RansacStats estimate_onefocal_fundamental(const double f2, const std::vector<Point2D> &points2D_1,
                                           const std::vector<Point2D> &points2D_2, const RansacOptions &ransac_opt,
-                                          const BundleOptions &bundle_opt, CameraOneFocalPose *focal_pose,
+                                          const BundleOptions &bundle_opt, Eigen::Matrix3d *focal_pose,
                                           std::vector<char> *inliers);
 
 // Estimates a fundamental matrix using LO-RANSAC followed by non-linear refinement

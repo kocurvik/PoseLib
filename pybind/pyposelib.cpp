@@ -487,7 +487,7 @@ std::pair<CameraOneFocalPose, py::dict> estimate_onefocal_relative_pose_wrapper(
     return std::make_pair(pose, output_dict);
 }
 
-std::pair<CameraOneFocalPose, py::dict> estimate_onefocal_fundamental_wrapper(const double f2, const std::vector<Eigen::Vector2d> points2D_1,
+std::pair<Eigen::Matrix3d, py::dict> estimate_onefocal_fundamental_wrapper(const double f2, const std::vector<Eigen::Vector2d> points2D_1,
                                                                const std::vector<Eigen::Vector2d> points2D_2,
                                                                const py::dict &ransac_opt_dict,
                                                                const py::dict &bundle_opt_dict) {
@@ -498,16 +498,16 @@ std::pair<CameraOneFocalPose, py::dict> estimate_onefocal_fundamental_wrapper(co
     bundle_opt.loss_scale = 0.5 * ransac_opt.max_epipolar_error;
     update_bundle_options(bundle_opt_dict, bundle_opt);
     
-    CameraOneFocalPose pose;
+    Eigen::Matrix3d F;
     std::vector<char> inlier_mask;
 
     RansacStats stats = estimate_onefocal_fundamental(f2, points2D_1, points2D_2, ransac_opt,
-                                                        bundle_opt, &pose, &inlier_mask);
+                                                        bundle_opt, &F, &inlier_mask);
 
     py::dict output_dict;
     write_to_dict(stats, output_dict);
     output_dict["inliers"] = convert_inlier_vector(inlier_mask);
-    return std::make_pair(pose, output_dict);
+    return std::make_pair(F, output_dict);
 }
 
 std::pair<CameraPose, py::dict> refine_relative_pose_wrapper(const std::vector<Eigen::Vector2d> points2D_1,

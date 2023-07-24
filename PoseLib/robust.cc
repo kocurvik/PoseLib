@@ -266,7 +266,7 @@ RansacStats estimate_onefocal_relative_pose(const double f2, const std::vector<P
 }
 
 RansacStats estimate_onefocal_fundamental(const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
-    const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, CameraOneFocalPose *focal_pose, std::vector<char> *inliers) {
+    const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, Eigen::Matrix3d *F, std::vector<char> *inliers) {
 
     const size_t num_pts = points2D_1.size();
 
@@ -274,7 +274,7 @@ RansacStats estimate_onefocal_fundamental(const double f2, const std::vector<Poi
     //ransac_opt_scaled.max_epipolar_error =
     //    ransac_opt.max_epipolar_error * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
 
-    RansacStats stats = ransac_onefocal_fundamental(f2, points2D_1, points2D_2, ransac_opt, focal_pose, inliers);
+    RansacStats stats = ransac_onefocal_fundamental(f2, points2D_1, points2D_2, ransac_opt, F, inliers);
 
     if (stats.num_inliers > 7) {
         // Collect inlier for additional bundle adjustment
@@ -291,8 +291,10 @@ RansacStats estimate_onefocal_fundamental(const double f2, const std::vector<Poi
             x2_inliers.push_back(points2D_2[k]);
         }
 
-        refine_onefocal_relpose(f2, x1_inliers, x2_inliers, focal_pose, bundle_opt);
+        refine_fundamental(x1_inliers, x2_inliers, F, bundle_opt);
     }
+
+    *F /= F->norm();
 
     return stats;
 }

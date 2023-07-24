@@ -139,18 +139,18 @@ void RelativeOneFocalPoseEstimator::refine_model(CameraOneFocalPose *focal_pose)
 }
 
 
-void OneFocalFundamentalEstimator::generate_models(std::vector<CameraOneFocalPose> *models) {
+void OneFocalFundamentalEstimator::generate_models(std::vector<Eigen::Matrix3d> *models) {
     std::vector<Eigen::Matrix3d> F_models;
     
     sampler.generate_sample(&sample);
     for (size_t k = 0; k < sample_sz; ++k) {
         x1s[k] = x1[sample[k]].homogeneous().normalized();
-        x2s[k] = x2_unproj[sample[k]].homogeneous().normalized();
+        x2s[k] = x2[sample[k]].homogeneous().normalized();
     }
     relpose_7pt(x1s, x2s, &F_models);
 
     for (Eigen::Matrix3d F : F_models) {
-        Eigen::JacobiSVD<Eigen::Matrix3d> svd(F, Eigen::ComputeFullV);
+        Eigen::JacobiSVD<Eigen::Matrix3d> svd(K2 * F, Eigen::ComputeFullV);
         svd.computeV();
         
         double v_13 = svd.matrixV()(2, 0);
@@ -174,34 +174,22 @@ void OneFocalFundamentalEstimator::generate_models(std::vector<CameraOneFocalPos
             continue;
         }
 
-        double focal = std::sqrt(f_sq);
-
-        Eigen::Matrix3d K;
-        Eigen::Matrix3d K_inv;
-        K << focal, 0.0, 0.0, 0.0, focal, 0.0, 0.0, 0.0, 1.0;
-        K_inv << 1 / focal, 0.0, 0.0, 0.0, 1 / focal, 0.0, 0.0, 0.0, 1.0;
-
-        Eigen::Matrix3d E = F * K;
-        CameraPoseVector poses;
-        motion_from_essential(E, K_inv * x1s[0], x2s[0], &poses);
-        for (CameraPose pose : poses) {
-            models->emplace_back(CameraOneFocalPose(pose, focal));            
-        }
+        models->emplace_back(F);            
     }
 }
 
-double OneFocalFundamentalEstimator::score_model(const CameraOneFocalPose &focal_pose, size_t *inlier_count) const {
+double OneFocalFundamentalEstimator::score_model(const Eigen::Matrix3d &F, size_t *inlier_count) const {
     // for (size_t k = 0; k < x1.size(); ++k) {
     //    x1_unproj[k](0) = x1[k](0) / focal_pose.f;
     //    x1_unproj[k](1) = x1[k](1) / focal_pose.f;
     //    //x1_unproj[k] = Eigen::Vector2d(x1[k](0) / focal_pose.f, x1[k](1) / focal_pose.f);
     //}
 
-    Eigen::Matrix3d K_inv;
+    /* Eigen::Matrix3d K_inv;
     K_inv << 1.0 / focal_pose.f, 0.0, 0.0, 0.0, 1.0 / focal_pose.f, 0.0, 0.0, 0.0, 1.0;
     Eigen::Matrix3d E;
     essential_from_motion(focal_pose, &E);
-    Eigen::Matrix3d F = K2_inv * (E * K_inv);
+    Eigen::Matrix3d F = K2_inv * (E * K_inv);*/
 
     // double score = compute_sampson_msac_score(focal_pose, x1_unproj, x2, 5 * opt.max_epipolar_error *
     // opt.max_epipolar_error / (focal_pose.f * focal_pose.f), inlier_count);
@@ -209,7 +197,7 @@ double OneFocalFundamentalEstimator::score_model(const CameraOneFocalPose &focal
     return score;
 }
 
-void OneFocalFundamentalEstimator::refine_model(CameraOneFocalPose *focal_pose) const {
+/* void OneFocalFundamentalEstimator::refine_model(CameraOneFocalPose *focal_pose) const {
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
@@ -239,6 +227,15 @@ void OneFocalFundamentalEstimator::refine_model(CameraOneFocalPose *focal_pose) 
         }
     }
     refine_onefocal_relpose(f2, x1_inlier, x2_inlier, focal_pose, bundle_opt);
+}*/
+
+void OneFocalFundamentalEstimator::refine_model(Eigen::Matrix3d *F) const {
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_epipolar_error;
+    bundle_opt.max_iterations = 25;
+
+    refine_fundamental(x1, x2, F, bundle_opt);
 }
 
 
