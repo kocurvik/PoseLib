@@ -618,7 +618,7 @@ class OneFocalRelativePoseJacobianAccumulator {
 
         double f1_inv = 1.0 / pose.f;
         Eigen::Matrix3d K_inv;
-        K_inv << f1_inv, 0.0, 0.0, 0.0, f1_inv, 0.0, 0.0, 0.0, f1_inv, 0.0, 0.0, 0.0, 1.0;
+        K_inv << f1_inv, 0.0, 0.0, 0.0, f1_inv, 0.0, 0.0, 0.0, 1;
 
 
         Eigen::Matrix3d E, R;
@@ -632,25 +632,47 @@ class OneFocalRelativePoseJacobianAccumulator {
 
         // Each column is vec(E*skew(e_k)) where e_k is k:th basis vector
         dR.block<3, 1>(0, 0).setZero();
-        dR.block<3, 1>(0, 1) = -E.col(2) * f2_inv * f1_inv;
-        dR.block<3, 1>(0, 2) = E.col(1) * f2_inv * f1_inv;
-        dR.block<3, 1>(3, 0) = E.col(2) * f2_inv * f1_inv;        
+        dR.block<3, 1>(0, 1) = -E.col(2);
+        dR.block<3, 1>(0, 2) = E.col(1);
+        dR.block<3, 1>(3, 0) = E.col(2);        
         dR.block<3, 1>(3, 1).setZero();
-        dR.block<3, 1>(3, 2) = -E.col(0) * f2_inv * f1_inv;
+        dR.block<3, 1>(3, 2) = -E.col(0);
         dR.block<3, 1>(6, 0) = -E.col(1);
         dR.block<3, 1>(6, 1) = E.col(0);
         dR.block<3, 1>(6, 2).setZero();
 
+        dR.row(0) *= f1_inv * f2_inv;
+        dR.row(1) *= f1_inv * f2_inv;
+        dR.row(2) *= f2_inv;
+        dR.row(3) *= f1_inv * f2_inv;
+        dR.row(4) *= f1_inv * f2_inv;
+        dR.row(5) *= f2_inv;
+        dR.row(6) *= f1_inv;
+        dR.row(7) *= f1_inv;
+
+
         // Each column is vec(skew(tangent_basis[k])*R)
-        dt.block<3, 1>(0, 0) = tangent_basis.col(0).cross(R.col(0)) * f2_inv * f1_inv;
-        dt.block<3, 1>(0, 1) = tangent_basis.col(1).cross(R.col(0)) * f2_inv * f1_inv;
-        dt.block<3, 1>(3, 0) = tangent_basis.col(0).cross(R.col(1)) * f2_inv * f1_inv;
-        dt.block<3, 1>(3, 1) = tangent_basis.col(1).cross(R.col(1)) * f2_inv * f1_inv;
+        dt.block<3, 1>(0, 0) = tangent_basis.col(0).cross(R.col(0));
+        dt.block<3, 1>(0, 1) = tangent_basis.col(1).cross(R.col(0));
+        dt.block<3, 1>(3, 0) = tangent_basis.col(0).cross(R.col(1));
+        dt.block<3, 1>(3, 1) = tangent_basis.col(1).cross(R.col(1));
         dt.block<3, 1>(6, 0) = tangent_basis.col(0).cross(R.col(2));
         dt.block<3, 1>(6, 1) = tangent_basis.col(1).cross(R.col(2));
 
-        Eigen::Matrix3d df1_mat = -K2_inv * (E * (K_inv * K_inv));
-        Eigen::VectorXd df1(Eigen::Map<Eigen::VectorXd>(df1_mat.data(), 9));
+        dt.row(0) *= f1_inv * f2_inv;
+        dt.row(1) *= f1_inv * f2_inv;
+        dt.row(2) *= f2_inv;
+        dt.row(3) *= f1_inv * f2_inv;
+        dt.row(4) *= f1_inv * f2_inv;
+        dt.row(5) *= f2_inv;
+        dt.row(6) *= f1_inv;
+        dt.row(7) *= f1_inv;
+
+        Eigen::VectorXd df(9);
+
+        df << -F(0, 0) * f1_inv * f1_inv * f2_inv, -F(0, 1) * f1_inv * f1_inv * f2_inv, 0,
+            -F(1, 0) * f1_inv * f1_inv * f2_inv, -F(1, 1) * f1_inv * f1_inv * f2_inv, 0,
+            -F(2, 0) * f1_inv * f1_inv, -F(1, 1) * f1_inv * f1_inv, 0;
 
         size_t num_residuals = 0;
         for (size_t k = 0; k < x1.size(); ++k) {
@@ -689,7 +711,7 @@ class OneFocalRelativePoseJacobianAccumulator {
             Eigen::Matrix<double, 1, 6> J;
             J.block<1, 3>(0, 0) = dF * dR;
             J.block<1, 2>(0, 3) = dF * dt;
-            J(0, 5) = dF * df1;
+            J(0, 5) = dF * df;
 
             // Accumulate into JtJ and Jtr
             Jtr += weight * C * inv_nJ_C * J.transpose();

@@ -127,8 +127,6 @@ void RelativeOneFocalPoseEstimator::refine_model(CameraOneFocalPose *focal_pose)
         return;
     }
 
-    return;
-
     for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
         if (inliers[pt_k]) {
             x1_inlier.push_back(x1[pt_k]);
