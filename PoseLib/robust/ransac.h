@@ -53,6 +53,9 @@ RansacStats ransac_pnpl(const std::vector<Point2D> &points2D, const std::vector<
 RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
                            CameraPose *best_model, std::vector<char> *best_inliers);
 
+RansacStats ransac_onefocal_relpose(const double f2, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
+                                    CameraOneFocalPose *best_model, std::vector<char> *best_inliers);
+
 RansacStats ransac_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
                                Eigen::Matrix3d *best_model, std::vector<char> *best_inliers);
 

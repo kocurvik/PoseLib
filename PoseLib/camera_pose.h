@@ -66,6 +66,27 @@ struct alignas(32) CameraPose {
 };
 
 typedef std::vector<CameraPose> CameraPoseVector;
+// namespace poselib
+
+struct alignas(32) CameraOneFocalPose : CameraPose {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    // Rotation is represented as a unit quaternion
+    // with real part first, i.e. QW, QX, QY, QZ
+    double f;
+
+    // Constructors (Defaults to identity camera)
+    CameraOneFocalPose() : CameraPose(), f(1.0) {}
+    CameraOneFocalPose(const Eigen::Vector4d &qq, const Eigen::Vector3d &tt, float &ff) : CameraPose(qq, tt), f(ff) {}
+    CameraOneFocalPose(const Eigen::Matrix3d &R, const Eigen::Vector3d &tt, float &ff) : CameraPose(R, tt), f(ff) {}
+    CameraOneFocalPose(const CameraPose &pose, const float &ff) : CameraPose(pose), f(ff) {}
+
+    // Maybe I should change the apply function to include unprojection
+};
+
+typedef std::vector<CameraOneFocalPose> CameraOneFocaPoseVector;
 } // namespace poselib
+
+
 
 #endif

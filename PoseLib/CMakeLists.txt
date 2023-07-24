@@ -23,6 +23,7 @@ set(SOURCES
     solvers/relpose_8pt.cc
     solvers/relpose_5pt.cc
     solvers/relpose_7pt.cc
+    solvers/relpose_6pt_onefocal.cc
     solvers/gen_relpose_upright_4pt.cc
     solvers/gen_relpose_5p1pt.cc
     solvers/gen_relpose_6pt.cc
@@ -68,6 +69,7 @@ set(HEADERS_PUBLIC
     solvers/relpose_8pt.h
     solvers/relpose_5pt.h
     solvers/relpose_7pt.h
+    solvers/relpose_6pt_onefocal.h
     solvers/gen_relpose_upright_4pt.h
     solvers/gen_relpose_5p1pt.h
     solvers/gen_relpose_6pt.h
