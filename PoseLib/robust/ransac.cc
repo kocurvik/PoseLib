@@ -109,15 +109,36 @@ RansacStats ransac_onefocal_relpose(const double f2, const std::vector<Point2D> 
     RelativeOneFocalPoseEstimator estimator(opt, f2, x1, x2);
     RansacStats stats = ransac<RelativeOneFocalPoseEstimator>(estimator, opt, best_model);
 
-    std::vector<Eigen::Vector2d> x1_unproj;
-    x1_unproj.resize(x1.size());
+    Eigen::Matrix3d K_inv;
+    K_inv << 1.0 / best_model->f, 0.0, 0.0, 0.0, 1.0 / best_model->f, 0.0, 0.0, 0.0, 1.0;
+    Eigen::Matrix3d K2_inv;
+    K_inv << 1.0 / f2, 0.0, 0.0, 0.0, 1.0 / f2, 0.0, 0.0, 0.0, 1.0;
+    Eigen::Matrix3d E;
+    essential_from_motion(*best_model, &E);
+    Eigen::Matrix3d F = K2_inv * (E * K_inv);
 
-    for (size_t k = 0; k < x1.size(); ++k) {
-        x1_unproj[k](0) = x1[k](0) / best_model->f;
-        x1_unproj[k](1) = x1[k](1) / best_model->f;
-    } 
+    get_inliers(F, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
 
-    get_inliers(*best_model, x1_unproj, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+    return stats;
+}
+
+RansacStats ransac_onefocal_fundamental(const double f2, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
+                                    CameraOneFocalPose *best_model, std::vector<char> *best_inliers) {
+    best_model->q << 1.0, 0.0, 0.0, 0.0;
+    best_model->t.setZero();
+    best_model->f = 1.0;
+    OneFocalFundamentalEstimator estimator(opt, f2, x1, x2);
+    RansacStats stats = ransac<OneFocalFundamentalEstimator>(estimator, opt, best_model);
+
+    Eigen::Matrix3d K_inv;
+    K_inv << 1.0 / best_model->f, 0.0, 0.0, 0.0, 1.0 / best_model->f, 0.0, 0.0, 0.0, 1.0;
+    Eigen::Matrix3d K2_inv;
+    K_inv << 1.0 / f2, 0.0, 0.0, 0.0, 1.0 / f2, 0.0, 0.0, 0.0, 1.0;
+    Eigen::Matrix3d E;
+    essential_from_motion(*best_model, &E);
+    Eigen::Matrix3d F = K2_inv * (E * K_inv);
+
+    get_inliers(F, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
 
     return stats;
 }
