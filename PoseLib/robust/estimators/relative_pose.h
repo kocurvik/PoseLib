@@ -111,8 +111,8 @@ class RelativeOneFocalPoseEstimator {
 
 class OneFocalFundamentalEstimator {
   public:
-    OneFocalFundamentalEstimator(const RansacOptions &ransac_opt, const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2, const bool direct)
-        : num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2), f2(f2), direct(direct),
+    OneFocalFundamentalEstimator(const RansacOptions &ransac_opt, const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2, const int method)
+        : num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2), f2(f2), method(method),
           sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);
@@ -129,7 +129,7 @@ class OneFocalFundamentalEstimator {
 
     const size_t sample_sz = 7;
     const size_t num_data;
-    const bool direct;
+    const int method;
 
   protected:
     const RansacOptions &opt;

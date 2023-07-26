@@ -32,10 +32,76 @@
 
 namespace poselib {
 
-double onefocal_sq(Eigen::Matrix3d &F, Eigen::Matrix3d &K2, bool direct) {
+double onefocal_sq(Eigen::Matrix3d &F, Eigen::Matrix3d &K2, int direct) {
+    if (direct == 3) {
+        Eigen::JacobiSVD<Eigen::Matrix3d> svd(F, Eigen::ComputeFullU | Eigen::ComputeFullV);
+        svd.computeV();
+        svd.computeU();
+
+        Eigen::Vector3d e1 = svd.matrixV().col(2);
+        Eigen::Vector3d e2 = svd.matrixU().col(2);
+
+        Eigen::Matrix3d e1_hat;
+        e1_hat << 0, -e1(2), e1(1), e1(2), 0, -e1(0), -e1(1), e1(0), 0;
+
+        Eigen::Matrix3d e2_hat;
+        e1_hat << 0, -e2(2), e2(1), e2(2), 0, -e2(0), -e2(1), e2(0), 0;
+
+        Eigen::Matrix3d II;
+        II << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0;
+
+        Eigen::Vector3d p;
+        p << 0.0, 0.0, 1.0;
+
+            
+        double f_sq;
+        f_sq = (-p.transpose() * e2_hat * II * F * (p.dot(p)) * F.transpose() * p)(0,0) /
+               (p.transpose() * e2_hat * II * F * II * F.transpose() * p)(0, 0);
+
+        return f_sq;
+    
+    }
+        
+    if (direct == 2) {
+        double f11 = F(0, 0), f12 = F(0, 1), f13 = F(0, 2);
+        double f21 = F(1, 0), f22 = F(1, 1), f23 = F(1, 2);
+        double f31 = F(2, 0), f32 = F(2, 1), f33 = F(2, 2);
+
+        Eigen::ArrayXd dens(3);
+
+        dens << f11 * f12 * f31 * f33 - f11 * f13 * f31 * f32 + f12 * f12 * f32 * f33 - f12 * f13 * f32 * f32 +
+                    f21 * f22 * f31 * f33 - f21 * f23 * f31 * f32 + f22 * f22 * f32 * f33 - f22 * f23 * f32 * f32,
+            f11 * f11 * f31 * f33 + f11 * f12 * f32 * f33 - f11 * f13 * f31 * f31 - f12 * f13 * f31 * f32 +
+                f21 * f21 * f31 * f33 + f21 * f22 * f32 * f33 - f21 * f23 * f31 * f31 - f22 * f23 * f31 * f32,
+            f11 * f11 * f31 * f32 - f11 * f12 * f31 * f31 + f11 * f12 * f32 * f32 - f12 * f12 * f31 * f32 +
+                f21 * f21 * f31 * f32 - f21 * f22 * f31 * f31 + f21 * f22 * f32 * f32 - f22 * f22 * f31 * f32;
+
+        Eigen::MatrixXf::Index max_index;
+        dens.abs().maxCoeff(&max_index);
+
+        double num;
+
+        switch (max_index) { 
+            case 0: {
+                num = -f33 * (f12 * f13 * f33 - f13 * f13 * f32 + f22 * f23 * f33 - f23 * f23 * f32);
+                break;
+            }
+            case 1: {
+                num = -f33 * (f11 * f13 * f33 - f13 * f13 * f31 + f21 * f23 * f33 - f23 * f23 * f31);
+                break;
+            }
+            case 2: {
+                num = -f33 * (f11 * f13 * f32 - f12 * f13 * f31 + f21 * f23 * f32 - f22 * f23 * f31);
+                break;
+            }
+        }
+
+        return num / dens(max_index);
+    }
+
     Eigen::Matrix3d G = K2 * F;
 
-    if (direct) {
+    if (direct == 1) {
         double f11 = G(0, 0), f12 = G(0, 1), f13 = G(0, 2);
         double f21 = G(1, 0), f22 = G(1, 1), f23 = G(1, 2);
         double f31 = G(2, 0), f32 = G(2, 1), f33 = G(2, 2);

@@ -516,7 +516,7 @@ std::pair<CameraOneFocalPose, py::dict> estimate_onefocal_relative_pose_wrapper(
 }
 
 std::pair<Eigen::Matrix3d, py::dict> estimate_onefocal_fundamental_wrapper(const double f2, const std::vector<Eigen::Vector2d> points2D_1,
-                                                                           const std::vector<Eigen::Vector2d> points2D_2, const bool direct,
+                                                                           const std::vector<Eigen::Vector2d> points2D_2, const int method,
                                                                            const py::dict &ransac_opt_dict,
                                                                            const py::dict &bundle_opt_dict) {
     RansacOptions ransac_opt;
@@ -531,7 +531,7 @@ std::pair<Eigen::Matrix3d, py::dict> estimate_onefocal_fundamental_wrapper(const
 
     std::vector<CameraOneFocalPose> output;
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-    RansacStats stats = estimate_onefocal_fundamental(direct, f2, points2D_1, points2D_2, ransac_opt,
+    RansacStats stats = estimate_onefocal_fundamental(method, f2, points2D_1, points2D_2, ransac_opt,
                                                         bundle_opt, &F, &inlier_mask);
 
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -913,7 +913,7 @@ PYBIND11_MODULE(poselib, m) {
           py::arg("points2D_1"), py::arg("points2D_2"), py::arg("ransac_opt") = py::dict(),
           py::arg("bundle_opt") = py::dict(), "Relative pose estimation with one unknown focal length with non-linear refinement.");
     m.def("estimate_onefocal_fundamental", &poselib::estimate_onefocal_fundamental_wrapper, py::arg("f2"),
-          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("direct") = false, py::arg("ransac_opt") = py::dict(),
+          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("method") = 0, py::arg("ransac_opt") = py::dict(),
           py::arg("bundle_opt") = py::dict(), "Relative pose estimation with one unknown focal length with non-linear refinement.");
     m.def("estimate_fundamental", &poselib::estimate_fundamental_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
           py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),

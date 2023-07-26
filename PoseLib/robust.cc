@@ -261,7 +261,7 @@ RansacStats estimate_onefocal_relative_pose(const double f2, const std::vector<P
     return stats;
 }
 
-RansacStats estimate_onefocal_fundamental(const bool direct, const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
+RansacStats estimate_onefocal_fundamental(const int method, const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
     const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, Eigen::Matrix3d *F, std::vector<char> *inliers) {
 
     const size_t num_pts = points2D_1.size();
@@ -270,7 +270,7 @@ RansacStats estimate_onefocal_fundamental(const bool direct, const double f2, co
     //ransac_opt_scaled.max_epipolar_error =
     //    ransac_opt.max_epipolar_error * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
 
-    RansacStats stats = ransac_onefocal_fundamental(direct, f2, points2D_1, points2D_2, ransac_opt, F, inliers);
+    RansacStats stats = ransac_onefocal_fundamental(method, f2, points2D_1, points2D_2, ransac_opt, F, inliers);
 
     if (stats.num_inliers > 7) {
         // Collect inlier for additional bundle adjustment
@@ -293,7 +293,7 @@ RansacStats estimate_onefocal_fundamental(const bool direct, const double f2, co
         Eigen::Matrix3d K2;
         K2 << f2, 0.0, 0.0, 0.0, f2, 0.0, 0.0, 0.0, 1.0;
 
-        if (onefocal_sq(FF, K2, direct) > 0) {
+        if (onefocal_sq(FF, K2, method) > 0) {
             (*F) = FF;
         }
     }

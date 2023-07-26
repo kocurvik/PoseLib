@@ -138,7 +138,7 @@ void RelativeOneFocalPoseEstimator::refine_model(CameraOneFocalPose *focal_pose)
     refine_onefocal_relpose(f2, x1_inlier, x2_inlier, focal_pose, bundle_opt);
 }
 
-double OneFocalFundamentalEstimator::calc_sq_focal(Eigen::Matrix3d &F) { return onefocal_sq(F, K2, direct); }
+double OneFocalFundamentalEstimator::calc_sq_focal(Eigen::Matrix3d &F) { return onefocal_sq(F, K2, method); }
 
 void OneFocalFundamentalEstimator::generate_models(std::vector<Eigen::Matrix3d> *models) {
     std::vector<Eigen::Matrix3d> F_models;

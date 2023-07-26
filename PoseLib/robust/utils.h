@@ -37,7 +37,7 @@
 
 namespace poselib {
 
-double onefocal_sq(Eigen::Matrix3d &F, Eigen::Matrix3d &K2, bool direct);
+double onefocal_sq(Eigen::Matrix3d &F, Eigen::Matrix3d &K2, int method);
 
 // Returns MSAC score of the reprojection error
 double compute_msac_score(const CameraPose &pose, const std::vector<Point2D> &x, const std::vector<Point3D> &X,
