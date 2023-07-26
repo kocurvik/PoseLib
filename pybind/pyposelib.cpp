@@ -1,4 +1,5 @@
 #include "helpers.h"
+#include "chrono"
 
 #include <PoseLib/poselib.h>
 #include <PoseLib/version.h>
@@ -232,6 +233,28 @@ std::vector<CameraPose> relpose_upright_planar_3pt_wrapper(const std::vector<Eig
     std::vector<CameraPose> output;
     relpose_upright_planar_3pt(x1, x2, &output);
     return output;
+}
+
+std::pair<std::vector<CameraOneFocalPose>, double> relpose_onefocal_6pt_wrapper(const std::vector<Eigen::Vector3d> &x1,
+                                                                                     const std::vector<Eigen::Vector3d> &x2) {
+    std::vector<CameraOneFocalPose> output;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    relpose_6pt_onefocal(x1, x2, &output);
+    auto end = std::chrono::steady_clock::now();
+    double us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+    return std::make_pair(output, us);
+}
+
+std::pair<std::vector<Eigen::Matrix3d>, double> fundamental_matrix_7pt_wrapper(const std::vector<Eigen::Vector3d> &x1,
+                                                                                       const std::vector<Eigen::Vector3d> &x2) {
+    std::vector<Eigen::Matrix3d> output;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    relpose_7pt(x1, x2, &output);
+    auto end = std::chrono::steady_clock::now();
+    double us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+    return std::make_pair(output, us);
 }
 
 std::pair<CameraPose, py::dict> estimate_absolute_pose_wrapper(const std::vector<Eigen::Vector2d> points2D,
@@ -478,8 +501,13 @@ std::pair<CameraOneFocalPose, py::dict> estimate_onefocal_relative_pose_wrapper(
     CameraOneFocalPose pose;
     std::vector<char> inlier_mask;
 
+    std::vector<CameraOneFocalPose> output;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     RansacStats stats = estimate_onefocal_relative_pose(f2, points2D_1, points2D_2, ransac_opt,
                                                         bundle_opt, &pose, &inlier_mask);
+
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    stats.execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
     py::dict output_dict;
     write_to_dict(stats, output_dict);
@@ -488,9 +516,9 @@ std::pair<CameraOneFocalPose, py::dict> estimate_onefocal_relative_pose_wrapper(
 }
 
 std::pair<Eigen::Matrix3d, py::dict> estimate_onefocal_fundamental_wrapper(const double f2, const std::vector<Eigen::Vector2d> points2D_1,
-                                                               const std::vector<Eigen::Vector2d> points2D_2,
-                                                               const py::dict &ransac_opt_dict,
-                                                               const py::dict &bundle_opt_dict) {
+                                                                           const std::vector<Eigen::Vector2d> points2D_2, const bool direct,
+                                                                           const py::dict &ransac_opt_dict,
+                                                                           const py::dict &bundle_opt_dict) {
     RansacOptions ransac_opt;
     update_ransac_options(ransac_opt_dict, ransac_opt);
 
@@ -501,8 +529,13 @@ std::pair<Eigen::Matrix3d, py::dict> estimate_onefocal_fundamental_wrapper(const
     Eigen::Matrix3d F;
     std::vector<char> inlier_mask;
 
-    RansacStats stats = estimate_onefocal_fundamental(f2, points2D_1, points2D_2, ransac_opt,
+    std::vector<CameraOneFocalPose> output;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    RansacStats stats = estimate_onefocal_fundamental(direct, f2, points2D_1, points2D_2, ransac_opt,
                                                         bundle_opt, &F, &inlier_mask);
+
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    stats.execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
     py::dict output_dict;
     write_to_dict(stats, output_dict);
@@ -858,6 +891,8 @@ PYBIND11_MODULE(poselib, m) {
           py::arg("p2"), py::arg("x2"));
     m.def("relpose_upright_planar_2pt", &poselib::relpose_upright_planar_2pt_wrapper, py::arg("x1"), py::arg("x2"));
     m.def("relpose_upright_planar_3pt", &poselib::relpose_upright_planar_3pt_wrapper, py::arg("x1"), py::arg("x2"));
+    m.def("fundamental_matrix_7pt", &poselib::fundamental_matrix_7pt_wrapper, py::arg("x1"), py::arg("x2"));
+    m.def("relpose_onefocal_6pt", &poselib::relpose_onefocal_6pt_wrapper, py::arg("x1"), py::arg("x2"));
 
     // Robust estimators
     m.def("estimate_absolute_pose", &poselib::estimate_absolute_pose_wrapper, py::arg("points2D"), py::arg("points3D"),
@@ -878,7 +913,7 @@ PYBIND11_MODULE(poselib, m) {
           py::arg("points2D_1"), py::arg("points2D_2"), py::arg("ransac_opt") = py::dict(),
           py::arg("bundle_opt") = py::dict(), "Relative pose estimation with one unknown focal length with non-linear refinement.");
     m.def("estimate_onefocal_fundamental", &poselib::estimate_onefocal_fundamental_wrapper, py::arg("f2"),
-          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("ransac_opt") = py::dict(),
+          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("direct") = false, py::arg("ransac_opt") = py::dict(),
           py::arg("bundle_opt") = py::dict(), "Relative pose estimation with one unknown focal length with non-linear refinement.");
     m.def("estimate_fundamental", &poselib::estimate_fundamental_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
           py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),

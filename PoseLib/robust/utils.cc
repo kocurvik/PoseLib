@@ -32,6 +32,101 @@
 
 namespace poselib {
 
+double onefocal_sq(Eigen::Matrix3d &F, Eigen::Matrix3d &K2, bool direct) {
+    Eigen::Matrix3d G = K2 * F;
+
+    if (direct) {
+        double f11 = G(0, 0), f12 = G(0, 1), f13 = G(0, 2);
+        double f21 = G(1, 0), f22 = G(1, 1), f23 = G(1, 2);
+        double f31 = G(2, 0), f32 = G(2, 1), f33 = G(2, 2);
+
+        Eigen::ArrayXd dens(9);
+        dens << f11 * f11 * f11 + f11 * f12 * f12 + f11 * f21 * f21 - f11 * f22 * f22 + f11 * f31 * f31 -
+                    f11 * f32 * f32 + 2 * f12 * f21 * f22 + 2 * f12 * f31 * f32,
+            f11 * f11 * f12 + 2 * f11 * f21 * f22 + 2 * f11 * f31 * f32 + f12 * f12 * f12 - f12 * f21 * f21 +
+                f12 * f22 * f22 - f12 * f31 * f31 + f12 * f32 * f32,
+            f11 * f11 * f13 + 2 * f11 * f21 * f23 + 2 * f11 * f31 * f33 + f12 * f12 * f13 + 2 * f12 * f22 * f23 +
+                2 * f12 * f32 * f33 - f13 * f21 * f21 - f13 * f22 * f22 - f13 * f31 * f31 - f13 * f32 * f32,
+            f11 * f11 * f21 + 2 * f11 * f12 * f22 - f12 * f12 * f21 + f21 * f21 * f21 + f21 * f22 * f22 +
+                f21 * f31 * f31 - f21 * f32 * f32 + 2 * f22 * f31 * f32,
+            f11 * f11 * f22 - 2 * f11 * f12 * f21 - f12 * f12 * f22 - f21 * f21 * f22 - 2 * f21 * f31 * f32 -
+                f22 * f22 * f22 + f22 * f31 * f31 - f22 * f32 * f32,
+            f11 * f11 * f23 - 2 * f11 * f13 * f21 + f12 * f12 * f23 - 2 * f12 * f13 * f22 - f21 * f21 * f23 -
+                2 * f21 * f31 * f33 - f22 * f22 * f23 - 2 * f22 * f32 * f33 + f23 * f31 * f31 + f23 * f32 * f32,
+            f11 * f11 * f31 + 2 * f11 * f12 * f32 - f12 * f12 * f31 + f21 * f21 * f31 + 2 * f21 * f22 * f32 -
+                f22 * f22 * f31 + f31 * f31 * f31 + f31 * f32 * f32,
+            f11 * f11 * f32 - 2 * f11 * f12 * f31 - f12 * f12 * f32 + f21 * f21 * f32 - 2 * f21 * f22 * f31 -
+                f22 * f22 * f32 - f31 * f31 * f32 - f32 * f32 * f32,
+            f11 * f11 * f33 - 2 * f11 * f13 * f31 + f12 * f12 * f33 - 2 * f12 * f13 * f32 + f21 * f21 * f33 -
+                2 * f21 * f23 * f31 + f22 * f22 * f33 - 2 * f22 * f23 * f32 - f31 * f31 * f33 - f32 * f32 * f33;
+
+        Eigen::MatrixXf::Index max_index;
+        dens.abs().maxCoeff(&max_index);
+
+        double num;
+
+        switch (max_index) {
+        case 0: {
+            num = f11 * f13 * f13 - f11 * f23 * f23 - f11 * f33 * f33 + 2 * f13 * f21 * f23 + 2 * f13 * f31 * f33;
+            break;
+        }
+        case 1: {
+            num = f12 * f13 * f13 - f12 * f23 * f23 - f12 * f33 * f33 + 2 * f13 * f22 * f23 + 2 * f13 * f32 * f33;
+            break;
+        }
+        case 2: {
+            num = f13 * f13 * f13 + f13 * f23 * f23 + f13 * f33 * f33;
+            break;
+        }
+        case 3: {
+            num = 2 * f11 * f13 * f23 - f13 * f13 * f21 + f21 * f23 * f23 - f21 * f33 * f33 + 2 * f23 * f31 * f33;
+            break;
+        }
+        case 4: {
+            num = -2 * f12 * f13 * f23 + f13 * f13 * f22 - f22 * f23 * f23 + f22 * f33 * f33 - 2 * f23 * f32 * f33;
+            break;
+        }
+        case 5: {
+            num = -f13 * f13 * f23 - f23 * f23 * f23 - f23 * f33 * f33;
+            break;
+        }
+        case 6: {
+            num = 2 * f11 * f13 * f33 - f13 * f13 * f31 + 2 * f21 * f23 * f33 - f23 * f23 * f31 + f31 * f33 * f33;
+            break;
+        }
+        case 7: {
+            num = -f13 * f13 * f23 - f23 * f23 * f23 - f23 * f33 * f33;
+            break;
+        }
+        case 8: {
+            num = -f13 * f13 * f33 - f23 * f23 * f33 - f33 * f33 * f33;
+            break;
+        }
+        }
+        return -num / dens(max_index);
+    }
+
+    Eigen::JacobiSVD<Eigen::Matrix3d> svd(G, Eigen::ComputeFullV);
+    svd.computeV();
+
+    double v_13 = svd.matrixV()(2, 0);
+    double v_23 = svd.matrixV()(2, 1);
+
+    double a, b, v;
+
+    if (std::fabs(v_13) > std::fabs(v_23)) {
+        a = svd.singularValues()(0);
+        b = svd.singularValues()(1);
+        v = v_13;
+    } else {
+        a = svd.singularValues()(1);
+        b = svd.singularValues()(0);
+        v = v_23;
+    }
+
+    return a * a * v * v / (a * a * v * v - a * a + b * b);
+}
+
 // Returns MSAC score
 double compute_msac_score(const CameraPose &pose, const std::vector<Point2D> &x, const std::vector<Point3D> &X,
                           double sq_threshold, size_t *inlier_count) {

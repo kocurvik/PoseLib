@@ -122,10 +122,10 @@ RansacStats ransac_onefocal_relpose(const double f2, const std::vector<Point2D> 
     return stats;
 }
 
-RansacStats ransac_onefocal_fundamental(const double f2, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
-                                    Eigen::Matrix3d *best_model, std::vector<char> *best_inliers) {
+RansacStats ransac_onefocal_fundamental(const bool direct, const double f2, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
+                                        Eigen::Matrix3d *best_model, std::vector<char> *best_inliers) {
     best_model->setIdentity();
-    OneFocalFundamentalEstimator estimator(opt, f2, x1, x2);
+    OneFocalFundamentalEstimator estimator(opt, f2, x1, x2, direct);
     RansacStats stats = ransac<OneFocalFundamentalEstimator>(estimator, opt, best_model);
 
     //Eigen::Matrix3d K2_inv;

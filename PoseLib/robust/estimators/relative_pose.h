@@ -111,8 +111,8 @@ class RelativeOneFocalPoseEstimator {
 
 class OneFocalFundamentalEstimator {
   public:
-    OneFocalFundamentalEstimator(const RansacOptions &ransac_opt, const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2)
-        : num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2), f2(f2),
+    OneFocalFundamentalEstimator(const RansacOptions &ransac_opt, const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2, const bool direct)
+        : num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2), f2(f2), direct(direct),
           sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);
@@ -125,10 +125,11 @@ class OneFocalFundamentalEstimator {
     void generate_models(std::vector<Eigen::Matrix3d> *models);
     double score_model(const Eigen::Matrix3d &F, size_t *inlier_count) const;
     void refine_model(Eigen::Matrix3d *focal_pose);
-    double calc_sq_focal(Eigen::Matrix3d F);
+    double calc_sq_focal(Eigen::Matrix3d &F);
 
     const size_t sample_sz = 7;
     const size_t num_data;
+    const bool direct;
 
   protected:
     const RansacOptions &opt;
@@ -146,8 +147,6 @@ class OneFocalFundamentalEstimator {
     std::vector<size_t> sample;
     mutable std::vector<Eigen::Vector2d> x1_unproj;
 };
-
-
 
 class GeneralizedRelativePoseEstimator {
   public:

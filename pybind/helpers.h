@@ -125,6 +125,7 @@ void write_to_dict(const RansacStats &stats, py::dict &dict) {
     dict["num_inliers"] = stats.num_inliers;
     dict["inlier_ratio"] = stats.inlier_ratio;
     dict["model_score"] = stats.model_score;
+    dict["execution_time"] = stats.execution_time;
 }
 
 Camera camera_from_dict(const py::dict &camera_dict) {

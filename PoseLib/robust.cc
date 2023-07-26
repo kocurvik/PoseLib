@@ -235,10 +235,6 @@ RansacStats estimate_onefocal_relative_pose(const double f2, const std::vector<P
 
     const size_t num_pts = points2D_1.size();
 
-    //RansacOptions ransac_opt_scaled = ransac_opt;
-    //ransac_opt_scaled.max_epipolar_error =
-    //    ransac_opt.max_epipolar_error * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
-
     RansacStats stats = ransac_onefocal_relpose(f2, points2D_1, points2D_2, ransac_opt, focal_pose, inliers);
 
     if (stats.num_inliers > 6) {
@@ -265,7 +261,7 @@ RansacStats estimate_onefocal_relative_pose(const double f2, const std::vector<P
     return stats;
 }
 
-RansacStats estimate_onefocal_fundamental(const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
+RansacStats estimate_onefocal_fundamental(const bool direct, const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
     const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, Eigen::Matrix3d *F, std::vector<char> *inliers) {
 
     const size_t num_pts = points2D_1.size();
@@ -274,9 +270,8 @@ RansacStats estimate_onefocal_fundamental(const double f2, const std::vector<Poi
     //ransac_opt_scaled.max_epipolar_error =
     //    ransac_opt.max_epipolar_error * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
 
-    RansacStats stats = ransac_onefocal_fundamental(f2, points2D_1, points2D_2, ransac_opt, F, inliers);
+    RansacStats stats = ransac_onefocal_fundamental(direct, f2, points2D_1, points2D_2, ransac_opt, F, inliers);
 
-    /* This is useless as refinement always happens for the best model anyways
     if (stats.num_inliers > 7) {
         // Collect inlier for additional bundle adjustment
         // TODO: use camera models for this refinement!
@@ -292,8 +287,16 @@ RansacStats estimate_onefocal_fundamental(const double f2, const std::vector<Poi
             x2_inliers.push_back(points2D_2[k]);
         }
 
-        refine_fundamental(x1_inliers, x2_inliers, F, bundle_opt);
-    }*/
+        Eigen::Matrix3d FF = *F;
+        refine_fundamental(x1_inliers, x2_inliers, &FF, bundle_opt);
+
+        Eigen::Matrix3d K2;
+        K2 << f2, 0.0, 0.0, 0.0, f2, 0.0, 0.0, 0.0, 1.0;
+
+        if (onefocal_sq(FF, K2, direct) > 0) {
+            (*F) = FF;
+        }
+    }
 
     *F /= F->norm();
 

@@ -744,7 +744,7 @@ class OneFocalRelativePoseJacobianAccumulator {
         CameraOneFocalPose pose_new;
         pose_new.q = quat_step_post(pose.q, dp.block<3, 1>(0, 0));
         pose_new.t = pose.t + tangent_basis * dp.block<2, 1>(3, 0);
-        pose_new.f = pose.f + dp(5, 0);
+        pose_new.f = std::max(pose.f + dp(5, 0), 0.0);
         return pose_new;
     }
     typedef CameraPose param_t;
