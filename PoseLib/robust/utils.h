@@ -36,7 +36,7 @@
 #include <vector>
 
 namespace poselib {
-
+bool valid_focal_bougnoux(Eigen::Matrix3d &F);
 double onefocal_sq(Eigen::Matrix3d &F, Eigen::Matrix3d &K2, int method);
 
 // Returns MSAC score of the reprojection error

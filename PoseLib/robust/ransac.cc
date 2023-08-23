@@ -125,13 +125,42 @@ RansacStats ransac_onefocal_relpose(const double f2, const std::vector<Point2D> 
 RansacStats ransac_onefocal_fundamental(const int method, const double f2, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
                                         Eigen::Matrix3d *best_model, std::vector<char> *best_inliers) {
     best_model->setIdentity();
-    OneFocalFundamentalEstimator estimator(opt, f2, x1, x2, method);
+    OneFocalFundamentalEstimator estimator(opt, f2, x1, x2, method, true);    
     RansacStats stats = ransac<OneFocalFundamentalEstimator>(estimator, opt, best_model);
 
     //Eigen::Matrix3d K2_inv;
     //K2_inv << 1.0 / f2, 0.0, 0.0, 0.0, 1.0 / f2, 0.0, 0.0, 0.0, 1.0;
 
     get_inliers(*best_model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+
+    return stats;
+}
+
+RansacValidStats ransac_onefocal_fundamental_valid(const int method, const double f2, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt, Eigen::Matrix3d *best_model,
+                                              std::vector<char> *best_inliers, Eigen::Matrix3d *best_valid_model,
+                                              std::vector<char> *best_valid_inliers) {
+    best_model->setIdentity();
+    best_valid_model->setIdentity();
+    OneFocalFundamentalEstimator estimator(opt, f2, x1, x2, method, false);    
+    RansacValidStats stats = ransac_focal_separate<OneFocalFundamentalEstimator>(estimator, opt, best_model, best_valid_model);
+
+
+    get_inliers(*best_model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+    get_inliers(*best_valid_model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_valid_inliers);
+
+    return stats;
+}
+
+RansacValidStats ransac_fundamental_valid(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt, Eigen::Matrix3d *best_model,
+                                              std::vector<char> *best_inliers, Eigen::Matrix3d *best_valid_model,
+                                              std::vector<char> *best_valid_inliers) {
+    best_model->setIdentity();
+    best_valid_model->setIdentity();
+    FundamentalEstimator estimator(opt, x1, x2);    
+    RansacValidStats stats = ransac_focal_separate<FundamentalEstimator>(estimator, opt, best_model, best_valid_model);
+
+    get_inliers(*best_model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+    get_inliers(*best_valid_model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_valid_inliers);
 
     return stats;
 }
@@ -143,6 +172,19 @@ RansacStats ransac_fundamental(const std::vector<Point2D> &x1, const std::vector
 
     FundamentalEstimator estimator(opt, x1, x2);
     RansacStats stats = ransac<FundamentalEstimator, Eigen::Matrix3d>(estimator, opt, best_model);
+
+    get_inliers(*best_model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+
+    return stats;
+}
+
+RansacStats ransac_fundamental_valid_only(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                          const RansacOptions &opt, Eigen::Matrix3d *best_model,
+                                          std::vector<char> *best_inliers) {
+    best_model->setIdentity();
+
+    FundamentalValidOnlyEstimator estimator(opt, x1, x2);
+    RansacStats stats = ransac<FundamentalValidOnlyEstimator, Eigen::Matrix3d>(estimator, opt, best_model);
 
     get_inliers(*best_model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
 

@@ -84,12 +84,29 @@ RansacStats estimate_onefocal_fundamental(const int method, const double f2, con
                                           const BundleOptions &bundle_opt, Eigen::Matrix3d *focal_pose,
                                           std::vector<char> *inliers);
 
+RansacStats estimate_fundamental_valid_only(const std::vector<Point2D> &points2D_1,
+                                            const std::vector<Point2D> &points2D_2, const RansacOptions &ransac_opt,
+                                            const BundleOptions &bundle_opt, Eigen::Matrix3d *F,
+                                            std::vector<char> *inliers);
+
+// Estimates fundamental matrix but checks for meaningful focal length and keeps the model
+RansacValidStats estimate_onefocal_fundamental_valid(const int method, const double f2, const std::vector<Point2D> &points2D_1,
+                                          const std::vector<Point2D> &points2D_2, const RansacOptions &ransac_opt,
+                                          const BundleOptions &bundle_opt, Eigen::Matrix3d *F,
+                                          std::vector<char> *inliers, Eigen::Matrix3d *valid_F,
+                                          std::vector<char> *valid_inliers);
+
 // Estimates a fundamental matrix using LO-RANSAC followed by non-linear refinement
 // NOTE: USE estimate_relative_pose IF YOU KNOW THE INTRINSICS!!!
 // Threshold for Sampson error is set by RansacOptions.max_epipolar_error
 RansacStats estimate_fundamental(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
                                  const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, Eigen::Matrix3d *F,
                                  std::vector<char> *inliers);
+
+RansacValidStats estimate_fundamental_valid(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                            const RansacOptions &ransac_opt, const BundleOptions &bundle_opt,
+                                            Eigen::Matrix3d *F, std::vector<char> *inliers, Eigen::Matrix3d *valid_F,
+                                            std::vector<char> *valid_inliers);
 
 // Estimates a homography matrix using LO-RANSAC followed by non-linear refinement
 // Convention is x2 = H*x1

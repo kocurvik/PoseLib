@@ -532,7 +532,7 @@ std::pair<Eigen::Matrix3d, py::dict> estimate_onefocal_fundamental_wrapper(const
     std::vector<CameraOneFocalPose> output;
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     RansacStats stats = estimate_onefocal_fundamental(method, f2, points2D_1, points2D_2, ransac_opt,
-                                                        bundle_opt, &F, &inlier_mask);
+                                                      bundle_opt, &F, &inlier_mask);
 
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     stats.execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -541,6 +541,92 @@ std::pair<Eigen::Matrix3d, py::dict> estimate_onefocal_fundamental_wrapper(const
     write_to_dict(stats, output_dict);
     output_dict["inliers"] = convert_inlier_vector(inlier_mask);
     return std::make_pair(F, output_dict);
+}
+
+std::tuple<Eigen::Matrix3d, Eigen::Matrix3d, py::dict> estimate_onefocal_fundamental_valid_wrapper(const double f2, const std::vector<Eigen::Vector2d> points2D_1,
+                                                                                 const std::vector<Eigen::Vector2d> points2D_2, const int method,
+                                                                                 const py::dict &ransac_opt_dict,
+                                                                                 const py::dict &bundle_opt_dict) {
+    RansacOptions ransac_opt;
+    update_ransac_options(ransac_opt_dict, ransac_opt);
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_scale = 0.5 * ransac_opt.max_epipolar_error;
+    update_bundle_options(bundle_opt_dict, bundle_opt);
+    
+    Eigen::Matrix3d F;
+    Eigen::Matrix3d valid_F;
+    std::vector<char> inlier_mask;
+    std::vector<char> valid_inlier_mask;
+
+    std::vector<CameraOneFocalPose> output;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    RansacValidStats stats = estimate_onefocal_fundamental_valid(method, f2, points2D_1, points2D_2, ransac_opt, bundle_opt, &F, &inlier_mask, &valid_F, &valid_inlier_mask);
+
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    stats.execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    output_dict["valid_inliers"] = convert_inlier_vector(valid_inlier_mask);
+    return std::tuple(F, valid_F, output_dict);
+}
+
+std::tuple<Eigen::Matrix3d, Eigen::Matrix3d, py::dict> estimate_fundamental_valid_wrapper(const std::vector<Eigen::Vector2d> points2D_1, 
+                                                                                          const std::vector<Eigen::Vector2d> points2D_2,
+                                                                                          const py::dict &ransac_opt_dict,
+                                                                                          const py::dict &bundle_opt_dict) {
+    RansacOptions ransac_opt;
+    update_ransac_options(ransac_opt_dict, ransac_opt);
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_scale = 0.5 * ransac_opt.max_epipolar_error;
+    update_bundle_options(bundle_opt_dict, bundle_opt);
+
+    Eigen::Matrix3d F;
+    Eigen::Matrix3d valid_F;
+    std::vector<char> inlier_mask;
+    std::vector<char> valid_inlier_mask;
+
+
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    RansacValidStats stats = estimate_fundamental_valid(points2D_1, points2D_2, ransac_opt, bundle_opt, &F, &inlier_mask, &valid_F, &valid_inlier_mask);
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    stats.execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    output_dict["valid_inliers"] = convert_inlier_vector(valid_inlier_mask);
+    return std::tuple(F, valid_F, output_dict);
+}
+
+
+std::pair<Eigen::Matrix3d, py::dict> estimate_fundamental_valid_only_wrapper(const std::vector<Eigen::Vector2d> points2D_1, 
+                                                                                          const std::vector<Eigen::Vector2d> points2D_2,
+                                                                                          const py::dict &ransac_opt_dict,
+                                                                                          const py::dict &bundle_opt_dict) {
+    RansacOptions ransac_opt;
+    update_ransac_options(ransac_opt_dict, ransac_opt);
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_scale = 0.5 * ransac_opt.max_epipolar_error;
+    update_bundle_options(bundle_opt_dict, bundle_opt);
+
+    Eigen::Matrix3d F;
+    std::vector<char> inlier_mask;
+
+
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    RansacStats stats = estimate_fundamental_valid_only(points2D_1, points2D_2, ransac_opt, bundle_opt, &F, &inlier_mask);
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    stats.execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::pair(F, output_dict);
 }
 
 std::pair<CameraPose, py::dict> refine_relative_pose_wrapper(const std::vector<Eigen::Vector2d> points2D_1,
@@ -587,7 +673,12 @@ std::pair<Eigen::Matrix3d, py::dict> estimate_fundamental_wrapper(const std::vec
     Eigen::Matrix3d F;
     std::vector<char> inlier_mask;
 
+
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     RansacStats stats = estimate_fundamental(points2D_1, points2D_2, ransac_opt, bundle_opt, &F, &inlier_mask);
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    stats.execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
 
     py::dict output_dict;
     write_to_dict(stats, output_dict);
@@ -915,6 +1006,14 @@ PYBIND11_MODULE(poselib, m) {
     m.def("estimate_onefocal_fundamental", &poselib::estimate_onefocal_fundamental_wrapper, py::arg("f2"),
           py::arg("points2D_1"), py::arg("points2D_2"), py::arg("method") = 0, py::arg("ransac_opt") = py::dict(),
           py::arg("bundle_opt") = py::dict(), "Relative pose estimation with one unknown focal length with non-linear refinement.");
+    m.def("estimate_onefocal_fundamental_valid", &poselib::estimate_onefocal_fundamental_valid_wrapper, py::arg("f2"),
+          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("method") = 0,
+          py::arg("ransac_opt") = py::dict(),
+          py::arg("bundle_opt") = py::dict(), "Relative pose estimation with one unknown focal length with non-linear refinement.");
+    m.def("estimate_fundamental_valid", &poselib::estimate_fundamental_valid_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
+          py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(), "Relative pose estimation with keeping track of the best Fs with valid focals."); 
+    m.def("estimate_fundamental_valid_only", &poselib::estimate_fundamental_valid_only_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
+          py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(), "Relative pose estimation with keeping track of the best Fs with valid focals."); 
     m.def("estimate_fundamental", &poselib::estimate_fundamental_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
           py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
           "Fundamental matrix estimation with non-linear refinement. Note: if you have known intrinsics you should use "

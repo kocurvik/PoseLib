@@ -261,7 +261,57 @@ RansacStats estimate_onefocal_relative_pose(const double f2, const std::vector<P
     return stats;
 }
 
-RansacStats estimate_onefocal_fundamental(const int method, const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
+RansacValidStats estimate_onefocal_fundamental_valid(const int method, const double f2,
+                                                const std::vector<Point2D> &points2D_1,
+                                                const std::vector<Point2D> &points2D_2, const RansacOptions &ransac_opt,
+                                                const BundleOptions &bundle_opt, Eigen::Matrix3d *F,
+                                                std::vector<char> *inliers, Eigen::Matrix3d *valid_F,
+                                                std::vector<char> *valid_inliers) {
+
+    const size_t num_pts = points2D_1.size();
+
+    //RansacOptions ransac_opt_scaled = ransac_opt;
+    //ransac_opt_scaled.max_epipolar_error =
+    //    ransac_opt.max_epipolar_error * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
+
+    RansacValidStats stats = ransac_onefocal_fundamental_valid(method, f2,  points2D_1, points2D_2, ransac_opt, F, inliers, valid_F, valid_inliers);
+
+    if (stats.num_inliers > 7) {
+        // Collect inlier for additional bundle adjustment
+        // TODO: use camera models for this refinement!
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < num_pts; ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(points2D_1[k]);
+            x2_inliers.push_back(points2D_2[k]);
+        }
+
+        Eigen::Matrix3d FF = *F;
+        refine_fundamental(x1_inliers, x2_inliers, &FF, bundle_opt);
+        (*F) = FF;
+
+        Eigen::Matrix3d K2;
+        K2 << f2, 0.0, 0.0, 0.0, f2, 0.0, 0.0, 0.0, 1.0;
+
+        if (onefocal_sq(FF, K2, method) > 0) {
+            (*valid_F) = FF;
+        }
+    }
+
+    *F /= F->norm();
+    *valid_F /= valid_F->norm();
+
+    return stats;
+}
+
+RansacStats estimate_onefocal_fundamental(const int method, const double f2,
+                                          const std::vector<Point2D> &points2D_1,
+                                          const std::vector<Point2D> &points2D_2,
     const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, Eigen::Matrix3d *F, std::vector<char> *inliers) {
 
     const size_t num_pts = points2D_1.size();
@@ -294,6 +344,41 @@ RansacStats estimate_onefocal_fundamental(const int method, const double f2, con
         K2 << f2, 0.0, 0.0, 0.0, f2, 0.0, 0.0, 0.0, 1.0;
 
         if (onefocal_sq(FF, K2, method) > 0) {
+            (*F) = FF;
+        }
+    }
+
+    *F /= F->norm();
+
+    return stats;
+}
+
+RansacStats estimate_fundamental_valid_only(const std::vector<Point2D> &points2D_1,const std::vector<Point2D> &points2D_2,
+    const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, Eigen::Matrix3d *F, std::vector<char> *inliers) {
+
+    const size_t num_pts = points2D_1.size();
+
+    RansacStats stats = ransac_fundamental_valid_only(points2D_1, points2D_2, ransac_opt, F, inliers);
+
+    if (stats.num_inliers > 7) {
+        // Collect inlier for additional bundle adjustment
+        // TODO: use camera models for this refinement!
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < num_pts; ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(points2D_1[k]);
+            x2_inliers.push_back(points2D_2[k]);
+        }
+
+        Eigen::Matrix3d FF = *F;
+        refine_fundamental(x1_inliers, x2_inliers, &FF, bundle_opt);
+
+        if (valid_focal_bougnoux(FF) > 0) {
             (*F) = FF;
         }
     }
@@ -346,6 +431,50 @@ RansacStats estimate_fundamental(const std::vector<Point2D> &x1, const std::vect
 
     *F = T2.transpose() * (*F) * T1;
     *F /= F->norm();
+
+    return stats;
+}
+
+RansacValidStats estimate_fundamental_valid(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                       const RansacOptions &ransac_opt, const BundleOptions &bundle_opt,
+                                       Eigen::Matrix3d *F, std::vector<char> *inliers, Eigen::Matrix3d *valid_F,
+                                       std::vector<char> *valid_inliers) {
+
+    const size_t num_pts = x1.size();
+
+    // RansacOptions ransac_opt_scaled = ransac_opt;
+    // ransac_opt_scaled.max_epipolar_error =
+    //    ransac_opt.max_epipolar_error * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
+
+    RansacValidStats stats = ransac_fundamental_valid(x1, x2, ransac_opt, F, inliers, valid_F, valid_inliers);
+
+    if (stats.num_inliers > 7) {
+        // Collect inlier for additional bundle adjustment
+        // TODO: use camera models for this refinement!
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < num_pts; ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1[k]);
+            x2_inliers.push_back(x2[k]);
+        }
+
+        Eigen::Matrix3d FF = *F;
+        refine_fundamental(x1_inliers, x2_inliers, &FF, bundle_opt);
+        (*F) = FF;
+
+
+        if (valid_focal_bougnoux(FF)) {
+            (*valid_F) = FF;
+        }
+    }
+
+    *F /= F->norm();
+    *valid_F /= valid_F->norm();
 
     return stats;
 }

@@ -59,8 +59,21 @@ RansacStats ransac_onefocal_relpose(const double f2, const std::vector<Point2D> 
 RansacStats ransac_onefocal_fundamental(const int method, const double f2, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
                                     Eigen::Matrix3d *best_model, std::vector<char> *best_inliers);
 
+RansacValidStats ransac_onefocal_fundamental_valid(const int method, const double f2, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
+                                        Eigen::Matrix3d *best_model, std::vector<char> *best_inliers,
+                                                   Eigen::Matrix3d *best_valid_model,
+                                                   std::vector<char> *best_valid_inliers);
+
+RansacValidStats ransac_fundamental_valid(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                          const RansacOptions &opt, Eigen::Matrix3d *best_model,
+                                          std::vector<char> *best_inliers, Eigen::Matrix3d *best_valid_model,
+                                          std::vector<char> *best_valid_inliers);
+
 RansacStats ransac_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
                                Eigen::Matrix3d *best_model, std::vector<char> *best_inliers);
+
+RansacStats ransac_fundamental_valid_only(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
+                                          Eigen::Matrix3d *best_model, std::vector<char> *best_inliers);
 
 RansacStats ransac_homography(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
                               Eigen::Matrix3d *best_model, std::vector<char> *best_inliers);

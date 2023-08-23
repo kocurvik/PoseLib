@@ -26,11 +26,97 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "iostream"
 #include "utils.h"
 
 #include "PoseLib/misc/essential.h"
 
 namespace poselib {
+
+bool valid_focal_bougnoux(Eigen::Matrix3d &F) {
+    /* Eigen::JacobiSVD<Eigen::Matrix3d> svd(F, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    svd.computeV();
+    svd.computeU();
+    Eigen::Vector3d e1 = svd.matrixV().col(2);
+    Eigen::Vector3d e2 = svd.matrixU().col(2);*/
+
+    /* Eigen::Vector3d e1 = F.row(0).cross(F.row(1));
+    Eigen::Vector3d e2 = F.col(0).cross(F.col(1));
+       
+    Eigen::Matrix3d e1_hat;
+    e1_hat << 0, -e1(2), e1(1), e1(2), 0, -e1(0), -e1(1), e1(0), 0;
+
+    Eigen::Matrix3d e2_hat;
+    e2_hat << 0, -e2(2), e2(1), e2(2), 0, -e2(0), -e2(1), e2(0), 0;
+
+    Eigen::Matrix3d II;
+    II << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0;
+
+    Eigen::Vector3d p;
+    p << 0.0, 0.0, 1.0;
+
+    double f_sq, ff_sq;
+    f_sq = -p.dot(e2_hat * (II * (F * ((p * p.transpose()) * (F.transpose() * p))))) /
+            p.dot(e2_hat * (II * (F * (II * (F.transpose() * p)))));
+
+    ff_sq = -p.dot(e1_hat * (II * (F.transpose() * ((p * p.transpose()) * (F * p))))) /
+            p.dot(e1_hat * (II * (F.transpose() * (II * (F * p)))));
+
+    return (f_sq > 0) && (ff_sq > 0);*/
+
+    float f11 = F(0, 0), f12 = F(0, 1), f13 = F(0, 2);
+    float f21 = F(1, 0), f22 = F(1, 1), f23 = F(1, 2);
+    float f31 = F(2, 0), f32 = F(2, 1), f33 = F(2, 2);
+
+    float den, num;
+    float tol = 10e-8;
+
+    bool f1_pos, f2_pos;
+
+    den = f11 * f12 * f31 * f33 - f11 * f13 * f31 * f32 + f12 * f12 * f32 * f33 - f12 * f13 * f32 * f32 +
+          f21 * f22 * f31 * f33 - f21 * f23 * f31 * f32 + f22 * f22 * f32 * f33 - f22 * f23 * f32 * f32;
+
+    if (std::fabs(den) > tol) {
+        num = -f33 * (f12 * f13 * f33 - f13 * f13 * f32 + f22 * f23 * f33 - f23 * f23 * f32);
+    } else {    
+        den = f11 * f11 * f31 * f33 + f11 * f12 * f32 * f33 - f11 * f13 * f31 * f31 - f12 * f13 * f31 * f32 +
+              f21 * f21 * f31 * f33 + f21 * f22 * f32 * f33 - f21 * f23 * f31 * f31 - f22 * f23 * f31 * f32;
+        if (std::fabs(den) > tol) {
+            num = -f33 * (f11 * f13 * f33 - f13 * f13 * f31 + f21 * f23 * f33 - f23 * f23 * f31);
+        } else {
+            den = f11 * f11 * f31 * f32 - f11 * f12 * f31 * f31 + f11 * f12 * f32 * f32 - f12 * f12 * f31 * f32 +
+                  f21 * f21 * f31 * f32 - f21 * f22 * f31 * f31 + f21 * f22 * f32 * f32 - f22 * f22 * f31 * f32;
+            num = -f33 * (f11 * f13 * f32 - f12 * f13 * f31 + f21 * f23 * f32 - f22 * f23 * f31);        
+        }
+    }
+
+    f1_pos = num * den > 0;
+
+    f11 = F(0, 0), f12 = F(1, 0), f13 = F(2, 0);
+    f21 = F(0, 1), f22 = F(1, 1), f23 = F(2, 1);
+    f31 = F(0, 2), f32 = F(1, 2), f33 = F(2, 2);    
+
+    den = f11 * f12 * f31 * f33 - f11 * f13 * f31 * f32 + f12 * f12 * f32 * f33 - f12 * f13 * f32 * f32 +
+          f21 * f22 * f31 * f33 - f21 * f23 * f31 * f32 + f22 * f22 * f32 * f33 - f22 * f23 * f32 * f32;
+
+    if (std::fabs(den) > tol) {
+        num = -f33 * (f12 * f13 * f33 - f13 * f13 * f32 + f22 * f23 * f33 - f23 * f23 * f32);
+    } else {
+        den = f11 * f11 * f31 * f33 + f11 * f12 * f32 * f33 - f11 * f13 * f31 * f31 - f12 * f13 * f31 * f32 +
+              f21 * f21 * f31 * f33 + f21 * f22 * f32 * f33 - f21 * f23 * f31 * f31 - f22 * f23 * f31 * f32;
+        if (std::fabs(den) > tol) {
+            num = -f33 * (f11 * f13 * f33 - f13 * f13 * f31 + f21 * f23 * f33 - f23 * f23 * f31);
+        } else {
+            den = f11 * f11 * f31 * f32 - f11 * f12 * f31 * f31 + f11 * f12 * f32 * f32 - f12 * f12 * f31 * f32 +
+                  f21 * f21 * f31 * f32 - f21 * f22 * f31 * f31 + f21 * f22 * f32 * f32 - f22 * f22 * f31 * f32;
+            num = -f33 * (f11 * f13 * f32 - f12 * f13 * f31 + f21 * f23 * f32 - f22 * f23 * f31);
+        }
+    }
+
+    f2_pos = num * den > 0;
+
+    return f1_pos && f2_pos;
+}
 
 double onefocal_sq(Eigen::Matrix3d &F, Eigen::Matrix3d &K2, int direct) {
     if (direct == 3) {
@@ -45,7 +131,7 @@ double onefocal_sq(Eigen::Matrix3d &F, Eigen::Matrix3d &K2, int direct) {
         e1_hat << 0, -e1(2), e1(1), e1(2), 0, -e1(0), -e1(1), e1(0), 0;
 
         Eigen::Matrix3d e2_hat;
-        e1_hat << 0, -e2(2), e2(1), e2(2), 0, -e2(0), -e2(1), e2(0), 0;
+        e2_hat << 0, -e2(2), e2(1), e2(2), 0, -e2(0), -e2(1), e2(0), 0;
 
         Eigen::Matrix3d II;
         II << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0;
@@ -55,11 +141,9 @@ double onefocal_sq(Eigen::Matrix3d &F, Eigen::Matrix3d &K2, int direct) {
 
             
         double f_sq;
-        f_sq = (-p.transpose() * e2_hat * II * F * (p.dot(p)) * F.transpose() * p)(0,0) /
-               (p.transpose() * e2_hat * II * F * II * F.transpose() * p)(0, 0);
+        f_sq = -p.dot(e2_hat * (II * (F * ((p * p.transpose()) * (F.transpose() *p))))) / p.dot(e2_hat * (II * (F * (II * (F.transpose() * p)))));
 
-        return f_sq;
-    
+        return f_sq;    
     }
         
     if (direct == 2) {
@@ -100,6 +184,88 @@ double onefocal_sq(Eigen::Matrix3d &F, Eigen::Matrix3d &K2, int direct) {
     }
 
     Eigen::Matrix3d G = K2 * F;
+
+    if (direct == 4) {
+        double f11 = G(0, 0), f21 = G(0, 1), f31 = G(0, 2);
+        double f12 = G(1, 0), f22 = G(1, 1), f32 = G(1, 2);
+        double f13 = G(2, 0), f23 = G(2, 1), f33 = G(2, 2);
+
+        double num = f23 * f31 * f31 + f23 * f32 * f32 - 2 * f21 * f31 * f33 - 2 * f22 * f32 * f33 - f23 * f33 * f33;
+
+        double den = 2 * f11 * f13 * f21 + 2 * f12 * f13 * f22 - f11 * f11 * f23 - f12 * f12 * f23 + f13 * f13 * f23 +
+                     f21 * f21 * f23 + f22 * f22 * f23 + f23 * f23 * f23;
+
+        
+
+        return num / den;
+    }
+
+    if (direct >= 10) {
+        double num, den;
+
+        double f11 = G(0, 0), f12 = G(0, 1), f13 = G(0, 2);
+        double f21 = G(1, 0), f22 = G(1, 1), f23 = G(1, 2);
+        double f31 = G(2, 0), f32 = G(2, 1), f33 = G(2, 2);
+
+        switch (direct - 10) {
+        case 0: {
+            num = f11 * f13 * f13 - f11 * f23 * f23 - f11 * f33 * f33 + 2 * f13 * f21 * f23 + 2 * f13 * f31 * f33;
+            den = f11 * f11 * f11 + f11 * f12 * f12 + f11 * f21 * f21 - f11 * f22 * f22 + f11 * f31 * f31 -
+                  f11 * f32 * f32 + 2 * f12 * f21 * f22 + 2 * f12 * f31 * f32;
+            break;
+        }
+        case 1: {
+            num = f12 * f13 * f13 - f12 * f23 * f23 - f12 * f33 * f33 + 2 * f13 * f22 * f23 + 2 * f13 * f32 * f33;
+            den = f11 * f11 * f12 + 2 * f11 * f21 * f22 + 2 * f11 * f31 * f32 + f12 * f12 * f12 - f12 * f21 * f21 +
+                  f12 * f22 * f22 - f12 * f31 * f31 + f12 * f32 * f32;
+            break;
+        }
+        case 2: {
+            num = f13 * f13 * f13 + f13 * f23 * f23 + f13 * f33 * f33;
+            den = f11 * f11 * f13 + 2 * f11 * f21 * f23 + 2 * f11 * f31 * f33 + f12 * f12 * f13 + 2 * f12 * f22 * f23 +
+                  2 * f12 * f32 * f33 - f13 * f21 * f21 - f13 * f22 * f22 - f13 * f31 * f31 - f13 * f32 * f32;
+            break;
+        }
+        case 3: {
+            num = 2 * f11 * f13 * f23 - f13 * f13 * f21 + f21 * f23 * f23 - f21 * f33 * f33 + 2 * f23 * f31 * f33;
+            den = f11 * f11 * f21 + 2 * f11 * f12 * f22 - f12 * f12 * f21 + f21 * f21 * f21 + f21 * f22 * f22 +
+                  f21 * f31 * f31 - f21 * f32 * f32 + 2 * f22 * f31 * f32;
+            break;
+        }
+        case 4: {
+            num = -2 * f12 * f13 * f23 + f13 * f13 * f22 - f22 * f23 * f23 + f22 * f33 * f33 - 2 * f23 * f32 * f33;
+            den = f11 * f11 * f22 - 2 * f11 * f12 * f21 - f12 * f12 * f22 - f21 * f21 * f22 - 2 * f21 * f31 * f32 -
+                  f22 * f22 * f22 + f22 * f31 * f31 - f22 * f32 * f32;
+            break;
+        }
+        case 5: {
+            num = -f13 * f13 * f23 - f23 * f23 * f23 - f23 * f33 * f33;
+            den = f11 * f11 * f23 - 2 * f11 * f13 * f21 + f12 * f12 * f23 - 2 * f12 * f13 * f22 - f21 * f21 * f23 -
+                  2 * f21 * f31 * f33 - f22 * f22 * f23 - 2 * f22 * f32 * f33 + f23 * f31 * f31 + f23 * f32 * f32;
+            break;
+        }
+        case 6: {
+            num = 2 * f11 * f13 * f33 - f13 * f13 * f31 + 2 * f21 * f23 * f33 - f23 * f23 * f31 + f31 * f33 * f33;
+            den = f11 * f11 * f31 + 2 * f11 * f12 * f32 - f12 * f12 * f31 + f21 * f21 * f31 + 2 * f21 * f22 * f32 -
+                  f22 * f22 * f31 + f31 * f31 * f31 + f31 * f32 * f32;
+            break;
+        }
+        case 7: {
+            num = -f13 * f13 * f23 - f23 * f23 * f23 - f23 * f33 * f33;
+            den = f11 * f11 * f32 - 2 * f11 * f12 * f31 - f12 * f12 * f32 + f21 * f21 * f32 - 2 * f21 * f22 * f31 -
+                  f22 * f22 * f32 - f31 * f31 * f32 - f32 * f32 * f32;
+            break;
+        }
+        case 8: {
+            num = -f13 * f13 * f33 - f23 * f23 * f33 - f33 * f33 * f33;
+            den = f11 * f11 * f33 - 2 * f11 * f13 * f31 + f12 * f12 * f33 - 2 * f12 * f13 * f32 + f21 * f21 * f33 -
+                  2 * f21 * f23 * f31 + f22 * f22 * f33 - 2 * f22 * f23 * f32 - f31 * f31 * f33 - f32 * f32 * f33;
+            break;
+        }
+        }
+        return -num / den;
+    
+    }
 
     if (direct == 1) {
         double f11 = G(0, 0), f12 = G(0, 1), f13 = G(0, 2);

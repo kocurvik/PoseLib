@@ -58,6 +58,17 @@ struct RansacStats {
     double execution_time = 0;
 };
 
+struct RansacValidStats {
+    size_t refinements = 0;
+    size_t iterations = 0;
+    size_t num_inliers = 0;
+    size_t valid_num_inliers = 0;
+    double inlier_ratio = 0;
+    double model_score = std::numeric_limits<double>::max();
+    double valid_model_score = std::numeric_limits<double>::max();
+    double execution_time = 0;
+};
+
 struct BundleOptions {
     size_t max_iterations = 100;
     enum LossType {

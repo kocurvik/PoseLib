@@ -111,9 +111,9 @@ class RelativeOneFocalPoseEstimator {
 
 class OneFocalFundamentalEstimator {
   public:
-    OneFocalFundamentalEstimator(const RansacOptions &ransac_opt, const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2, const int method)
+    OneFocalFundamentalEstimator(const RansacOptions &ransac_opt, const double f2, const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2, const int method, const bool valid_only)
         : num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2), f2(f2), method(method),
-          sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
+          sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations), valid_only(valid_only) {
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);
             
@@ -126,10 +126,12 @@ class OneFocalFundamentalEstimator {
     double score_model(const Eigen::Matrix3d &F, size_t *inlier_count) const;
     void refine_model(Eigen::Matrix3d *focal_pose);
     double calc_sq_focal(Eigen::Matrix3d &F);
+    double valid_model(Eigen::Matrix3d &F);
 
     const size_t sample_sz = 7;
     const size_t num_data;
     const int method;
+    const bool valid_only;
 
   protected:
     const RansacOptions &opt;
@@ -200,6 +202,38 @@ class FundamentalEstimator {
 
     void generate_models(std::vector<Eigen::Matrix3d> *models);
     double score_model(const Eigen::Matrix3d &F, size_t *inlier_count) const;
+    bool valid_model(Eigen::Matrix3d &F);
+    void refine_model(Eigen::Matrix3d *F) const;
+
+    const size_t sample_sz = 7;
+    const size_t num_data;
+
+  private:
+    const RansacOptions &opt;
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+
+    RandomSampler sampler;
+    // pre-allocated vectors for sampling
+    std::vector<Eigen::Vector3d> x1s, x2s;
+    std::vector<size_t> sample;
+};
+
+
+class FundamentalValidOnlyEstimator {
+  public:
+    FundamentalValidOnlyEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
+                         const std::vector<Point2D> &points2D_2)
+        : num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2),
+          sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
+        x1s.resize(sample_sz);
+        x2s.resize(sample_sz);
+        sample.resize(sample_sz);
+    }
+
+    void generate_models(std::vector<Eigen::Matrix3d> *models);
+    double score_model(const Eigen::Matrix3d &F, size_t *inlier_count) const;
+    bool valid_model(Eigen::Matrix3d &F);
     void refine_model(Eigen::Matrix3d *F) const;
 
     const size_t sample_sz = 7;

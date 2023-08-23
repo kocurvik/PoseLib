@@ -128,6 +128,17 @@ void write_to_dict(const RansacStats &stats, py::dict &dict) {
     dict["execution_time"] = stats.execution_time;
 }
 
+void write_to_dict(const RansacValidStats &stats, py::dict &dict) {
+    dict["refinements"] = stats.refinements;
+    dict["iterations"] = stats.iterations;
+    dict["num_inliers"] = stats.num_inliers;
+    dict["inlier_ratio"] = stats.inlier_ratio;
+    dict["model_score"] = stats.model_score;
+    dict["execution_time"] = stats.execution_time;
+    dict["valid_num_inliers"] = stats.valid_num_inliers;
+    dict["valid_model_score"] = stats.valid_model_score;
+}
+
 Camera camera_from_dict(const py::dict &camera_dict) {
     Camera camera;
     camera.model_id = Camera::id_from_string(camera_dict["model"].cast<std::string>());
