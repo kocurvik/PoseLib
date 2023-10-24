@@ -375,12 +375,14 @@ RansacStats estimate_fundamental_valid_only(const std::vector<Point2D> &points2D
             x2_inliers.push_back(points2D_2[k]);
         }
 
-        Eigen::Matrix3d FF = *F;
+        refine_fundamental(x1_inliers, x2_inliers, F, bundle_opt);
+        
+        /* Eigen::Matrix3d FF = *F;
         refine_fundamental(x1_inliers, x2_inliers, &FF, bundle_opt);
-
+        
         if (valid_focal_bougnoux(FF) > 0) {
             (*F) = FF;
-        }
+        }*/
     }
 
     *F /= F->norm();

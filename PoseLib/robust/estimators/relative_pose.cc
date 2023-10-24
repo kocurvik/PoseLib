@@ -342,11 +342,12 @@ void FundamentalValidOnlyEstimator::refine_model(Eigen::Matrix3d *F) const {
     bundle_opt.max_iterations = 25;
 
     
-    Eigen::Matrix3d FF = *F;
+    refine_fundamental(x1, x2, F, bundle_opt);
+    /* Eigen::Matrix3d FF = *F;
     refine_fundamental(x1, x2, &FF, bundle_opt);
     if (valid_focal_bougnoux(FF)) {
         (*F) = FF;
-    }
+    }*/
 }
 
 } // namespace poselib
