@@ -38,10 +38,10 @@ bool valid_focal_bougnoux(Eigen::Matrix3d &F) {
     svd.computeV();
     svd.computeU();
     Eigen::Vector3d e1 = svd.matrixV().col(2);
-    Eigen::Vector3d e2 = svd.matrixU().col(2);*/
+    Eigen::Vector3d e2 = svd.matrixU().col(2);
 
-    /* Eigen::Vector3d e1 = F.row(0).cross(F.row(1));
-    Eigen::Vector3d e2 = F.col(0).cross(F.col(1));
+    //Eigen::Vector3d e1 = F.row(0).cross(F.row(1));
+    //Eigen::Vector3d e2 = F.col(0).cross(F.col(1));
        
     Eigen::Matrix3d e1_hat;
     e1_hat << 0, -e1(2), e1(1), e1(2), 0, -e1(0), -e1(1), e1(0), 0;
@@ -61,7 +61,7 @@ bool valid_focal_bougnoux(Eigen::Matrix3d &F) {
 
     ff_sq = -p.dot(e1_hat * (II * (F.transpose() * ((p * p.transpose()) * (F * p))))) /
             p.dot(e1_hat * (II * (F.transpose() * (II * (F * p)))));
-
+    
     return (f_sq > 0) && (ff_sq > 0);*/
 
     float f11 = F(0, 0), f12 = F(0, 1), f13 = F(0, 2);
@@ -76,21 +76,26 @@ bool valid_focal_bougnoux(Eigen::Matrix3d &F) {
     den = f11 * f12 * f31 * f33 - f11 * f13 * f31 * f32 + f12 * f12 * f32 * f33 - f12 * f13 * f32 * f32 +
           f21 * f22 * f31 * f33 - f21 * f23 * f31 * f32 + f22 * f22 * f32 * f33 - f22 * f23 * f32 * f32;
 
-    if (std::fabs(den) > tol) {
-        num = -f33 * (f12 * f13 * f33 - f13 * f13 * f32 + f22 * f23 * f33 - f23 * f23 * f32);
-    } else {    
-        den = f11 * f11 * f31 * f33 + f11 * f12 * f32 * f33 - f11 * f13 * f31 * f31 - f12 * f13 * f31 * f32 +
-              f21 * f21 * f31 * f33 + f21 * f22 * f32 * f33 - f21 * f23 * f31 * f31 - f22 * f23 * f31 * f32;
-        if (std::fabs(den) > tol) {
-            num = -f33 * (f11 * f13 * f33 - f13 * f13 * f31 + f21 * f23 * f33 - f23 * f23 * f31);
-        } else {
-            den = f11 * f11 * f31 * f32 - f11 * f12 * f31 * f31 + f11 * f12 * f32 * f32 - f12 * f12 * f31 * f32 +
-                  f21 * f21 * f31 * f32 - f21 * f22 * f31 * f31 + f21 * f22 * f32 * f32 - f22 * f22 * f31 * f32;
-            num = -f33 * (f11 * f13 * f32 - f12 * f13 * f31 + f21 * f23 * f32 - f22 * f23 * f31);        
-        }
-    }
+    num = -f33 * (f12 * f13 * f33 - f13 * f13 * f32 + f22 * f23 * f33 - f23 * f23 * f32);
+
+    //if (std::fabs(den) > tol) {
+    //    num = -f33 * (f12 * f13 * f33 - f13 * f13 * f32 + f22 * f23 * f33 - f23 * f23 * f32);
+    //} else {    
+    //    den = f11 * f11 * f31 * f33 + f11 * f12 * f32 * f33 - f11 * f13 * f31 * f31 - f12 * f13 * f31 * f32 +
+    //          f21 * f21 * f31 * f33 + f21 * f22 * f32 * f33 - f21 * f23 * f31 * f31 - f22 * f23 * f31 * f32;
+    //    if (std::fabs(den) > tol) {
+    //        num = -f33 * (f11 * f13 * f33 - f13 * f13 * f31 + f21 * f23 * f33 - f23 * f23 * f31);
+    //    } else {
+    //        den = f11 * f11 * f31 * f32 - f11 * f12 * f31 * f31 + f11 * f12 * f32 * f32 - f12 * f12 * f31 * f32 +
+    //              f21 * f21 * f31 * f32 - f21 * f22 * f31 * f31 + f21 * f22 * f32 * f32 - f22 * f22 * f31 * f32;
+    //        num = -f33 * (f11 * f13 * f32 - f12 * f13 * f31 + f21 * f23 * f32 - f22 * f23 * f31);        
+    //    }
+    //}
 
     f1_pos = num * den > 0;
+
+    if (!f1_pos)
+        return false;
 
     f11 = F(0, 0), f12 = F(1, 0), f13 = F(2, 0);
     f21 = F(0, 1), f22 = F(1, 1), f23 = F(2, 1);
@@ -99,23 +104,25 @@ bool valid_focal_bougnoux(Eigen::Matrix3d &F) {
     den = f11 * f12 * f31 * f33 - f11 * f13 * f31 * f32 + f12 * f12 * f32 * f33 - f12 * f13 * f32 * f32 +
           f21 * f22 * f31 * f33 - f21 * f23 * f31 * f32 + f22 * f22 * f32 * f33 - f22 * f23 * f32 * f32;
 
-    if (std::fabs(den) > tol) {
-        num = -f33 * (f12 * f13 * f33 - f13 * f13 * f32 + f22 * f23 * f33 - f23 * f23 * f32);
-    } else {
-        den = f11 * f11 * f31 * f33 + f11 * f12 * f32 * f33 - f11 * f13 * f31 * f31 - f12 * f13 * f31 * f32 +
-              f21 * f21 * f31 * f33 + f21 * f22 * f32 * f33 - f21 * f23 * f31 * f31 - f22 * f23 * f31 * f32;
-        if (std::fabs(den) > tol) {
-            num = -f33 * (f11 * f13 * f33 - f13 * f13 * f31 + f21 * f23 * f33 - f23 * f23 * f31);
-        } else {
-            den = f11 * f11 * f31 * f32 - f11 * f12 * f31 * f31 + f11 * f12 * f32 * f32 - f12 * f12 * f31 * f32 +
-                  f21 * f21 * f31 * f32 - f21 * f22 * f31 * f31 + f21 * f22 * f32 * f32 - f22 * f22 * f31 * f32;
-            num = -f33 * (f11 * f13 * f32 - f12 * f13 * f31 + f21 * f23 * f32 - f22 * f23 * f31);
-        }
-    }
+    num = -f33 * (f12 * f13 * f33 - f13 * f13 * f32 + f22 * f23 * f33 - f23 * f23 * f32);
+
+    //if (std::fabs(den) > tol) {
+    //    num = -f33 * (f12 * f13 * f33 - f13 * f13 * f32 + f22 * f23 * f33 - f23 * f23 * f32);
+    //} else {
+    //    den = f11 * f11 * f31 * f33 + f11 * f12 * f32 * f33 - f11 * f13 * f31 * f31 - f12 * f13 * f31 * f32 +
+    //          f21 * f21 * f31 * f33 + f21 * f22 * f32 * f33 - f21 * f23 * f31 * f31 - f22 * f23 * f31 * f32;
+    //    if (std::fabs(den) > tol) {
+    //        num = -f33 * (f11 * f13 * f33 - f13 * f13 * f31 + f21 * f23 * f33 - f23 * f23 * f31);
+    //    } else {
+    //        den = f11 * f11 * f31 * f32 - f11 * f12 * f31 * f31 + f11 * f12 * f32 * f32 - f12 * f12 * f31 * f32 +
+    //              f21 * f21 * f31 * f32 - f21 * f22 * f31 * f31 + f21 * f22 * f32 * f32 - f22 * f22 * f31 * f32;
+    //        num = -f33 * (f11 * f13 * f32 - f12 * f13 * f31 + f21 * f23 * f32 - f22 * f23 * f31);
+    //    }
+    //}
 
     f2_pos = num * den > 0;
 
-    return f1_pos && f2_pos;
+    return f2_pos;
 }
 
 double onefocal_sq(Eigen::Matrix3d &F, Eigen::Matrix3d &K2, int direct) {

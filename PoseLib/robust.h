@@ -89,6 +89,11 @@ RansacStats estimate_fundamental_valid_only(const std::vector<Point2D> &points2D
                                             const BundleOptions &bundle_opt, Eigen::Matrix3d *F,
                                             std::vector<char> *inliers);
 
+RansacStats estimate_singlefocal_relative_pose(const std::vector<Point2D> &points2D_1,
+                                               const std::vector<Point2D> &points2D_2, const RansacOptions &ransac_opt,
+                                               const BundleOptions &bundle_opt, CameraOneFocalPose *focal_pose,
+                                               std::vector<char> *inliers);
+
 // Estimates fundamental matrix but checks for meaningful focal length and keeps the model
 RansacValidStats estimate_onefocal_fundamental_valid(const int method, const double f2, const std::vector<Point2D> &points2D_1,
                                           const std::vector<Point2D> &points2D_2, const RansacOptions &ransac_opt,
