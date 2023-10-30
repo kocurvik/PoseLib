@@ -287,7 +287,7 @@ RansacStats estimate_singlefocal_relative_pose(const std::vector<Point2D> &point
         //BundleOptions scaled_bundle_opt = bundle_opt;
         //scaled_bundle_opt.loss_scale = bundle_opt.loss_scale * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
 
-        //refine_singlefocal_relpose(x1_inliers, x2_inliers, focal_pose, bundle_opt);
+        refine_singlefocal_relpose(x1_inliers, x2_inliers, focal_pose, bundle_opt);
     }
 
     return stats;

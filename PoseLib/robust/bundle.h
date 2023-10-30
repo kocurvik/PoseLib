@@ -91,6 +91,10 @@ BundleStats refine_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
 BundleStats refine_onefocal_relpose(const double f2, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, CameraOneFocalPose *pose,
                                     const BundleOptions &opt = BundleOptions(), const std::vector<double> &weights = std::vector<double>());
 
+// Relative pose refinement. Minimizes Sampson error error. Assumes identity intrinsics (calibrated camera)
+BundleStats refine_singlefocal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, CameraOneFocalPose *pose,
+                                       const BundleOptions &opt = BundleOptions(), const std::vector<double> &weights = std::vector<double>());
+
 // Fundamental matrix refinement. Minimizes Sampson error error.
 BundleStats refine_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, Eigen::Matrix3d *F,
                                const BundleOptions &opt = BundleOptions(),

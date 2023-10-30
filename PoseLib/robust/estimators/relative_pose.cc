@@ -196,7 +196,16 @@ void RelativeSingleFocalPoseEstimator::refine_model(CameraOneFocalPose *focal_po
             x2_inlier.push_back(x2[pt_k]);
         }
     }
-    //refine_singlefocal_relpose(x1_inlier, x2_inlier, focal_pose, bundle_opt);
+    
+    /*size_t inliers_before = 0;
+    std::cout << "Model score before:" << score_model(*focal_pose, &inliers_before) << std::endl;*/
+
+    refine_singlefocal_relpose(x1_inlier, x2_inlier, focal_pose, bundle_opt);
+
+    /*std::cout << "Model score after:" << score_model(*focal_pose, &inliers_before) << std::endl;
+    std::cout << "Init cost: " << stats.initial_cost << "\t Final cost: " << stats.cost
+              << "\t Iterations: " << stats.iterations << "\t Invalid steps: " << stats.invalid_steps
+              << "\t Lambda: " << stats.lambda << std::endl;*/
 }
 
 double OneFocalFundamentalEstimator::calc_sq_focal(Eigen::Matrix3d &F) { return onefocal_sq(F, K2, method); }
