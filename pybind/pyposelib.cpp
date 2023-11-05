@@ -1043,7 +1043,7 @@ PYBIND11_MODULE(poselib, m) {
     m.def("estimate_onefocal_relative_pose", &poselib::estimate_onefocal_relative_pose_wrapper, py::arg("f2"),
           py::arg("points2D_1"), py::arg("points2D_2"), py::arg("ransac_opt") = py::dict(),
           py::arg("bundle_opt") = py::dict(), "Relative pose estimation with one unknown focal length with non-linear refinement.");
-    m.def("estimate_singlefocal_relative_pose", &poselib::estimate_singlefocal_relative_pose_wrapper, 
+    m.def("estimate_singlefocal_relative_pose", &poselib::estimate_singlefocal_relative_pose_wrapper,
           py::arg("points2D_1"), py::arg("points2D_2"), py::arg("ransac_opt") = py::dict(),
           py::arg("bundle_opt") = py::dict(), "Relative pose estimation with unknown equal focal lengths with non-linear refinement.");
     m.def("estimate_onefocal_fundamental", &poselib::estimate_onefocal_fundamental_wrapper, py::arg("f2"),

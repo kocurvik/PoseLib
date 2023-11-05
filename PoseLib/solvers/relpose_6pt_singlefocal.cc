@@ -137,11 +137,11 @@ int modrf_pos(int ord, double *coef, double a, double b, double *val, int invert
     // If we reach here, we have not converged -- give some diagnostics
     //==================================================================
 
-    fprintf(stderr, "modrf overflow on interval %f %f\n", a, b);
-    fprintf(stderr, "\t b-a = %12.5e\n", b - a);
-    fprintf(stderr, "\t fa  = %12.5e\n", fa);
-    fprintf(stderr, "\t fb  = %12.5e\n", fb);
-    fprintf(stderr, "\t fx  = %12.5e\n", fx);
+    //fprintf(stderr, "modrf overflow on interval %f %f\n", a, b);
+    //fprintf(stderr, "\t b-a = %12.5e\n", b - a);
+    //fprintf(stderr, "\t fa  = %12.5e\n", fa);
+    //fprintf(stderr, "\t fb  = %12.5e\n", fb);
+    //fprintf(stderr, "\t fx  = %12.5e\n", fx);
 
     // Evaluate the true values at a and b
     if (invert) {
@@ -158,14 +158,14 @@ int modrf_pos(int ord, double *coef, double a, double b, double *val, int invert
         }
     }
 
-    fprintf(stderr, "\t true fa = %12.5e\n", fa);
-    fprintf(stderr, "\t true fb = %12.5e\n", fb);
-    fprintf(stderr, "\t gradient= %12.5e\n", (fb - fa) / (b - a));
+    //fprintf(stderr, "\t true fa = %12.5e\n", fa);
+    //fprintf(stderr, "\t true fb = %12.5e\n", fb);
+    //fprintf(stderr, "\t gradient= %12.5e\n", (fb - fa) / (b - a));
 
-    // Print out the polynomial
-    fprintf(stderr, "Polynomial coefficients\n");
-    for (fp = ecoef; fp >= scoef; fp--)
-        fprintf(stderr, "\t%12.5e\n", *fp);
+    //// Print out the polynomial
+    //fprintf(stderr, "Polynomial coefficients\n");
+    //for (fp = ecoef; fp >= scoef; fp--)
+    //    fprintf(stderr, "\t%12.5e\n", *fp);
 
     return (0);
 }
@@ -440,9 +440,9 @@ int sbisect(int np, poly *sseq, double min, double max, int atmin, int atmax, do
         }
 
         if (its == MAXIT) {
-            fprintf(stderr, "sbisect: overflow min %f max %f\
+            /*fprintf(stderr, "sbisect: overflow min %f max %f\
 							                         diff %e nroot %d n1 %d n2 %d\n",
-                    min, max, max - min, nroot, n1, n2);
+                    min, max, max - min, nroot, n1, n2);*/
             roots[0] = mid;
         }
 
@@ -471,10 +471,10 @@ int sbisect(int np, poly *sseq, double min, double max, int atmin, int atmax, do
     }
 
     if (its == MAXIT) {
-        fprintf(stderr, "sbisect: roots too close together\n");
+        /*fprintf(stderr, "sbisect: roots too close together\n");
         fprintf(stderr, "sbisect: overflow min %f max %f diff %e\
 						                      nroot %d n1 %d n2 %d\n",
-                min, max, max - min, nroot, n1, n2);
+                min, max, max - min, nroot, n1, n2);*/
         for (n1 = atmax; n1 < atmin; n1++)
             roots[n1 - atmax] = mid;
     }
@@ -1737,7 +1737,7 @@ int relpose_6pt_singlefocal(const std::vector<Eigen::Vector3d> &x1, const std::v
         Eigen::Matrix3d E = K.transpose() * (F * K);
 
         CameraPoseVector poses;
-        motion_from_essential(E, K_inv * x1[0], K_inv * x2[0], &poses);
+        motion_from_essential(E, x2[0], x1[0], &poses);
 
         for (CameraPose pose : poses) {
             out_focal_poses->emplace_back(CameraOneFocalPose(pose, focal));
