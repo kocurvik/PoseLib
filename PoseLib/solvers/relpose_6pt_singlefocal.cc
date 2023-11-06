@@ -632,6 +632,8 @@ template <typename Derived> void charpoly_danilevsky_piv(Eigen::MatrixBase<Deriv
         p[i] = -A(0, n - i - 1);
 }
 
+namespace poselib {
+
 void fast_eigenvector_solver(double *eigv, int neig, Eigen::Matrix<double, 15, 15> &AM,
                              Eigen::Matrix<std::complex<double>, 3, 15> &sols) {
     static const int ind[] = {2, 3, 4, 6, 8, 9, 11, 14};
@@ -665,7 +667,14 @@ void fast_eigenvector_solver(double *eigv, int neig, Eigen::Matrix<double, 15, 1
         AA(5, 6) = AA(5, 6) - zi[2];
         AA(4, 7) = AA(4, 7) - zi[2];
 
-        Eigen::Matrix<double, 7, 1> s = AA.leftCols(7).colPivHouseholderQr().solve(-AA.col(7));
+        // Eigen::Matrix<double, 7, 1> s = AA.leftCols(7).colPivHouseholderQr().solve(-AA.col(7));
+        Eigen::Matrix<double, 7, 1> s = AA.block<7, 7>(0,0).householderQr().solve(-AA.block<7,1>(0, 7));
+
+        //std::cout << "AA sol: " << AA.block<7, 7>(0, 0) * s + AA.block<7, 1>(0, 7) << std::endl;
+        //std::cout << "A: \r\n";
+        //std::cout << AA << std::endl;
+        //std::cout << "S: " << s << std::endl;
+
         sols(0, i) = s(3);
         sols(1, i) = zi[0];
         sols(2, i) = s(6);
@@ -1684,13 +1693,18 @@ int solver_relpose_6pt_singlefocal(const Eigen::VectorXd &data, Eigen::Matrix<st
     double roots[15];
     int nroots;
     find_real_roots_sturm(p, 15, roots, &nroots, 8, 0);
+    //int nroots = sturm::bisect_sturm<15>(p, roots);
+
+    /*std::cout << "n roots: " << nroots << std::endl;
+    std::cout << "Roots: ";
+    for (int i = 0; i < nroots; i++)
+        std::cout << roots[i] << ", ";
+    std::cout << std::endl;*/
+    
     fast_eigenvector_solver(roots, nroots, AM, sols);
 
     return nroots;
 }
-
-
-namespace poselib {
 
 int relpose_6pt_singlefocal(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2,
                             CameraOneFocaPoseVector *out_focal_poses) {
@@ -1723,6 +1737,8 @@ int relpose_6pt_singlefocal(const std::vector<Eigen::Vector3d> &x1, const std::v
         // std::cout << "Focal: " << focal << ", Sol: " << sols.col(i) << ", Sol img norm: " <<
         // sols.col(i).imag().norm() << "\n";
 
+        // std::cout << "Sols: " << sols.col(i) << std::endl;
+
         Eigen::Vector<double, 9> F_vector = N.col(0) + sols(0, i).real() * N.col(1) + sols(1, i).real() * N.col(2);
         F_vector.normalize();
         Eigen::Matrix3d F = Eigen::Matrix3d(F_vector.data());
@@ -1736,12 +1752,52 @@ int relpose_6pt_singlefocal(const std::vector<Eigen::Vector3d> &x1, const std::v
 
         Eigen::Matrix3d E = K.transpose() * (F * K);
 
-        CameraPoseVector poses;
-        motion_from_essential(E, x2[0], x1[0], &poses);
+        /*std::cout << "Focal: " << focal << std::endl;
+        std::cout << "x2.T E x1" << x2[0].transpose() * (E * x1[0]) << std::endl;
+        std::cout << "(K_inv * x2).T E (K_inv x1)" << (K_inv * x2[0]).transpose() * (E * (K_inv * x1[0])) << std::endl;
+        std::cout << "x1.T E x2" << x1[0].transpose() * (E * x2[0]) << std::endl;
+        std::cout << "(K_inv * x1).T E (K_inv x2)" << (K_inv * x1[0]).transpose() * (E * (K_inv * x2[0])) << std::endl;
 
-        for (CameraPose pose : poses) {
-            out_focal_poses->emplace_back(CameraOneFocalPose(pose, focal));
-            n_poses++;
+        Eigen::JacobiSVD<Eigen::Matrix3d> svd_F(F, Eigen::ComputeFullU | Eigen::ComputeFullV);
+        Eigen::JacobiSVD<Eigen::Matrix3d> svd_E(E, Eigen::ComputeFullU | Eigen::ComputeFullV);
+
+        std::cout << "F singular: " << svd_F.singularValues() << std::endl;
+        std::cout << "E singular: " << svd_E.singularValues() << std::endl;*/
+
+
+        CameraPoseVector poses;
+        //motion_from_essential(F, K_inv * x1[0], K_inv * x2[0], &poses);
+        
+        Eigen::Vector3d x1_u = K_inv * x1[0];
+        Eigen::Vector3d x2_u = K_inv * x2[0];
+        x1_u = x1_u / x1_u(2);
+        x2_u = x2_u / x2_u(2);
+        /*std::cout << "x1[0]: " << x1[0] << std::endl;
+        std::cout << "x1_u: " << x1_u << std::endl;
+              
+
+        
+        std::cout << "x1_u after: " << x1_u << std::endl;
+
+        //motion_from_essential(F, x1[0], x2[0], &poses);*/
+        motion_from_essential(E, x1_u, x2_u, &poses);
+
+        bool ok = true;
+                
+        for (CameraPose const pose : poses) {
+            ok = true;
+            for (int i = 1; i < 6; i++) {
+                Eigen::Vector3d x1_u = K_inv * x1[i];
+                Eigen::Vector3d x2_u = K_inv * x2[i];
+                x1_u = x1_u / x1_u(2);
+                x2_u = x2_u / x2_u(2);
+                ok = ok && check_cheirality(pose, x1_u, x2_u);
+            }
+
+            if (ok) {
+                out_focal_poses->emplace_back(CameraOneFocalPose(pose, focal));
+                n_poses++;
+            }
         }
     }
 

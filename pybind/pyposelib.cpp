@@ -250,7 +250,7 @@ std::pair<std::vector<CameraOneFocalPose>, double>
 relpose_singlefocal_6pt_wrapper(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2) {
     std::vector<CameraOneFocalPose> output;
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-    relpose_6pt_singlefocal(x1, x2, &output);
+     relpose_6pt_singlefocal(x1, x2, &output);
     auto end = std::chrono::steady_clock::now();
     double us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
@@ -1085,7 +1085,7 @@ PYBIND11_MODULE(poselib, m) {
           py::arg("points3D"), py::arg("lines2D_1"), py::arg("lines2D_2"), py::arg("lines3D_1"), py::arg("lines3D_2"),
           py::arg("initial_pose"), py::arg("camera_dict"), py::arg("bundle_opt") = py::dict(), py::arg("line_bundle_opt") = py::dict(),
           "Absolute pose non-linear refinement from points and lines.");
-
+    
     m.def("refine_generalized_absolute_pose", &poselib::refine_generalized_absolute_pose_wrapper,
           py::arg("points2D"), py::arg("points3D"), py::arg("initial_pose"), py::arg("camera_ext"), py::arg("camera_dicts"),
           py::arg("bundle_opt") = py::dict(),
