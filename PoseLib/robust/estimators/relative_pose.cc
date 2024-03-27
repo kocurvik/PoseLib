@@ -31,6 +31,7 @@
 #include "PoseLib/misc/essential.h"
 #include "PoseLib/robust/bundle.h"
 #include "PoseLib/solvers/gen_relpose_5p1pt.h"
+#include "PoseLib/solvers/p3p.h"
 #include "PoseLib/solvers/relpose_5pt.h"
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
@@ -76,6 +77,60 @@ void RelativePoseEstimator::refine_model(CameraPose *pose) const {
         }
     }
     refine_relpose(x1_inlier, x2_inlier, pose, bundle_opt);
+}
+
+void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCameraPose> *models) {
+    sampler.generate_sample(&sample);
+    for (size_t k = 0; k < sample_sz; ++k) {
+        x1n[k] = x1[sample[k]].homogeneous().normalized();
+        x2n[k] = x2[sample[k]].homogeneous().normalized();
+    }
+
+    for (size_t k = 0; k < sample_sz_13; ++k) {
+        x1s[k] = x1[sample[k]].homogeneous();
+        x2s[k] = x2[sample[k]].homogeneous();
+        x3s[k] = x3[sample[k]].homogeneous().normalized();
+    }
+
+    std::vector<CameraPose> models12;
+    relpose_5pt(x1n, x2n, &models12);
+
+    std::vector<Point3D> triangulated_12;
+    triangulated_12.reserve(3);
+
+    for (CameraPose pose12 : models12){
+//        std::cout << "Pose12 R: " << pose12.R() << std::endl;
+//        std::cout << "Pose12 t: " << pose12.t << std::endl;
+        for (size_t i = 0; i < sample_sz_13; i++){
+            triangulated_12[i] = triangulate(pose12, x1s[i], x2s[i]);
+        }
+
+
+        std::vector<CameraPose> models13;
+        p3p(x3s, triangulated_12, &models13);
+
+        for (CameraPose pose13 : models13){
+//            std::cout << "Pose13 R: " << pose13.R() << std::endl;
+//            std::cout << "Pose13 t: " << pose13.t << std::endl;
+            models->emplace_back(ThreeViewCameraPose(pose12, pose13));
+        }
+    }
+}
+
+double ThreeViewRelativePoseEstimator::score_model(const ThreeViewCameraPose &three_view_pose, size_t *inlier_count) const {
+    size_t inlier_count12, inlier_count13, inlier_count23;
+    // TODO: calc inliers better w/o redundant computation
+
+    double score12 = compute_sampson_msac_score(three_view_pose.pose12, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count12);
+    double score13 = compute_sampson_msac_score(three_view_pose.pose13, x1, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count13);
+    double score23 = compute_sampson_msac_score(three_view_pose.pose23(), x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count23);
+
+    std::vector<char> inliers;
+    *inlier_count = get_inliers(three_view_pose, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inliers);
+    return score12 + score13 + score23;
+}
+void ThreeViewRelativePoseEstimator::refine_model(ThreeViewCameraPose *pose) const {
+    // TODO: add refinement
 }
 
 void SharedFocalRelativePoseEstimator::generate_models(ImagePairVector *models) {

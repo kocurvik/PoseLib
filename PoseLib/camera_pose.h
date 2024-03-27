@@ -93,6 +93,35 @@ struct alignas(32) ImagePair {
     ImagePair(CameraPose pose, Camera camera1, Camera camera2) : pose(pose), camera1(camera1), camera2(camera2) {}
 };
 
+struct alignas(32) ThreeViewCameraPose {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    // Rotation is represented as a unit quaternion
+    // with real part first, i.e. QW, QX, QY, QZ
+    CameraPose pose12;
+    CameraPose pose13;
+
+    // Constructors (Defaults to identity camera)
+    ThreeViewCameraPose() : pose12(CameraPose()), pose13(CameraPose()) {}
+    ThreeViewCameraPose(CameraPose pose12, CameraPose pose13) : pose12(pose12), pose13(pose13) {}
+
+    const CameraPose pose23() const {
+        Eigen::Matrix4d T12 = Eigen::Matrix4d::Zero();
+        Eigen::Matrix4d T13 = Eigen::Matrix4d::Zero();
+        T12(3, 3) = 1.0;
+        T13(3, 3) = 1.0;
+        T12.block<3, 4>(0,0 ) = pose12.Rt();
+        T13.block<3, 4>(0,0 ) = pose13.Rt();
+
+        Eigen::Matrix4d T23 = T13 * T12.inverse();
+
+        Eigen::Matrix3d R23 = T23.block<3, 3>(0, 0);
+        Eigen::Vector3d t23 = T23.block<3, 1>(0, 3);
+
+        return CameraPose(R23, t23);
+    }
+};
+
 typedef std::vector<ImagePair> ImagePairVector;
 } // namespace poselib
 

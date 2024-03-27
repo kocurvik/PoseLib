@@ -53,6 +53,10 @@ RansacStats ransac_pnpl(const std::vector<Point2D> &points2D, const std::vector<
 RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
                            CameraPose *best_model, std::vector<char> *best_inliers);
 
+RansacStats ransac_3v_relpose_5p3p(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                   const std::vector<Point2D> &x3, const RansacOptions &opt,
+                                   ThreeViewCameraPose *three_view_pose, std::vector<char> *inliers);
+
 RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         const RansacOptions &opt, ImagePair *best_model,
                                         std::vector<char> *best_inliers);

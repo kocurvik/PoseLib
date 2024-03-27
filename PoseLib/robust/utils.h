@@ -63,6 +63,9 @@ int get_inliers(const CameraPose &pose, const std::vector<Point2D> &x1, const st
                 double sq_threshold, std::vector<char> *inliers);
 int get_inliers(const Eigen::Matrix3d &E, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                 double sq_threshold, std::vector<char> *inliers);
+int get_inliers(const ThreeViewCameraPose &three_view_pose, const std::vector<Point2D> &x1,
+                const std::vector<Point2D> &x2, const std::vector<Point2D> &x3,
+                double sq_threshold, std::vector<char> *inliers);
 
 // inliers for homography
 void get_homography_inliers(const Eigen::Matrix3d &H, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
@@ -80,6 +83,9 @@ double normalize_points(std::vector<Eigen::Vector2d> &x1, std::vector<Eigen::Vec
 
 // Calculate whether F would yield real focals, assumes both pp at [0, 0]
 bool calculate_RFC(const Eigen::Matrix3d &F);
+
+// Triangulates points from uncalibrated view - assumes that last homog coord of x1, x2 is 1.0
+Point3D triangulate(const CameraPose &pose, const Point3D &x1, const Point3D &x2);
 
 } // namespace poselib
 

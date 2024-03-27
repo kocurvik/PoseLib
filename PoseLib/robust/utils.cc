@@ -320,6 +320,31 @@ int get_inliers(const CameraPose &pose, const std::vector<Point2D> &x1, const st
     return inlier_count;
 }
 
+int get_inliers(const ThreeViewCameraPose &three_view_pose, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const std::vector<Point2D> &x3, double sq_threshold, std::vector<char> *inliers){
+    std::vector<char> best_inliers12;
+    std::vector<char> best_inliers13;
+    std::vector<char> best_inliers23;
+
+    inliers->resize(x1.size());
+
+    get_inliers(three_view_pose.pose12, x1, x2, sq_threshold, &best_inliers12);
+    get_inliers(three_view_pose.pose13, x1, x3, sq_threshold, &best_inliers13);
+    get_inliers(three_view_pose.pose23(), x2, x3, sq_threshold, &best_inliers23);
+
+    int count = 0;
+    bool val;
+
+    for (size_t i = 0; i < x1.size(); i++){
+//        std::cout << "At: " << i << ": " << best_inliers12[i] << ", " << best_inliers13[i] << ", " << best_inliers23[i] << std::endl;
+        val = (best_inliers12[i] and best_inliers13[i]) and best_inliers23[i];
+        (*inliers)[i] = val;
+        if (val)
+            count++;
+    }
+
+    return count;
+}
+
 // Compute inliers for relative pose estimation (using Sampson error)
 int get_inliers(const Eigen::Matrix3d &E, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                 double sq_threshold, std::vector<char> *inliers) {
@@ -458,6 +483,31 @@ bool calculate_RFC(const Eigen::Matrix3d &F) {
     if (num * den < 0)
         return false;
     return true;
+}
+
+Point3D triangulate(const CameraPose &pose, const Point3D &x1, const Point3D &x2){
+    Eigen::Matrix4d A;
+    Eigen::MatrixXd P = pose.Rt();
+    A << -1.0, 0.0, x1(0), 0.0,
+         0.0, -1.0, x1(1), 0.0,
+        P(2, 0) * x2(0) - P(0,0), P(2, 1) * x2(0) - P(0,1), P(2, 2) * x2(0) - P(0, 2), P(2, 3) * x2(0) - P(0, 3),
+        P(2, 0) * x2(1) - P(1,0), P(2, 1) * x2(1) - P(1,1), P(2, 2) * x2(1) - P(1, 2), P(2, 3) * x2(1) - P(1, 3);
+
+//    std::cout << A << std::endl;
+
+    Eigen::JacobiSVD<Eigen::Matrix4d> svd(A, Eigen::ComputeFullV);
+
+    Eigen::Vector4d X_h = svd.matrixV().col(3);
+
+//    Eigen::Vector3d x2_p = P * X_h;
+//    std::cout << "x2_p: " << x2_p / x2_p(2) << std::endl;
+//    std::cout << "x2: " << x2 << std::endl;
+
+    Eigen::Vector3d X(X_h(0) / X_h(3), X_h(1) / X_h(3), X_h(2) / X_h(3));
+
+
+
+    return X;
 }
 
 } // namespace poselib

@@ -65,6 +65,40 @@ class RelativePoseEstimator {
     std::vector<size_t> sample;
 };
 
+class ThreeViewRelativePoseEstimator {
+  public:
+    ThreeViewRelativePoseEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
+                                   const std::vector<Point2D> &points2D_2, const std::vector<Point2D> &points2D_3)
+        : num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2), x3(points2D_3),
+          sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
+        x1n.resize(sample_sz);
+        x2n.resize(sample_sz);
+        x1s.resize(sample_sz_13);
+        x2s.resize(sample_sz_13);
+        x3s.resize(sample_sz_13);
+        sample.resize(sample_sz);
+    }
+
+    void generate_models(std::vector<ThreeViewCameraPose> *models);
+    double score_model(const ThreeViewCameraPose &three_view_pose, size_t *inlier_count) const;
+    void refine_model(ThreeViewCameraPose *three_view_pose) const;
+
+    const size_t sample_sz = 5;
+    const size_t sample_sz_13 = 3;
+    const size_t num_data;
+
+  private:
+    const RansacOptions &opt;
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+    const std::vector<Point2D> &x3;
+
+    RandomSampler sampler;
+    // pre-allocated vectors for sampling
+    std::vector<Eigen::Vector3d> x1n, x2n, x1s, x2s, x3s;
+    std::vector<size_t> sample;
+};
+
 class SharedFocalRelativePoseEstimator {
   public:
     SharedFocalRelativePoseEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
