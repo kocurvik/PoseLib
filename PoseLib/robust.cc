@@ -306,28 +306,28 @@ RansacStats estimate_3v_relative_pose_5p3p(const std::vector<Point2D> &x1, const
 
     RansacStats stats = ransac_3v_relpose_5p3p(x1_calib, x2_calib, x3_calib, ransac_opt_scaled, three_view_pose, inliers);
 
-//    if (stats.num_inliers > 4) {
-//        std::vector<Point2D> x1_inliers;
-//        std::vector<Point2D> x2_inliers;
-//        std::vector<Point2D> x3_inliers;
-//        x1_inliers.reserve(stats.num_inliers);
-//        x2_inliers.reserve(stats.num_inliers);
-//        x3_inliers.reserve(stats.num_inliers);
-//
-//        for (size_t k = 0; k < num_pts; ++k) {
-//            if (!(*inliers)[k])
-//                continue;
-//            x1_inliers.push_back(x1_calib[k]);
-//            x2_inliers.push_back(x2_calib[k]);
-//            x3_inliers.push_back(x3_calib[k]);
-//        }
-//
-//        BundleOptions scaled_bundle_opt = bundle_opt;
-//        scaled_bundle_opt.loss_scale =
-//            bundle_opt.loss_scale * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal() + 1.0 / camera3.focal());
-//
-//        // refine_3v_relpose(x1_inliers, x2_inliers, x3_inliers, three_view_pose, scaled_bundle_opt);
-//    }
+    if (stats.num_inliers > 4) {
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        std::vector<Point2D> x3_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+        x3_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < num_pts; ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1_calib[k]);
+            x2_inliers.push_back(x2_calib[k]);
+            x3_inliers.push_back(x3_calib[k]);
+        }
+
+        BundleOptions scaled_bundle_opt = bundle_opt;
+        scaled_bundle_opt.loss_scale =
+            bundle_opt.loss_scale * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal() + 1.0 / camera3.focal());
+
+         refine_3v_relpose(x1_inliers, x2_inliers, x3_inliers, three_view_pose, scaled_bundle_opt);
+    }
 
     return stats;
 }

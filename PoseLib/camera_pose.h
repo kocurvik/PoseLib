@@ -106,17 +106,8 @@ struct alignas(32) ThreeViewCameraPose {
     ThreeViewCameraPose(CameraPose pose12, CameraPose pose13) : pose12(pose12), pose13(pose13) {}
 
     const CameraPose pose23() const {
-        Eigen::Matrix4d T12 = Eigen::Matrix4d::Zero();
-        Eigen::Matrix4d T13 = Eigen::Matrix4d::Zero();
-        T12(3, 3) = 1.0;
-        T13(3, 3) = 1.0;
-        T12.block<3, 4>(0,0 ) = pose12.Rt();
-        T13.block<3, 4>(0,0 ) = pose13.Rt();
-
-        Eigen::Matrix4d T23 = T13 * T12.inverse();
-
-        Eigen::Matrix3d R23 = T23.block<3, 3>(0, 0);
-        Eigen::Vector3d t23 = T23.block<3, 1>(0, 3);
+        Eigen::Matrix3d R23 = pose13.R() * pose12.R().transpose();
+        Eigen::Vector3d t23 = - R23 * pose12.t + pose13.t;
 
         return CameraPose(R23, t23);
     }

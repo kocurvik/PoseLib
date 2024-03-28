@@ -118,19 +118,56 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
 }
 
 double ThreeViewRelativePoseEstimator::score_model(const ThreeViewCameraPose &three_view_pose, size_t *inlier_count) const {
-    size_t inlier_count12, inlier_count13, inlier_count23;
+//    size_t inlier_count12, inlier_count13, inlier_count23;
+    size_t inlier_count12, inlier_count13;
     // TODO: calc inliers better w/o redundant computation
 
     double score12 = compute_sampson_msac_score(three_view_pose.pose12, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count12);
     double score13 = compute_sampson_msac_score(three_view_pose.pose13, x1, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count13);
-    double score23 = compute_sampson_msac_score(three_view_pose.pose23(), x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count23);
+//    double score23 = compute_sampson_msac_score(three_view_pose.pose23(), x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count23);
 
     std::vector<char> inliers;
     *inlier_count = get_inliers(three_view_pose, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inliers);
-    return score12 + score13 + score23;
+//    return score12 + score13 + score23;
+    return score12 + score13;
 }
 void ThreeViewRelativePoseEstimator::refine_model(ThreeViewCameraPose *pose) const {
-    // TODO: add refinement
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_epipolar_error;
+    bundle_opt.max_iterations = 25;
+
+    // Find approximate inliers and bundle over these with a truncated loss
+    std::vector<char> inliers;
+    int num_inl = get_inliers(*pose, x1, x2, x3, 5 * (opt.max_epipolar_error * opt.max_epipolar_error), &inliers);
+    std::vector<Eigen::Vector2d> x1_inlier, x2_inlier, x3_inlier;
+    x1_inlier.reserve(num_inl);
+    x2_inlier.reserve(num_inl);
+    x3_inlier.reserve(num_inl);
+
+    if (num_inl <= 4) {
+        return;
+    }
+
+    for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+        if (inliers[pt_k]) {
+            x1_inlier.push_back(x1[pt_k]);
+            x2_inlier.push_back(x2[pt_k]);
+            x3_inlier.push_back(x3[pt_k]);
+        }
+    }
+
+    size_t inliers_before;
+    double score_before = score_model(*pose, &inliers_before);
+    std::cout << "Score before: " << score_before <<std::endl;
+    std::cout << "Inliers before: " << inliers_before <<std::endl;
+
+    refine_3v_relpose(x1_inlier, x2_inlier, x3_inlier, pose, bundle_opt);
+
+    size_t inliers_after;
+    double score_after = score_model(*pose, &inliers_after);
+    std::cout << "Score after: " << score_after <<std::endl;
+    std::cout << "Inliers after: " << inliers_after <<std::endl;
 }
 
 void SharedFocalRelativePoseEstimator::generate_models(ImagePairVector *models) {
