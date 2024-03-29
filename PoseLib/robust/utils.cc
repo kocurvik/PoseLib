@@ -504,10 +504,6 @@ Point3D triangulate(const CameraPose &pose, const Point3D &x1, const Point3D &x2
 //    std::cout << "x2: " << x2 << std::endl;
 
     Eigen::Vector3d X(X_h(0) / X_h(3), X_h(1) / X_h(3), X_h(2) / X_h(3));
-
-
-
     return X;
 }
-
 } // namespace poselib

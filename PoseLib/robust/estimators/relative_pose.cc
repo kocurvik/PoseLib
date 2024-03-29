@@ -99,8 +99,6 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
     triangulated_12.reserve(3);
 
     for (CameraPose pose12 : models12){
-//        std::cout << "Pose12 R: " << pose12.R() << std::endl;
-//        std::cout << "Pose12 t: " << pose12.t << std::endl;
         for (size_t i = 0; i < sample_sz_13; i++){
             triangulated_12[i] = triangulate(pose12, x1s[i], x2s[i]);
         }
@@ -110,32 +108,30 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
         p3p(x3s, triangulated_12, &models13);
 
         for (CameraPose pose13 : models13){
-//            std::cout << "Pose13 R: " << pose13.R() << std::endl;
-//            std::cout << "Pose13 t: " << pose13.t << std::endl;
             models->emplace_back(ThreeViewCameraPose(pose12, pose13));
         }
     }
 }
 
 double ThreeViewRelativePoseEstimator::score_model(const ThreeViewCameraPose &three_view_pose, size_t *inlier_count) const {
-//    size_t inlier_count12, inlier_count13, inlier_count23;
-    size_t inlier_count12, inlier_count13;
+    size_t inlier_count12, inlier_count13, inlier_count23;
     // TODO: calc inliers better w/o redundant computation
 
     double score12 = compute_sampson_msac_score(three_view_pose.pose12, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count12);
     double score13 = compute_sampson_msac_score(three_view_pose.pose13, x1, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count13);
-//    double score23 = compute_sampson_msac_score(three_view_pose.pose23(), x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count23);
+    double score23 = compute_sampson_msac_score(three_view_pose.pose23(), x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count23);
 
     std::vector<char> inliers;
     *inlier_count = get_inliers(three_view_pose, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inliers);
-//    return score12 + score13 + score23;
-    return score12 + score13;
+    return score12 + score13 + score23;
 }
+
 void ThreeViewRelativePoseEstimator::refine_model(ThreeViewCameraPose *pose) const {
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
     bundle_opt.max_iterations = 25;
+//    bundle_opt.verbose = true;
 
     // Find approximate inliers and bundle over these with a truncated loss
     std::vector<char> inliers;
@@ -157,17 +153,17 @@ void ThreeViewRelativePoseEstimator::refine_model(ThreeViewCameraPose *pose) con
         }
     }
 
-    size_t inliers_before;
-    double score_before = score_model(*pose, &inliers_before);
-    std::cout << "Score before: " << score_before <<std::endl;
-    std::cout << "Inliers before: " << inliers_before <<std::endl;
+//    size_t inliers_before;
+//    double score_before = score_model(*pose, &inliers_before);
+//    std::cout << "Score before: " << score_before <<std::endl;
+//    std::cout << "Inliers before: " << inliers_before <<std::endl;
 
     refine_3v_relpose(x1_inlier, x2_inlier, x3_inlier, pose, bundle_opt);
 
-    size_t inliers_after;
-    double score_after = score_model(*pose, &inliers_after);
-    std::cout << "Score after: " << score_after <<std::endl;
-    std::cout << "Inliers after: " << inliers_after <<std::endl;
+//    size_t inliers_after;
+//    double score_after = score_model(*pose, &inliers_after);
+//    std::cout << "Score after: " << score_after <<std::endl;
+//    std::cout << "Inliers after: " << inliers_after <<std::endl;
 }
 
 void SharedFocalRelativePoseEstimator::generate_models(ImagePairVector *models) {
