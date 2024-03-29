@@ -597,7 +597,9 @@ class ThreeViewRelativePoseJacobianAccumulator {
             double nJc12_sq = (E12.block<2, 3>(0, 0) * x1[k].homogeneous()).squaredNorm() +
                             (E12.block<3, 2>(0, 0).transpose() * x2[k].homogeneous()).squaredNorm();
             double r12_sq = (C12 * C12) / nJc12_sq;
-            cost += weights[k] * loss_fn.loss(r12_sq);
+            double loss12 = loss_fn.loss(r12_sq);
+            if (loss12 == 0.0)
+                continue;
 
             // E13            
             double C13 = x3[k].homogeneous().dot(E13 * x1[k].homogeneous());
@@ -605,7 +607,9 @@ class ThreeViewRelativePoseJacobianAccumulator {
                               (E13.block<3, 2>(0, 0).transpose() * x3[k].homogeneous()).squaredNorm();
             
             double r13_sq = (C13 * C13) / nJc13_sq;
-            cost += weights[k] * loss_fn.loss(r13_sq);
+            double loss13 = loss_fn.loss(r13_sq);
+            if (loss13 == 0.0)
+                continue;
             
             // E23            
             double C23 = x3[k].homogeneous().dot(E23 * x2[k].homogeneous());
@@ -613,7 +617,13 @@ class ThreeViewRelativePoseJacobianAccumulator {
                               (E23.block<3, 2>(0, 0).transpose() * x3[k].homogeneous()).squaredNorm();
 
             double r23_sq = (C23 * C23) / nJc23_sq;
-            cost += weights[k] * loss_fn.loss(r23_sq);
+            double loss23 = loss_fn.loss(r23_sq);
+            if (loss23 == 0.0)
+                continue;
+
+            cost += weights[k] * loss12;
+            cost += weights[k] * loss13;
+            cost += weights[k] * loss23;
         }
 
         return cost;
