@@ -889,7 +889,7 @@ class ThreeViewRelativePoseJacobianAccumulator {
 
             for (int row = 0; row < 11; row++)
                 for (int col = 0; col < 11; col++)
-                    if (row <= col) {
+                    if (row >= col) {
                         JtJ(row, col) += weight12 * (J12(row) * J12(col));
                         JtJ(row, col) += weight13 * (J13(row) * J13(col));
                         JtJ(row, col) += weight23 * (J23(row) * J23(col));
