@@ -101,15 +101,16 @@ RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
     return stats;
 }
 
-RansacStats ransac_3v_relpose_5p3p(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                   const std::vector<Point2D> &x3, const RansacOptions &opt,
-                                   ThreeViewCameraPose *three_view_pose, std::vector<char> *best_inliers) {
+RansacStats ransac_3v_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                              const std::vector<Point2D> &x3, const RansacOptions &opt,
+                              ThreeViewCameraPose *three_view_pose, std::vector<char> *best_inliers,
+                              const size_t sample_sz, const bool inner_refine) {
     three_view_pose->pose12.q << 1.0, 0.0, 0.0, 0.0;
     three_view_pose->pose13.q << 1.0, 0.0, 0.0, 0.0;
     three_view_pose->pose12.t.setZero();
     three_view_pose->pose13.t.setZero();
 
-    ThreeViewRelativePoseEstimator estimator(opt, x1, x2, x3);
+    ThreeViewRelativePoseEstimator estimator(opt, x1, x2, x3, sample_sz, inner_refine);
     RansacStats stats = ransac<ThreeViewRelativePoseEstimator>(estimator, opt, three_view_pose);
 
     get_inliers(*three_view_pose, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);

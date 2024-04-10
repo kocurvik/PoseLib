@@ -284,11 +284,11 @@ RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &poin
     return stats;
 }
 
-RansacStats estimate_3v_relative_pose_5p3p(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                           const std::vector<Point2D> &x3, const Camera &camera1, const Camera &camera2,
-                                           const Camera &camera3, const RansacOptions &ransac_opt,
-                                           const BundleOptions &bundle_opt, ThreeViewCameraPose *three_view_pose,
-                                           std::vector<char> *inliers) {
+RansacStats estimate_3v_relative_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                      const std::vector<Point2D> &x3, const Camera &camera1, const Camera &camera2,
+                                      const Camera &camera3, const RansacOptions &ransac_opt,
+                                      const BundleOptions &bundle_opt, ThreeViewCameraPose *three_view_pose,
+                                      std::vector<char> *inliers, const size_t sample_sz, const bool inner_refine) {
     const size_t num_pts = x1.size();
 
     std::vector<Point2D> x1_calib(num_pts);
@@ -304,7 +304,7 @@ RansacStats estimate_3v_relative_pose_5p3p(const std::vector<Point2D> &x1, const
     ransac_opt_scaled.max_epipolar_error =
         ransac_opt.max_epipolar_error * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal() + 1.0 / camera3.focal());
 
-    RansacStats stats = ransac_3v_relpose_5p3p(x1_calib, x2_calib, x3_calib, ransac_opt_scaled, three_view_pose, inliers);
+    RansacStats stats = ransac_3v_relpose(x1_calib, x2_calib, x3_calib, ransac_opt_scaled, three_view_pose, inliers, sample_sz, inner_refine);
 
     if (stats.num_inliers > 4) {
         std::vector<Point2D> x1_inliers;

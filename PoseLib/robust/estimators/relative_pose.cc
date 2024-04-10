@@ -86,6 +86,12 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
         x2n[k] = x2[sample[k]].homogeneous().normalized();
     }
 
+    // if we use 4 pts we approx the last as the mean of the prev 4 pts
+    if (sample_sz == 4){
+        x1n[4] = (0.25 * (x1[sample[0]] + x1[sample[1]] + x1[sample[2]] + x1[sample[3]])).homogeneous().normalized();
+        x2n[4] = (0.25 * (x2[sample[0]] + x2[sample[1]] + x2[sample[2]] + x2[sample[3]])).homogeneous().normalized();
+    }
+
     for (size_t k = 0; k < sample_sz_13; ++k) {
         x1s[k] = x1[sample[k]].homogeneous();
         x2s[k] = x2[sample[k]].homogeneous();
@@ -108,7 +114,43 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
         p3p(x3s, triangulated_12, &models13);
 
         for (CameraPose pose13 : models13){
-            models->emplace_back(ThreeViewCameraPose(pose12, pose13));
+            if (inner_refine){
+                ThreeViewCameraPose three_view_pose = ThreeViewCameraPose(pose12, pose13);
+                std::vector<Point2D> x1r, x2r, x3r;
+                x1r.resize(4);
+                x2r.resize(4);
+                x3r.resize(4);
+                for (size_t k = 0; k < 4; k++){
+                    x1r[k] = x1[sample[k]];
+                    x2r[k] = x2[sample[k]];
+                    x3r[k] = x3[sample[k]];
+                }
+
+                BundleOptions bundle_opt;
+                bundle_opt.loss_type = BundleOptions::LossType::HUBER;
+                bundle_opt.loss_scale = opt.max_epipolar_error;
+                bundle_opt.max_iterations = 10;
+//                bundle_opt.verbose = true;
+
+//                size_t inliers_before;
+//                double score_before = score_model(three_view_pose, &inliers_before);
+//                std::cout << "Score before: " << score_before <<std::endl;
+//                std::cout << "Inliers before: " << inliers_before <<std::endl;
+
+                refine_3v_relpose(x1r, x2r, x3r, &three_view_pose, bundle_opt);
+                models->emplace_back(three_view_pose);
+
+//                size_t inliers_after;
+//                double score_after = score_model(three_view_pose, &inliers_after);
+//                std::cout << "Score after: " << score_after <<std::endl;
+//                std::cout << "Inliers after: " << inliers_after <<std::endl;
+            } else {
+//                size_t inliers_before;
+//                double score_before = score_model(ThreeViewCameraPose(pose12, pose13), &inliers_before);
+//                std::cout << "Score before: " << score_before <<std::endl;
+//                std::cout << "Inliers before: " << inliers_before <<std::endl;
+                models->emplace_back(ThreeViewCameraPose(pose12, pose13));
+            }
         }
     }
 }
@@ -130,7 +172,7 @@ void ThreeViewRelativePoseEstimator::refine_model(ThreeViewCameraPose *pose) con
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
-    bundle_opt.max_iterations = 25;
+    bundle_opt.max_iterations = opt.lo_iterations;
 //    bundle_opt.verbose = true;
 
     // Find approximate inliers and bundle over these with a truncated loss

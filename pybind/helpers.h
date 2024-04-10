@@ -30,6 +30,7 @@ template <> void update(const py::dict &input, const std::string &name, bool &va
 void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "max_iterations", ransac_opt.max_iterations);
     update(input, "min_iterations", ransac_opt.min_iterations);
+    update(input, "lo_iterations", ransac_opt.lo_iterations);
     update(input, "dyn_num_trials_mult", ransac_opt.dyn_num_trials_mult);
     update(input, "success_prob", ransac_opt.success_prob);
     update(input, "max_reproj_error", ransac_opt.max_reproj_error);

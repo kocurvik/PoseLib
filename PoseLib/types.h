@@ -39,6 +39,7 @@ namespace poselib {
 struct RansacOptions {
     size_t max_iterations = 100000;
     size_t min_iterations = 1000;
+    size_t lo_iterations = 25;
     double dyn_num_trials_mult = 3.0;
     double success_prob = 0.9999;
     double max_reproj_error = 12.0;  // used for 2D-3D matches
