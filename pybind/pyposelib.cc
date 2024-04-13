@@ -807,7 +807,8 @@ PYBIND11_MODULE(poselib, m) {
     py::class_<poselib::ThreeViewCameraPose>(m, "ThreeViewCameraPose")
         .def(py::init<>())
         .def_readwrite("pose12", &poselib::ThreeViewCameraPose::pose12)
-        .def_readwrite("pose13", &poselib::ThreeViewCameraPose::pose13);
+        .def_readwrite("pose13", &poselib::ThreeViewCameraPose::pose13)
+        .def("pose23", &poselib::ThreeViewCameraPose::pose23);
 
     py::class_<poselib::Camera>(m, "Camera")
         .def(py::init<>())
