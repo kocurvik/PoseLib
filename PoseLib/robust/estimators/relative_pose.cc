@@ -114,43 +114,50 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
         p3p(x3s, triangulated_12, &models13);
 
         for (CameraPose pose13 : models13){
-            if (inner_refine){
-                ThreeViewCameraPose three_view_pose = ThreeViewCameraPose(pose12, pose13);
+            ThreeViewCameraPose three_view_pose = ThreeViewCameraPose(pose12, pose13);
+
+            size_t inlier_4p_13 = 0;
+            size_t inlier_4p_23 = 0;
+            std::vector<Point2D> x1c = {x1[sample[3]]};
+            std::vector<Point2D> x2c = {x2[sample[3]]};
+            std::vector<Point2D> x3c = {x3[sample[3]]};
+            compute_sampson_msac_score(three_view_pose.pose13, x1c, x3c, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_13);
+            compute_sampson_msac_score(three_view_pose.pose23(), x2c, x3c, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_23);
+
+            if (inlier_4p_13 + inlier_4p_23 < 2){
+                continue;
+            }
+
+            if (inner_refine) {
                 std::vector<Point2D> x1r, x2r, x3r;
                 x1r.resize(4);
                 x2r.resize(4);
                 x3r.resize(4);
-                for (size_t k = 0; k < 4; k++){
+                for (size_t k = 0; k < 4; k++) {
                     x1r[k] = x1[sample[k]];
                     x2r[k] = x2[sample[k]];
                     x3r[k] = x3[sample[k]];
                 }
 
                 BundleOptions bundle_opt;
-                bundle_opt.loss_type = BundleOptions::LossType::HUBER;
+                bundle_opt.loss_type = BundleOptions::LossType::CAUCHY;
                 bundle_opt.loss_scale = opt.max_epipolar_error;
                 bundle_opt.max_iterations = 10;
-//                bundle_opt.verbose = true;
+                //                bundle_opt.verbose = true;
 
-//                size_t inliers_before;
-//                double score_before = score_model(three_view_pose, &inliers_before);
-//                std::cout << "Score before: " << score_before <<std::endl;
-//                std::cout << "Inliers before: " << inliers_before <<std::endl;
+                //                size_t inliers_before;
+                //                double score_before = score_model(three_view_pose, &inliers_before);
+                //                std::cout << "Score before: " << score_before <<std::endl;
+                //                std::cout << "Inliers before: " << inliers_before <<std::endl;
 
                 refine_3v_relpose(x1r, x2r, x3r, &three_view_pose, bundle_opt);
-                models->emplace_back(three_view_pose);
 
-//                size_t inliers_after;
-//                double score_after = score_model(three_view_pose, &inliers_after);
-//                std::cout << "Score after: " << score_after <<std::endl;
-//                std::cout << "Inliers after: " << inliers_after <<std::endl;
-            } else {
-//                size_t inliers_before;
-//                double score_before = score_model(ThreeViewCameraPose(pose12, pose13), &inliers_before);
-//                std::cout << "Score before: " << score_before <<std::endl;
-//                std::cout << "Inliers before: " << inliers_before <<std::endl;
-                models->emplace_back(ThreeViewCameraPose(pose12, pose13));
+                //                size_t inliers_after;
+                //                double score_after = score_model(three_view_pose, &inliers_after);
+                //                std::cout << "Score after: " << score_after <<std::endl;
+                //                std::cout << "Inliers after: " << inliers_after <<std::endl;
             }
+            models->emplace_back(three_view_pose);
         }
     }
 }
@@ -169,6 +176,9 @@ double ThreeViewRelativePoseEstimator::score_model(const ThreeViewCameraPose &th
 }
 
 void ThreeViewRelativePoseEstimator::refine_model(ThreeViewCameraPose *pose) const {
+    if (opt.lo_iterations == 0)
+        return;
+
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
