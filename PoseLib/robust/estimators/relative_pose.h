@@ -68,9 +68,8 @@ class RelativePoseEstimator {
 class ThreeViewRelativePoseEstimator {
   public:
     ThreeViewRelativePoseEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
-                                   const std::vector<Point2D> &points2D_2, const std::vector<Point2D> &points2D_3,
-                                   size_t sample_sz = 5, bool inner_refine = false)
-        : sample_sz(sample_sz), inner_refine(inner_refine), num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2), x3(points2D_3),
+                                   const std::vector<Point2D> &points2D_2, const std::vector<Point2D> &points2D_3                                   )
+        : sample_sz((ransac_opt.sample_sz == 0) ? 5 : ransac_opt.sample_sz), num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2), x3(points2D_3),
           sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
         x1n.resize(5);
         x2n.resize(5);
@@ -83,9 +82,9 @@ class ThreeViewRelativePoseEstimator {
     void generate_models(std::vector<ThreeViewCameraPose> *models);
     double score_model(const ThreeViewCameraPose &three_view_pose, size_t *inlier_count) const;
     void refine_model(ThreeViewCameraPose *three_view_pose) const;
+    void inner_refine(ThreeViewCameraPose *three_view_pose) const;
 
     const size_t sample_sz;
-    const bool inner_refine;
     const size_t sample_sz_13 = 3;
     const size_t num_data;
 
@@ -99,6 +98,8 @@ class ThreeViewRelativePoseEstimator {
     // pre-allocated vectors for sampling
     std::vector<Eigen::Vector3d> x1n, x2n, x1s, x2s, x3s;
     std::vector<size_t> sample;
+
+    void estimate_models(std::vector<ThreeViewCameraPose> *models);
 };
 
 class SharedFocalRelativePoseEstimator {

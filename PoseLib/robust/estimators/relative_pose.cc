@@ -88,8 +88,10 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
 
     // if we use 4 pts we approx the last as the mean of the prev 4 pts
     if (sample_sz == 4){
-        x1n[4] = (0.25 * (x1[sample[0]] + x1[sample[1]] + x1[sample[2]] + x1[sample[3]])).homogeneous().normalized();
-        x2n[4] = (0.25 * (x2[sample[0]] + x2[sample[1]] + x2[sample[2]] + x2[sample[3]])).homogeneous().normalized();
+//        x1n[4] = (0.25 * (x1[sample[0]] + x1[sample[1]] + x1[sample[2]] + x1[sample[3]])).homogeneous().normalized();
+//        x2n[4] = (0.25 * (x2[sample[0]] + x2[sample[1]] + x2[sample[2]] + x2[sample[3]])).homogeneous().normalized();
+        x1n[4] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
+        x2n[4] = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0).homogeneous().normalized();
     }
 
     for (size_t k = 0; k < sample_sz_13; ++k) {
@@ -97,7 +99,37 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
         x2s[k] = x2[sample[k]].homogeneous();
         x3s[k] = x3[sample[k]].homogeneous().normalized();
     }
+    estimate_models(models);
 
+    if (sample_sz == 4 and opt.delta > 0.0){
+        Point2D x2n4 = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0);
+
+        double min_x = std::min({x2[sample[0]][0] + x2[sample[1]][0] + x2[sample[2]][0]});
+        double min_y = std::min({x2[sample[0]][1] + x2[sample[1]][1] + x2[sample[2]][1]});
+        double max_x = std::max({x2[sample[0]][0] + x2[sample[1]][0] + x2[sample[2]][0]});
+        double max_y = std::max({x2[sample[0]][1] + x2[sample[1]][1] + x2[sample[2]][1]});
+
+        int idx;
+        double scale;
+        if ((max_x - min_x) > (max_y - min_y)) {
+            scale = max_x - min_x;
+            idx = 0;
+        } else {
+            scale = max_y - min_y;
+            idx = 1;
+        }
+
+        x2n4(idx) += opt.delta * scale;
+        x2n[4] = x2n4.homogeneous().normalized();
+        estimate_models(models);
+
+        x2n4(idx) -= 2 * opt.delta * scale;
+        x2n[4] = x2n4.homogeneous().normalized();
+        estimate_models(models);
+    }
+}
+
+void ThreeViewRelativePoseEstimator::estimate_models(std::vector<ThreeViewCameraPose> *models) {
     std::vector<CameraPose> models12;
     relpose_5pt(x1n, x2n, &models12);
 
@@ -109,57 +141,48 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
             triangulated_12[i] = triangulate(pose12, x1s[i], x2s[i]);
         }
 
-
         std::vector<CameraPose> models13;
         p3p(x3s, triangulated_12, &models13);
 
         for (CameraPose pose13 : models13){
             ThreeViewCameraPose three_view_pose = ThreeViewCameraPose(pose12, pose13);
-
-            size_t inlier_4p_13 = 0;
-            size_t inlier_4p_23 = 0;
-            std::vector<Point2D> x1c = {x1[sample[3]]};
-            std::vector<Point2D> x2c = {x2[sample[3]]};
-            std::vector<Point2D> x3c = {x3[sample[3]]};
-            compute_sampson_msac_score(three_view_pose.pose13, x1c, x3c, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_13);
-            compute_sampson_msac_score(three_view_pose.pose23(), x2c, x3c, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_23);
-
-            if (inlier_4p_13 + inlier_4p_23 < 2){
-                continue;
+            if (opt.threeview_check){
+                size_t inlier_4p_13 = 0;
+                size_t inlier_4p_23 = 0;
+                std::vector<Point2D> x1c = {x1[sample[3]]};
+                std::vector<Point2D> x2c = {x2[sample[3]]};
+                std::vector<Point2D> x3c = {x3[sample[3]]};
+                compute_sampson_msac_score(three_view_pose.pose13, x1c, x3c, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_13);
+                compute_sampson_msac_score(three_view_pose.pose23(), x2c, x3c, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_23);
+                if (inlier_4p_13 + inlier_4p_23 < 2) {
+                    continue;
+                }
             }
 
-            if (inner_refine) {
-                std::vector<Point2D> x1r, x2r, x3r;
-                x1r.resize(4);
-                x2r.resize(4);
-                x3r.resize(4);
-                for (size_t k = 0; k < 4; k++) {
-                    x1r[k] = x1[sample[k]];
-                    x2r[k] = x2[sample[k]];
-                    x3r[k] = x3[sample[k]];
-                }
-
-                BundleOptions bundle_opt;
-                bundle_opt.loss_type = BundleOptions::LossType::CAUCHY;
-                bundle_opt.loss_scale = opt.max_epipolar_error;
-                bundle_opt.max_iterations = 10;
-                //                bundle_opt.verbose = true;
-
-                //                size_t inliers_before;
-                //                double score_before = score_model(three_view_pose, &inliers_before);
-                //                std::cout << "Score before: " << score_before <<std::endl;
-                //                std::cout << "Inliers before: " << inliers_before <<std::endl;
-
-                refine_3v_relpose(x1r, x2r, x3r, &three_view_pose, bundle_opt);
-
-                //                size_t inliers_after;
-                //                double score_after = score_model(three_view_pose, &inliers_after);
-                //                std::cout << "Score after: " << score_after <<std::endl;
-                //                std::cout << "Inliers after: " << inliers_after <<std::endl;
+            if (opt.inner_refine > 0) {
+                inner_refine(&three_view_pose);
             }
             models->emplace_back(three_view_pose);
         }
     }
+}
+
+void ThreeViewRelativePoseEstimator::inner_refine(ThreeViewCameraPose *three_view_pose) const {
+    std::vector<Point2D> x1r, x2r, x3r;
+    x1r.resize(4);
+    x2r.resize(4);
+    x3r.resize(4);
+    for (size_t k = 0; k < 4; ++k) {
+        x1r[k] = x1[sample[k]];
+        x2r[k] = x2[sample[k]];
+        x3r[k] = x3[sample[k]];
+    }
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::CAUCHY;
+    bundle_opt.loss_scale = opt.max_epipolar_error;
+    bundle_opt.max_iterations = opt.inner_refine;
+    refine_3v_relpose(x1r, x2r, x3r, three_view_pose, bundle_opt);
 }
 
 double ThreeViewRelativePoseEstimator::score_model(const ThreeViewCameraPose &three_view_pose, size_t *inlier_count) const {
