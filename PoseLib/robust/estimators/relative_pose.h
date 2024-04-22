@@ -100,6 +100,7 @@ class ThreeViewRelativePoseEstimator {
     std::vector<size_t> sample;
 
     void estimate_models(std::vector<ThreeViewCameraPose> *models);
+    void delta(std::vector<ThreeViewCameraPose> *models);
 };
 
 class SharedFocalRelativePoseEstimator {

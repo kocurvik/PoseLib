@@ -102,31 +102,95 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
     estimate_models(models);
 
     if (sample_sz == 4 and opt.delta > 0.0){
-        Point2D x2n4 = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0);
+        delta(models);
 
-        double min_x = std::min({x2[sample[0]][0] + x2[sample[1]][0] + x2[sample[2]][0]});
-        double min_y = std::min({x2[sample[0]][1] + x2[sample[1]][1] + x2[sample[2]][1]});
-        double max_x = std::max({x2[sample[0]][0] + x2[sample[1]][0] + x2[sample[2]][0]});
-        double max_y = std::max({x2[sample[0]][1] + x2[sample[1]][1] + x2[sample[2]][1]});
-
-        int idx;
-        double scale;
-        if ((max_x - min_x) > (max_y - min_y)) {
-            scale = max_x - min_x;
-            idx = 0;
-        } else {
-            scale = max_y - min_y;
-            idx = 1;
-        }
-
-        x2n4(idx) += opt.delta * scale;
-        x2n[4] = x2n4.homogeneous().normalized();
-        estimate_models(models);
-
-        x2n4(idx) -= 2 * opt.delta * scale;
-        x2n[4] = x2n4.homogeneous().normalized();
-        estimate_models(models);
     }
+}
+
+void ThreeViewRelativePoseEstimator::delta(std::vector<ThreeViewCameraPose> *models) {
+    Point2D x2n4 = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0);
+    double mx2 = x2n4(0), my2 = x2n4(1);
+
+    double tr_xA = x2[sample[0]](0), tr_yA = x2[sample[0]](1);
+    double tr_xB = x2[sample[1]](0), tr_yB = x2[sample[1]](1);
+    double tr_xC = x2[sample[2]](0), tr_yC = x2[sample[2]](1);
+
+    double slopeAB = (tr_yB - tr_yA) / (tr_xB - tr_xA);
+    double slopeAC = (tr_yC - tr_yA) / (tr_xC - tr_xA);
+    double slopeBC = (tr_yC - tr_yB) / (tr_xC - tr_xB);
+
+    double interceptAB = tr_yA - slopeAB * tr_xA;
+    double interceptAC = tr_yA - slopeAC * tr_xA;
+    double interceptBC = tr_yB - slopeBC * tr_xB;
+
+    // find y coord in lines AB, AC, and BC, in the 2nd view for x=mean
+    double yAB = slopeAB * mx2 + interceptAB;
+    double yAC = slopeAC * mx2 + interceptAC;
+    double yBC = slopeBC * mx2 + interceptBC;
+
+    // find x coord in lines AB, AC, and BC, in the 2nd view for y=mean
+    double xAB = (my2 - interceptAB) / slopeAB;
+    double xAC = (my2 - interceptAC) / slopeAC;
+    double xBC = (my2 - interceptBC) / slopeBC;
+
+    // find min and max y and min and max x of thriangle vertices
+    double min_y = std::min(std::min(tr_yA, tr_yB), tr_yC);
+    double max_y = std::max(std::max(tr_yA, tr_yB), tr_yC);
+    double min_x = std::min(std::min(tr_xA, tr_xB), tr_xC);
+    double max_x = std::max(std::max(tr_xA, tr_xB), tr_xC);
+
+    double max_distY;
+    if (yAB>max_y || yAB<min_y) {
+        max_distY = std::abs(yAC-yBC);
+    } else if (yAC>max_y || yAC<min_y) {
+        max_distY = std::abs(yAB-yBC);
+    } else {
+        max_distY = std::abs(yAB-yAC);
+    }
+
+    double max_distX;
+    if (xAB>max_x || xAB<min_x) {
+        max_distX = std::abs(xAC-xBC);
+    } else if (xAC>max_x || xAC<min_x) {
+        max_distX = std::abs(xAB-xBC);
+    } else {
+        max_distX = std::abs(xAB-xAC);
+    }
+
+    int idx;
+    double scale;
+    if (max_distX > max_distY){
+        scale = max_distX;
+        idx = 0;
+    } else {
+        scale = max_distY;
+        idx = 1;
+    }
+
+//    Point2D x2n4 = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0);
+//
+//    double min_x = std::min({x2[sample[0]][0], x2[sample[1]][0], x2[sample[2]][0]});
+//    double min_y = std::min({x2[sample[0]][1], x2[sample[1]][1], x2[sample[2]][1]});
+//    double max_x = std::max({x2[sample[0]][0], x2[sample[1]][0], x2[sample[2]][0]});
+//    double max_y = std::max({x2[sample[0]][1], x2[sample[1]][1], x2[sample[2]][1]});
+//
+//    int idx;
+//    double scale;
+//    if ((max_x - min_x) > (max_y - min_y)) {
+//        scale = max_x - min_x;
+//        idx = 0;
+//    } else {
+//        scale = max_y - min_y;
+//        idx = 1;
+//    }
+
+    x2n4(idx) += opt.delta * scale;
+    x2n[4] = x2n4.homogeneous().normalized();
+    estimate_models(models);
+
+    x2n4(idx) -= 2 * opt.delta * scale;
+    x2n[4] = x2n4.homogeneous().normalized();
+    estimate_models(models);
 }
 
 void ThreeViewRelativePoseEstimator::estimate_models(std::vector<ThreeViewCameraPose> *models) {
@@ -152,8 +216,8 @@ void ThreeViewRelativePoseEstimator::estimate_models(std::vector<ThreeViewCamera
                 std::vector<Point2D> x1c = {x1[sample[3]]};
                 std::vector<Point2D> x2c = {x2[sample[3]]};
                 std::vector<Point2D> x3c = {x3[sample[3]]};
-                compute_sampson_msac_score(three_view_pose.pose13, x1c, x3c, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_13);
-                compute_sampson_msac_score(three_view_pose.pose23(), x2c, x3c, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_23);
+                compute_sampson_msac_score(three_view_pose.pose13, x1c, x3c, 4 * opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_13);
+                compute_sampson_msac_score(three_view_pose.pose23(), x2c, x3c, 4 * opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_23);
                 if (inlier_4p_13 + inlier_4p_23 < 2) {
                     continue;
                 }
