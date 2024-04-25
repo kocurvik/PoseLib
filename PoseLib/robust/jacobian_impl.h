@@ -33,6 +33,7 @@
 #include "PoseLib/misc/colmap_models.h"
 #include "PoseLib/misc/essential.h"
 #include "PoseLib/types.h"
+#include "utils.h"
 
 namespace poselib {
 
@@ -566,15 +567,7 @@ class RelativePoseJacobianAccumulator {
     Eigen::Matrix<double, 3, 2> tangent_basis;
 };
 
-// TODO move somewhere better
-Eigen::Matrix3d skew(const Eigen::Vector3d &x){
-    Eigen::Matrix3d s;
-    s <<  0, -x(2), x(1), x(2), 0, -x(0),
-        -x(1), x(0), 0;
-    return s;
-}
-
-template <typename LossFunction, typename ResidualWeightVector = UniformWeightVector>
+    template <typename LossFunction, typename ResidualWeightVector = UniformWeightVector>
 class ThreeViewRelativePoseJacobianAccumulator {
   public:
     ThreeViewRelativePoseJacobianAccumulator(const std::vector<Point2D> &points2D_1,

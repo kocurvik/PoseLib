@@ -506,4 +506,13 @@ Point3D triangulate(const CameraPose &pose, const Point3D &x1, const Point3D &x2
     Eigen::Vector3d X(X_h(0) / X_h(3), X_h(1) / X_h(3), X_h(2) / X_h(3));
     return X;
 }
+
+// TODO move somewhere better
+Eigen::Matrix3d skew(const Eigen::Vector3d &x){
+    Eigen::Matrix3d s;
+    s <<  0, -x(2), x(1), x(2), 0, -x(0),
+            -x(1), x(0), 0;
+    return s;
+}
+
 } // namespace poselib

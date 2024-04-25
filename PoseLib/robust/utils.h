@@ -86,6 +86,8 @@ bool calculate_RFC(const Eigen::Matrix3d &F);
 
 // Triangulates points from uncalibrated view - assumes that last homog coord of x1, x2 is 1.0
 Point3D triangulate(const CameraPose &pose, const Point3D &x1, const Point3D &x2);
+
+Eigen::Matrix3d skew(const Eigen::Vector3d &x);
 } // namespace poselib
 
 #endif
