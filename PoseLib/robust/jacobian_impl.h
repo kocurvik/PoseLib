@@ -29,6 +29,7 @@
 #ifndef POSELIB_JACOBIAN_IMPL_H_
 #define POSELIB_JACOBIAN_IMPL_H_
 
+#include <iostream>
 #include "PoseLib/camera_pose.h"
 #include "PoseLib/misc/colmap_models.h"
 #include "PoseLib/misc/essential.h"
@@ -744,6 +745,211 @@ class SharedFocalRelativePoseJacobianAccumulator {
     }
     typedef ImagePair param_t;
     static constexpr size_t num_params = 6;
+
+  private:
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+    const LossFunction &loss_fn;
+    const ResidualWeightVector &weights;
+    Eigen::Matrix<double, 3, 2> tangent_basis;
+};
+
+template <typename LossFunction, typename ResidualWeightVector = UniformWeightVector>
+class RDSharedFocalRelativePoseJacobianAccumulator {
+  public:
+    RDSharedFocalRelativePoseJacobianAccumulator(const std::vector<Point2D> &points2D_1,
+                                                 const std::vector<Point2D> &points2D_2, const LossFunction &l,
+                                                 const ResidualWeightVector &w = ResidualWeightVector())
+        : x1(points2D_1), x2(points2D_2), loss_fn(l), weights(w) {}
+
+    double residual(const ImagePair &image_pair) const {
+        Eigen::Matrix3d E;
+        essential_from_motion(image_pair.pose, &E);
+        Eigen::Matrix3d K_inv;
+        K_inv << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, image_pair.camera1.focal();
+
+        Eigen::Matrix3d F = K_inv * (E * K_inv);
+
+        double cost = 0.0;
+        double rd_k = image_pair.camera1.params[3];
+        for (size_t k = 0; k < x1.size(); ++k) {
+            Point3D x1u = (x1[k] / (1 + rd_k * x1[k].squaredNorm())).homogeneous();
+            Point3D x2u = (x2[k] / (1 + rd_k * x2[k].squaredNorm())).homogeneous();
+
+            double C = x2u.dot(F * x1u);
+            double nJc_sq = (F.block<2, 3>(0, 0) * x1u).squaredNorm() +
+                            (F.block<3, 2>(0, 0).transpose() * x2u).squaredNorm();
+
+            double r2 = (C * C) / nJc_sq;
+            cost += weights[k] * loss_fn.loss(r2);
+        }
+
+        return cost;
+    }
+
+    size_t accumulate(const ImagePair &image_pair, Eigen::Matrix<double, 7, 7> &JtJ, Eigen::Matrix<double, 7, 1> &Jtr) {
+        // We start by setting up a basis for the updates in the translation (orthogonal to t)
+        // We find the minimum element of t and cross product with the corresponding basis vector.
+        // (this ensures that the first cross product is not close to the zero vector)
+        if (std::abs(image_pair.pose.t.x()) < std::abs(image_pair.pose.t.y())) {
+            // x < y
+            if (std::abs(image_pair.pose.t.x()) < std::abs(image_pair.pose.t.z())) {
+                tangent_basis.col(0) = image_pair.pose.t.cross(Eigen::Vector3d::UnitX()).normalized();
+            } else {
+                tangent_basis.col(0) = image_pair.pose.t.cross(Eigen::Vector3d::UnitZ()).normalized();
+            }
+        } else {
+            // x > y
+            if (std::abs(image_pair.pose.t.y()) < std::abs(image_pair.pose.t.z())) {
+                tangent_basis.col(0) = image_pair.pose.t.cross(Eigen::Vector3d::UnitY()).normalized();
+            } else {
+                tangent_basis.col(0) = image_pair.pose.t.cross(Eigen::Vector3d::UnitZ()).normalized();
+            }
+        }
+        tangent_basis.col(1) = tangent_basis.col(0).cross(image_pair.pose.t).normalized();
+
+        double focal = image_pair.camera1.focal();
+        Eigen::Matrix3d K_inv;
+        K_inv << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, focal;
+
+        Eigen::Matrix3d E, R;
+        R = image_pair.pose.R();
+        essential_from_motion(image_pair.pose, &E);
+        Eigen::Matrix3d F = K_inv * (E * K_inv);
+
+        // Matrices contain the jacobians of E w.r.t. the rotation and translation parameters
+        Eigen::Matrix<double, 9, 3> dR;
+        Eigen::Matrix<double, 9, 2> dt;
+
+        // Each column is vec(E*skew(e_k)) where e_k is k:th basis vector
+        dR.block<3, 1>(0, 0).setZero();
+        dR.block<3, 1>(0, 1) = -E.col(2);
+        dR.block<3, 1>(0, 2) = E.col(1);
+        dR.block<3, 1>(3, 0) = E.col(2);
+        dR.block<3, 1>(3, 1).setZero();
+        dR.block<3, 1>(3, 2) = -E.col(0);
+        dR.block<3, 1>(6, 0) = -E.col(1);
+        dR.block<3, 1>(6, 1) = E.col(0);
+        dR.block<3, 1>(6, 2).setZero();
+
+        dR.row(2) *= focal;
+        dR.row(5) *= focal;
+        dR.row(6) *= focal;
+        dR.row(7) *= focal;
+        dR.row(8) *= focal * focal;
+
+        // Each column is vec(skew(tangent_basis[k])*R)
+        dt.block<3, 1>(0, 0) = tangent_basis.col(0).cross(R.col(0));
+        dt.block<3, 1>(0, 1) = tangent_basis.col(1).cross(R.col(0));
+        dt.block<3, 1>(3, 0) = tangent_basis.col(0).cross(R.col(1));
+        dt.block<3, 1>(3, 1) = tangent_basis.col(1).cross(R.col(1));
+        dt.block<3, 1>(6, 0) = tangent_basis.col(0).cross(R.col(2));
+        dt.block<3, 1>(6, 1) = tangent_basis.col(1).cross(R.col(2));
+
+        dt.row(2) *= focal;
+        dt.row(5) *= focal;
+        dt.row(6) *= focal;
+        dt.row(7) *= focal;
+        dt.row(8) *= focal * focal;
+
+        Eigen::Matrix<double, 9, 1> df;
+
+        df << 0.0, 0.0, E(2, 0), 0.0, 0.0, E(2, 1), E(0, 2), E(1, 2), 2 * E(2, 2) * focal;
+
+        size_t num_residuals = 0;
+
+        double rd_k = image_pair.camera1.params[3];
+        for (size_t k = 0; k < x1.size(); ++k) {
+            Point3D x1u = (x1[k] / (1 + rd_k * x1[k].squaredNorm())).homogeneous();
+            Point3D x2u = (x2[k] / (1 + rd_k * x2[k].squaredNorm())).homogeneous();
+            double C = x2u.dot(F * x1u);
+
+            // J_C is the Jacobian of the epipolar constraint w.r.t. the image points
+            Eigen::Vector4d J_C;
+            J_C << F.block<3, 2>(0, 0).transpose() * x2u, F.block<2, 3>(0, 0) * x1u;
+            const double nJ_C = J_C.norm();
+            const double inv_nJ_C = 1.0 / nJ_C;
+            const double r = C * inv_nJ_C;
+
+            // Compute weight from robust loss function (used in the IRLS)
+            const double weight = weights[k] * loss_fn.weight(r * r);
+            if (weight == 0.0) {
+                continue;
+            }
+            num_residuals++;
+
+            // Compute Jacobian of Sampson error w.r.t the fundamental/essential matrix (3x3)
+            Eigen::Matrix<double, 1, 9> dF;
+            dF << x1u(0) * x2u(0), x1u(0) * x2u(1), x1u(0), x1u(1) * x2u(0), x1u(1) * x2u(1),
+                x1u(1), x2u(0), x2u(1), 1.0;
+            const double s = C * inv_nJ_C * inv_nJ_C;
+            dF(0) -= s * (J_C(2) * x1u(0) + J_C(0) * x2u(0));
+            dF(1) -= s * (J_C(3) * x1u(0) + J_C(0) * x2u(1));
+            dF(2) -= s * (J_C(0));
+            dF(3) -= s * (J_C(2) * x1u(1) + J_C(1) * x2u(0));
+            dF(4) -= s * (J_C(3) * x1u(1) + J_C(1) * x2u(1));
+            dF(5) -= s * (J_C(1));
+            dF(6) -= s * (J_C(2));
+            dF(7) -= s * (J_C(3));
+            dF *= inv_nJ_C;
+
+
+            Point3D dx1udk, dx2udk;
+            dx1udk << - x1[k] * x1[k].squaredNorm() / ((1 + rd_k * x1[k].squaredNorm()) * (1 + rd_k * x1[k].squaredNorm())), 0.0;
+            dx2udk << - x2[k] * x2[k].squaredNorm() / ((1 + rd_k * x2[k].squaredNorm()) * (1 + rd_k * x2[k].squaredNorm())), 0.0;
+
+            // derivative of the Sampson error denominator w.r.t. k
+            Eigen::Vector4d dSdendk;
+            dSdendk << F.block<3, 2>(0, 0).transpose() * dx2udk, F.block<2, 3>(0, 0) * dx1udk;
+            double ndSdendk = dSdendk.norm();
+            double dSnumdk = x2u.dot(F * dx1udk) + dx2udk.dot(F * x1u);
+            double dk = dSnumdk * inv_nJ_C - 0.5 * inv_nJ_C * inv_nJ_C * C * ndSdendk;
+
+            // and then w.r.t. the pose parameters (rotation + tangent basis for translation)
+            Eigen::Matrix<double, 1, 7> J;
+            J.block<1, 3>(0, 0) = dF * dR;
+            J.block<1, 2>(0, 3) = dF * dt;
+            J(0, 5) = dF * df;
+            J(0, 6) = dk;
+
+//            Eigen::Matrix<double, 1, 7> num_J;
+//            Eigen::Matrix<double, 7, 1> dp;
+//            double eps = 1.0e-12;
+//            for (int i = 0; i < 7; ++i){
+//                dp.setZero();
+//                dp(i, 0) = eps;
+//                ImagePair step_image_pair = step(dp, image_pair);
+//                dp.setZero();
+//                num_J(0, i) = (residual(step_image_pair, k) - residual(image_pair, k)) / eps;
+//            }
+//
+//            std::cout << "Sym J: " << 2 * weight * C * inv_nJ_C * J << std::endl;
+//            std::cout << "Num J: " << num_J << std::endl;
+
+            // Accumulate into JtJ and Jtr
+            Jtr += weight * C * inv_nJ_C * J.transpose();
+            for (int row = 0; row < 7; ++row){
+                for (int col = 0; col <= row; ++col)
+                    JtJ(row, col) += weight * (J(row) * J(col));
+            }
+        }
+        return num_residuals;
+    }
+
+    ImagePair step(Eigen::Matrix<double, 7, 1> dp, const ImagePair &image_pair) const {
+        CameraPose pose_new;
+        pose_new.q = quat_step_post(image_pair.pose.q, dp.block<3, 1>(0, 0));
+        pose_new.t = image_pair.pose.t + tangent_basis * dp.block<2, 1>(3, 0);
+
+        Camera camera_new =
+            Camera("DIVISION_RADIAL",
+                   std::vector<double>{std::max(image_pair.camera1.focal() + dp(5, 0), 0.0), 0.0, 0.0, image_pair.camera1.params[3] + dp(6, 0)}, -1, -1);
+        ImagePair calib_pose_new(pose_new, camera_new, camera_new);
+
+        return calib_pose_new;
+    }
+    typedef ImagePair param_t;
+    static constexpr size_t num_params = 7;
 
   private:
     const std::vector<Point2D> &x1;

@@ -94,6 +94,42 @@ class SharedFocalRelativePoseEstimator {
     std::vector<size_t> sample;
 };
 
+class RDSharedFocalRelativePoseEstimator {
+  public:
+    RDSharedFocalRelativePoseEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
+                                       const std::vector<Point2D> &points2D_2)
+        : num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2),
+          sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
+        x1s.resize(sample_sz);
+        x2s.resize(sample_sz);
+        sample.resize(sample_sz);
+        x1u.resize(num_data);
+        x2u.resize(num_data);
+        rd_vals = {0, 0.5, 1.0};
+        last_k = 0.0;
+    }
+
+    void generate_models(ImagePairVector *models);
+    double score_model(const ImagePair &image_pair, size_t *inlier_count);
+    void refine_model(ImagePair *image_pair);
+
+    const size_t sample_sz = 6;
+    const size_t num_data;
+
+  private:
+    const RansacOptions &opt;
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+    std::vector<double> rd_vals;
+    double last_k;
+
+    RandomSampler sampler;
+    // pre-allocated vectors for sampling
+    std::vector<Eigen::Vector3d> x1s, x2s;
+    std::vector<Eigen::Vector2d> x1u, x2u;
+    std::vector<size_t> sample;
+};
+
 class GeneralizedRelativePoseEstimator {
   public:
     GeneralizedRelativePoseEstimator(const RansacOptions &ransac_opt,

@@ -76,6 +76,7 @@ struct Camera {
         static void project_with_jac(const std::vector<double> &params, const Eigen::Vector2d &x, Eigen::Vector2d *xp, \
                                      Eigen::Matrix2d *jac);                                                            \
         static void unproject(const std::vector<double> &params, const Eigen::Vector2d &xp, Eigen::Vector2d *x);       \
+        static void undistort(const std::vector<double> &params, const Eigen::Vector2d &xp, Eigen::Vector2d *x);       \
         static const std::vector<size_t> focal_idx;                                                                    \
         static const std::vector<size_t> principal_point_idx;                                                          \
         static const int model_id = ModelId;                                                                           \
@@ -88,6 +89,7 @@ SETUP_CAMERA_SHARED_DEFS(PinholeCameraModel, "PINHOLE", 1);
 SETUP_CAMERA_SHARED_DEFS(SimpleRadialCameraModel, "SIMPLE_RADIAL", 2);
 SETUP_CAMERA_SHARED_DEFS(RadialCameraModel, "RADIAL", 3);
 SETUP_CAMERA_SHARED_DEFS(OpenCVCameraModel, "OPENCV", 4);
+SETUP_CAMERA_SHARED_DEFS(DivisionRadialCameraModel, "DIVISION_RADIAL", 5);
 SETUP_CAMERA_SHARED_DEFS(OpenCVFisheyeCameraModel, "OPENCV_FISHEYE", 8);
 
 #define SWITCH_CAMERA_MODELS                                                                                           \
@@ -97,6 +99,7 @@ SETUP_CAMERA_SHARED_DEFS(OpenCVFisheyeCameraModel, "OPENCV_FISHEYE", 8);
     SWITCH_CAMERA_MODEL_CASE(SimpleRadialCameraModel)                                                                  \
     SWITCH_CAMERA_MODEL_CASE(RadialCameraModel)                                                                        \
     SWITCH_CAMERA_MODEL_CASE(OpenCVCameraModel)                                                                        \
+    SWITCH_CAMERA_MODEL_CASE(DivisionRadialCameraModel)                                                                \
     SWITCH_CAMERA_MODEL_CASE(OpenCVFisheyeCameraModel)
 
 // TODO add more models
