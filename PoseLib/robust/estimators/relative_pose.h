@@ -105,7 +105,7 @@ class RDSharedFocalRelativePoseEstimator {
         sample.resize(sample_sz);
         x1u.resize(num_data);
         x2u.resize(num_data);
-        rd_vals = {0, 0.5, 1.0};
+        rd_vals = {0, 1e-2, 1e-4};
         last_k = 0.0;
     }
 

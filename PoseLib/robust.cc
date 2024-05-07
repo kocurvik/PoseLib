@@ -332,8 +332,7 @@ RansacStats estimate_rd_shared_focal_relative_pose(const std::vector<Point2D> &p
     image_pair->camera1.params[0] *= scale;
     image_pair->camera1.params[1] = pp(0);
     image_pair->camera1.params[2] = pp(1);
-//  or /= scale * scale???
-    image_pair->camera1.params[3] *= scale * scale;
+    image_pair->camera1.params[3] /= scale * scale;
 
     image_pair->camera2 = image_pair->camera1;
 

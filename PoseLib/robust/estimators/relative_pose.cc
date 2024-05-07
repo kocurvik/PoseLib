@@ -136,14 +136,10 @@ void RDSharedFocalRelativePoseEstimator::generate_models(ImagePairVector *models
 
     for (size_t i = 0; i < rd_vals.size(); ++i) {
         double rd = rd_vals[i];
+        Camera rd_cam = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, rd}, -1, -1);
         for (size_t k = 0; k < sample_sz; ++k) {
-            x1s[k] = x1[sample[k]].homogeneous();
-            x2s[k] = x2[sample[k]].homogeneous();
-            // undistort
-            x1s[k](2) += rd * x1[sample[k]].squaredNorm();
-            x2s[k](2) += rd * x2[sample[k]].squaredNorm();
-            x1s[k].normalize();
-            x2s[k].normalize();
+            x1s[k] = rd_cam.undistort(x1[sample[k]]).homogeneous().normalized();
+            x2s[k] = rd_cam.undistort(x2[sample[k]]).homogeneous().normalized();
         }
 
         ImagePairVector local_models;
@@ -168,8 +164,8 @@ double RDSharedFocalRelativePoseEstimator::score_model(const ImagePair &image_pa
     double k = image_pair.camera1.params[3];
     if (last_k != k) {
         for (size_t i = 0; i < x1.size(); ++i) {
-            x1u[i] = x1[i] / (k * x1[i].squaredNorm());
-            x2u[i] = x2[i] / (k * x2[i].squaredNorm());
+            x1u[i] = image_pair.camera1.undistort(x1[i]);
+            x2u[i] = image_pair.camera1.undistort(x2[i]);
         }
         last_k = k;
     }

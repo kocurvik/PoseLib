@@ -125,6 +125,41 @@ void Camera::unproject(const Eigen::Vector2d &xp, Eigen::Vector2d *x) const {
 #undef SWITCH_CAMERA_MODEL_CASE
 }
 
+
+Eigen::Vector2d Camera::undistort(const Eigen::Vector2d &xp) const {
+Eigen::Vector2d x;
+#define SWITCH_CAMERA_MODEL_CASE(Model)                                                                                \
+    case Model::model_id:                                                                                              \
+        Model::undistort(params, xp, &x);                                                                               \
+        break;
+
+        switch (model_id) {
+            SWITCH_CAMERA_MODELS
+
+            default:
+                throw std::runtime_error("NYI");
+        }
+#undef SWITCH_CAMERA_MODEL_CASE
+    return x;
+}
+
+Eigen::Vector3d Camera::dxudk(const Eigen::Vector2d &xp) const {
+    Eigen::Vector3d x;
+#define SWITCH_CAMERA_MODEL_CASE(Model)                                                                                \
+    case Model::model_id:                                                                                              \
+        Model::dxudk(params, xp, &x);                                                                               \
+        break;
+
+        switch (model_id) {
+            SWITCH_CAMERA_MODELS
+
+            default:
+                throw std::runtime_error("NYI");
+        }
+#undef SWITCH_CAMERA_MODEL_CASE
+    return x;
+}
+
 std::string Camera::model_name() const { return name_from_id(model_id); }
 
 double Camera::focal() const {
@@ -323,6 +358,10 @@ void PinholeCameraModel::undistort(const std::vector<double> &params, const Eige
     (*xp)(0) = x(0);
     (*xp)(1) = x(1);
 }
+void PinholeCameraModel::dxudk(const std::vector<double> &params, const Eigen::Vector2d &x,
+                              Eigen::Vector3d *xp) {
+    throw std::runtime_error("NYI");
+}
 const std::vector<size_t> PinholeCameraModel::focal_idx = {0, 1};
 const std::vector<size_t> PinholeCameraModel::principal_point_idx = {2, 3};
 
@@ -353,6 +392,10 @@ void SimplePinholeCameraModel::undistort(const std::vector<double> &params, cons
                                        Eigen::Vector2d *xp) {
     (*xp)(0) = x(0);
     (*xp)(1) = x(1);
+}
+void SimplePinholeCameraModel::dxudk(const std::vector<double> &params, const Eigen::Vector2d &x,
+                              Eigen::Vector3d *xp) {
+    throw std::runtime_error("NYI");
 }
 const std::vector<size_t> SimplePinholeCameraModel::focal_idx = {0};
 const std::vector<size_t> SimplePinholeCameraModel::principal_point_idx = {1, 2};
@@ -395,6 +438,10 @@ void RadialCameraModel::undistort(const std::vector<double> &params, const Eigen
     (*xp)(0) = alpha * x(0);
     (*xp)(1) = alpha * x(1);
 }
+void RadialCameraModel::dxudk(const std::vector<double> &params, const Eigen::Vector2d &x,
+                              Eigen::Vector3d *xp) {
+    throw std::runtime_error("NYI");
+}
 const std::vector<size_t> RadialCameraModel::focal_idx = {0};
 const std::vector<size_t> RadialCameraModel::principal_point_idx = {1, 2};
 
@@ -435,6 +482,11 @@ void SimpleRadialCameraModel::undistort(const std::vector<double> &params, const
     (*xp)(0) = alpha * x(0);
     (*xp)(1) = alpha * x(1);
 }
+void SimpleRadialCameraModel::dxudk(const std::vector<double> &params, const Eigen::Vector2d &x,
+                              Eigen::Vector3d *xp) {
+    const double r2 = x.squaredNorm();
+    *xp << x * r2, 0.0;
+}
 const std::vector<size_t> SimpleRadialCameraModel::focal_idx = {0};
 const std::vector<size_t> SimpleRadialCameraModel::principal_point_idx = {1, 2};
 
@@ -463,6 +515,11 @@ void DivisionRadialCameraModel::undistort(const std::vector<double> &params, con
     const double alpha = 1 / (1.0 + params[3] * r2);
     (*xp)(0) = alpha * x(0);
     (*xp)(1) = alpha * x(1);
+}
+void DivisionRadialCameraModel::dxudk(const std::vector<double> &params, const Eigen::Vector2d &x,
+                                      Eigen::Vector3d *xp) {
+    double div = (1 + params[3] * x.squaredNorm());
+    *xp << - x * x.squaredNorm() / (div * div), 0.0;
 }
 const std::vector<size_t> DivisionRadialCameraModel::focal_idx = {0};
 const std::vector<size_t> DivisionRadialCameraModel::principal_point_idx = {1, 2};
@@ -545,6 +602,10 @@ void OpenCVCameraModel::unproject(const std::vector<double> &params, const Eigen
 void OpenCVCameraModel::undistort(const std::vector<double> &params, const Eigen::Vector2d &x, Eigen::Vector2d *xp) {
     compute_opencv_distortion(params[4], params[5], params[6], params[7], x, *xp);
 }
+void OpenCVCameraModel::dxudk(const std::vector<double> &params, const Eigen::Vector2d &x,
+                                      Eigen::Vector3d *xp) {
+    throw std::runtime_error("NYI");
+}
 const std::vector<size_t> OpenCVCameraModel::focal_idx = {0, 1};
 const std::vector<size_t> OpenCVCameraModel::principal_point_idx = {2, 3};
 
@@ -568,6 +629,10 @@ void OpenCVFisheyeCameraModel::undistort(const std::vector<double> &params, cons
                                        Eigen::Vector2d *xp) {
     throw std::runtime_error("nyi");
 }
+void OpenCVFisheyeCameraModel::dxudk(const std::vector<double> &params, const Eigen::Vector2d &x,
+                              Eigen::Vector3d *xp) {
+    throw std::runtime_error("NYI");
+}
 const std::vector<size_t> OpenCVFisheyeCameraModel::focal_idx = {0, 1};
 const std::vector<size_t> OpenCVFisheyeCameraModel::principal_point_idx = {2, 3};
 
@@ -580,6 +645,7 @@ void NullCameraModel::project_with_jac(const std::vector<double> &params, const 
                                        Eigen::Matrix2d *jac) {}
 void NullCameraModel::unproject(const std::vector<double> &params, const Eigen::Vector2d &xp, Eigen::Vector2d *x) {}
 void NullCameraModel::undistort(const std::vector<double> &params, const Eigen::Vector2d &x, Eigen::Vector2d *xp) {}
+void NullCameraModel::dxudk(const std::vector<double> &params, const Eigen::Vector2d &x, Eigen::Vector3d *xp) {}
 const std::vector<size_t> NullCameraModel::focal_idx = {};
 const std::vector<size_t> NullCameraModel::principal_point_idx = {};
 

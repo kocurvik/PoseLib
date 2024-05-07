@@ -771,10 +771,9 @@ class RDSharedFocalRelativePoseJacobianAccumulator {
         Eigen::Matrix3d F = K_inv * (E * K_inv);
 
         double cost = 0.0;
-        double rd_k = image_pair.camera1.params[3];
         for (size_t k = 0; k < x1.size(); ++k) {
-            Point3D x1u = (x1[k] / (1 + rd_k * x1[k].squaredNorm())).homogeneous();
-            Point3D x2u = (x2[k] / (1 + rd_k * x2[k].squaredNorm())).homogeneous();
+            Point3D x1u = image_pair.camera1.undistort(x1[k]).homogeneous();
+            Point3D x2u = image_pair.camera1.undistort(x2[k]).homogeneous();
 
             double C = x2u.dot(F * x1u);
             double nJc_sq = (F.block<2, 3>(0, 0) * x1u).squaredNorm() +
@@ -858,10 +857,9 @@ class RDSharedFocalRelativePoseJacobianAccumulator {
 
         size_t num_residuals = 0;
 
-        double rd_k = image_pair.camera1.params[3];
         for (size_t k = 0; k < x1.size(); ++k) {
-            Point3D x1u = (x1[k] / (1 + rd_k * x1[k].squaredNorm())).homogeneous();
-            Point3D x2u = (x2[k] / (1 + rd_k * x2[k].squaredNorm())).homogeneous();
+            Point3D x1u = image_pair.camera1.undistort(x1[k]).homogeneous();
+            Point3D x2u = image_pair.camera1.undistort(x2[k]).homogeneous();
             double C = x2u.dot(F * x1u);
 
             // J_C is the Jacobian of the epipolar constraint w.r.t. the image points
@@ -893,10 +891,10 @@ class RDSharedFocalRelativePoseJacobianAccumulator {
             dF(7) -= s * (J_C(3));
             dF *= inv_nJ_C;
 
+            Point3D dx1udk = image_pair.camera1.dxudk(x1[k]);
+            Point3D dx2udk = image_pair.camera1.dxudk(x2[k]);
 
-            Point3D dx1udk, dx2udk;
-            dx1udk << - x1[k] * x1[k].squaredNorm() / ((1 + rd_k * x1[k].squaredNorm()) * (1 + rd_k * x1[k].squaredNorm())), 0.0;
-            dx2udk << - x2[k] * x2[k].squaredNorm() / ((1 + rd_k * x2[k].squaredNorm()) * (1 + rd_k * x2[k].squaredNorm())), 0.0;
+//            dx2udk << - x2[k] * x2[k].squaredNorm() / ((1 + rd_k * x2[k].squaredNorm()) * (1 + rd_k * x2[k].squaredNorm())), 0.0;
 
             // derivative of the Sampson error denominator w.r.t. k
             Eigen::Vector4d dSdendk;
