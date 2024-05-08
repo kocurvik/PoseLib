@@ -189,8 +189,8 @@ void RDSharedFocalRelativePoseEstimator::refine_model(ImagePair *image_pair) {
     double k = image_pair->camera1.params[3];
     if (last_k != k) {
         for (size_t i = 0; i < x1.size(); ++i) {
-            x1u[i] = x1[i] / (k * x1[i].squaredNorm());
-            x2u[i] = x2[i] / (k * x2[i].squaredNorm());
+            x1u[i] = image_pair->camera1.undistort(x1[i]);
+            x2u[i] = image_pair->camera1.undistort(x2[i]);
         }
         last_k = k;
     }
@@ -356,6 +356,49 @@ void FundamentalEstimator::refine_model(Eigen::Matrix3d *F) const {
     bundle_opt.max_iterations = 25;
 
     refine_fundamental(x1, x2, F, bundle_opt);
+}
+
+void RDFundamentalEstimator::generate_models(std::vector<FCam> *models) {
+    sampler.generate_sample(&sample);
+
+    for (size_t i = 0; i < rd_vals.size(); ++i) {
+        double rd = rd_vals[i];
+        Camera rd_cam = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, rd}, -1, -1);
+        for (size_t k = 0; k < sample_sz; ++k) {
+            x1s[k] = rd_cam.undistort(x1[sample[k]]).homogeneous().normalized();
+            x2s[k] = rd_cam.undistort(x2[sample[k]]).homogeneous().normalized();
+        }
+
+        std::vector<Eigen::Matrix3d> local_models;
+        relpose_7pt(x1s, x2s, &local_models);
+        models->reserve(models->size() + distance(local_models.begin(),local_models.end()));
+        for (const Eigen::Matrix3d& F: local_models){
+            Camera camera = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, rd}, -1, -1);
+            models->emplace_back(FCam(F, camera));
+        }
+    }
+}
+
+double RDFundamentalEstimator::score_model(const FCam &F_cam, size_t *inlier_count) {
+    double k = F_cam.camera.params[3];
+    if (last_k != k) {
+        for (size_t i = 0; i < x1.size(); ++i) {
+            x1u[i] = F_cam.camera.undistort(x1[i]);
+            x2u[i] = F_cam.camera.undistort(x2[i]);
+        }
+        last_k = k;
+    }
+
+    return compute_sampson_msac_score(F_cam.F, x1u, x2u, opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
+}
+
+void RDFundamentalEstimator::refine_model(FCam *F_cam) {
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_epipolar_error;
+    bundle_opt.max_iterations = 25;
+
+    refine_rd_fundamental(x1, x2, F_cam, bundle_opt);
 }
 
 } // namespace poselib

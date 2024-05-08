@@ -388,6 +388,56 @@ RansacStats estimate_fundamental(const std::vector<Point2D> &x1, const std::vect
     return stats;
 }
 
+RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                    const RansacOptions &ransac_opt, const BundleOptions &bundle_opt,
+                                    FCam *F_cam, std::vector<char> *inliers) {
+
+    const size_t num_pts = x1.size();
+    if (num_pts < 8) {
+        return RansacStats();
+    }
+
+    // We normalize points here to improve conditioning. Note that the normalization
+    // only ammounts to a uniform rescaling and shift of the image coordinate system
+    // and the cost we minimize is equivalent to the cost in the original image
+    // we do not perform the shift as the pp needs to remain at [0, 0]
+
+    Eigen::Matrix3d T1, T2;
+    std::vector<Point2D> x1_norm = x1;
+    std::vector<Point2D> x2_norm = x2;
+
+    double scale = normalize_points(x1_norm, x2_norm, T1, T2, true, false, true);
+    RansacOptions ransac_opt_scaled = ransac_opt;
+    ransac_opt_scaled.max_epipolar_error /= scale;
+    BundleOptions bundle_opt_scaled = bundle_opt;
+    bundle_opt_scaled.loss_scale /= scale;
+
+    RansacStats stats = ransac_rd_fundamental(x1_norm, x2_norm, ransac_opt_scaled, F_cam, inliers);
+
+    if (stats.num_inliers > 7) {
+        // Collect inlier for additional non-linear refinement
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < num_pts; ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1_norm[k]);
+            x2_inliers.push_back(x2_norm[k]);
+        }
+
+        refine_rd_fundamental(x1_inliers, x2_inliers, F_cam, bundle_opt_scaled);
+    }
+
+    F_cam->F = T2.transpose() * (F_cam->F) * T1;
+    F_cam->F /= F_cam->F.norm();
+    F_cam->camera.params[3] /= scale * scale;
+
+    return stats;
+}
+
 RansacStats estimate_homography(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                 const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, Eigen::Matrix3d *H,
                                 std::vector<char> *inliers) {

@@ -1406,6 +1406,169 @@ class FundamentalJacobianAccumulator {
     const ResidualWeightVector &weights;
 };
 
+template <typename LossFunction, typename ResidualWeightVector = UniformWeightVector>
+class RDFundamentalJacobianAccumulator {
+  public:
+    RDFundamentalJacobianAccumulator(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
+                                     const LossFunction &l, const ResidualWeightVector &w = ResidualWeightVector())
+        : x1(points2D_1), x2(points2D_2), loss_fn(l), weights(w) {}
+
+    double residual(const FCam F_cam) const {
+        Eigen::Matrix3d F = F_cam.F;
+
+        double cost = 0.0;
+        for (size_t k = 0; k < x1.size(); ++k) {
+            Point3D x1u = F_cam.camera.undistort(x1[k]).homogeneous();
+            Point3D x2u = F_cam.camera.undistort(x2[k]).homogeneous();
+
+            double C = x2u.dot(F * x1u);
+            double nJc_sq = (F.block<2, 3>(0, 0) * x1u).squaredNorm() +
+                            (F.block<3, 2>(0, 0).transpose() * x2u).squaredNorm();
+
+            double r2 = (C * C) / nJc_sq;
+            cost += weights[k] * loss_fn.loss(r2);
+        }
+
+        return cost;
+    }
+
+//    double residual(const FCam F_cam, size_t k) const {
+//        Eigen::Matrix3d F = F_cam.F;
+//
+//        double cost = 0.0;
+//
+//        Point3D x1u = F_cam.camera.undistort(x1[k]).homogeneous();
+//        Point3D x2u = F_cam.camera.undistort(x2[k]).homogeneous();
+//
+//        double C = x2u.dot(F * x1u);
+//        double nJc_sq = (F.block<2, 3>(0, 0) * x1u).squaredNorm() +
+//                        (F.block<3, 2>(0, 0).transpose() * x2u).squaredNorm();
+//
+//        double r2 = (C * C) / nJc_sq;
+//        cost += weights[k] * loss_fn.loss(r2);
+//        return cost;
+//    }
+
+    size_t accumulate(const FCam F_cam, Eigen::Matrix<double, 8, 8> &JtJ,
+                      Eigen::Matrix<double, 8, 1> &Jtr) const {
+
+        const Eigen::Matrix3d F = F_cam.F;
+
+        FactorizedFundamentalMatrix FF = FactorizedFundamentalMatrix(F);
+
+        // Matrices contain the jacobians of F w.r.t. the factorized fundamental matrix (U,V,sigma)
+        const Eigen::Matrix3d U = quat_to_rotmat(FF.qU);
+        const Eigen::Matrix3d V = quat_to_rotmat(FF.qV);
+
+        const Eigen::Matrix3d d_sigma = U.col(1) * V.col(1).transpose();
+        Eigen::Matrix<double, 9, 7> dF_dparams;
+        dF_dparams << 0, F(2, 0), -F(1, 0), 0, F(0, 2), -F(0, 1), d_sigma(0, 0), -F(2, 0), 0, F(0, 0), 0, F(1, 2),
+            -F(1, 1), d_sigma(1, 0), F(1, 0), -F(0, 0), 0, 0, F(2, 2), -F(2, 1), d_sigma(2, 0), 0, F(2, 1), -F(1, 1),
+            -F(0, 2), 0, F(0, 0), d_sigma(0, 1), -F(2, 1), 0, F(0, 1), -F(1, 2), 0, F(1, 0), d_sigma(1, 1), F(1, 1),
+            -F(0, 1), 0, -F(2, 2), 0, F(2, 0), d_sigma(2, 1), 0, F(2, 2), -F(1, 2), F(0, 1), -F(0, 0), 0, d_sigma(0, 2),
+            -F(2, 2), 0, F(0, 2), F(1, 1), -F(1, 0), 0, d_sigma(1, 2), F(1, 2), -F(0, 2), 0, F(2, 1), -F(2, 0), 0,
+            d_sigma(2, 2);
+
+        size_t num_residuals = 0;
+        for (size_t k = 0; k < x1.size(); ++k) {
+            Point3D x1u = F_cam.camera.undistort(x1[k]).homogeneous();
+            Point3D x2u = F_cam.camera.undistort(x2[k]).homogeneous();
+            
+            const double C = x2u.dot(F * x1u);
+
+            // J_C is the Jacobian of the epipolar constraint w.r.t. the image points
+            Eigen::Vector4d J_C;
+            J_C << F.block<3, 2>(0, 0).transpose() * x2u, F.block<2, 3>(0, 0) * x1u;
+            const double nJ_C = J_C.norm();
+            const double inv_nJ_C = 1.0 / nJ_C;
+            const double r = C * inv_nJ_C;
+
+            // Compute weight from robust loss function (used in the IRLS)
+            const double weight = weights[k] * loss_fn.weight(r * r);
+            if (weight == 0.0) {
+                continue;
+            }
+            num_residuals++;
+
+            // Compute Jacobian of Sampson error w.r.t the fundamental/essential matrix (3x3)
+            Eigen::Matrix<double, 1, 9> dF;
+            dF << x1u(0) * x2u(0), x1u(0) * x2u(1), x1u(0), x1u(1) * x2u(0), x1u(1) * x2u(1),
+                x1u(1), x2u(0), x2u(1), 1.0;
+            const double s = C * inv_nJ_C * inv_nJ_C;
+            dF(0) -= s * (J_C(2) * x1u(0) + J_C(0) * x2u(0));
+            dF(1) -= s * (J_C(3) * x1u(0) + J_C(0) * x2u(1));
+            dF(2) -= s * (J_C(0));
+            dF(3) -= s * (J_C(2) * x1u(1) + J_C(1) * x2u(0));
+            dF(4) -= s * (J_C(3) * x1u(1) + J_C(1) * x2u(1));
+            dF(5) -= s * (J_C(1));
+            dF(6) -= s * (J_C(2));
+            dF(7) -= s * (J_C(3));
+            dF *= inv_nJ_C;
+
+            Point3D dx1udk = F_cam.camera.dxudk(x1[k]);
+            Point3D dx2udk = F_cam.camera.dxudk(x2[k]);
+
+            // derivative of the Sampson error denominator w.r.t. k
+            Eigen::Vector4d dSdendk;
+            dSdendk << F.block<3, 2>(0, 0).transpose() * dx2udk, F.block<2, 3>(0, 0) * dx1udk;
+            double ndSdendk = dSdendk.norm();
+            double dSnumdk = x2u.dot(F * dx1udk) + dx2udk.dot(F * x1u);
+            double dk = dSnumdk * inv_nJ_C - 0.5 * inv_nJ_C * inv_nJ_C * C * ndSdendk;
+
+            // and then w.r.t. the pose parameters (rotation + tangent basis for translation)
+            Eigen::Matrix<double, 1, 8> J;
+            J.block<1, 7>(0, 0) = dF * dF_dparams;
+            J(0, 7) = dk;
+
+//            Eigen::Matrix<double, 1, 8> num_J;
+//            Eigen::Matrix<double, 8, 1> dp;
+//            double eps = 1.0e-12;
+//            for (int i = 0; i < 8; ++i){
+//                dp.setZero();
+//                dp(i, 0) = eps;
+//                FCam step_F_cam = step(dp, F_cam);
+//                dp.setZero();
+//                num_J(0, i) = (residual(step_F_cam, k) - residual(F_cam, k)) / eps;
+//            }
+//
+//            std::cout << "Sym J: " << 2 * weight * C * inv_nJ_C * J << std::endl;
+//            std::cout << "Num J: " << num_J << std::endl;
+
+
+            // Accumulate into JtJ and Jtr
+            Jtr += weight * C * inv_nJ_C * J.transpose();
+            for (size_t i = 0; i < 8; ++i) {
+                for (size_t j = 0; j <= i; ++j) {
+                    JtJ(i, j) += weight * (J(i) * J(j));
+                }
+            }
+        }
+        return num_residuals;
+    }
+
+    FCam step(Eigen::Matrix<double, 8, 1> dp, const FCam &F_cam) const {
+        FactorizedFundamentalMatrix F = FactorizedFundamentalMatrix(F_cam.F);
+        FactorizedFundamentalMatrix F_new;
+        F_new.qU = quat_step_pre(F.qU, dp.block<3, 1>(0, 0));
+        F_new.qV = quat_step_pre(F.qV, dp.block<3, 1>(3, 0));
+        F_new.sigma = F.sigma + dp(6);
+
+        Camera camera_new =
+                Camera("DIVISION_RADIAL",
+                       std::vector<double>{1.0, 0.0, 0.0, F_cam.camera.params[3] + dp(7, 0)}, -1, -1);
+
+        return FCam(F_new.F(), camera_new);
+    }
+    typedef FCam param_t;
+    static constexpr size_t num_params = 8;
+
+  private:
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+    const LossFunction &loss_fn;
+    const ResidualWeightVector &weights;
+};
+
 // Non-linear refinement of transfer error |x2 - pi(H*x1)|^2, parameterized by fixing H(2,2) = 1
 // I did some preliminary experiments comparing different error functions (e.g. symmetric and transfer)
 // as well as other parameterizations (different affine patches, SVD as in Bartoli/Sturm, etc)

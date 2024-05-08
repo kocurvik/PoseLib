@@ -198,6 +198,42 @@ class FundamentalEstimator {
     std::vector<size_t> sample;
 };
 
+class RDFundamentalEstimator {
+  public:
+    RDFundamentalEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
+                           const std::vector<Point2D> &points2D_2)
+        : num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2),
+          sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
+        x1s.resize(sample_sz);
+        x2s.resize(sample_sz);
+        x1u.resize(x1.size());
+        x2u.resize(x1.size());
+        sample.resize(sample_sz);
+        rd_vals = {0, 1e-2, 1e-4};
+        last_k = 0.0;
+    }
+
+    void generate_models(std::vector<FCam> *models);
+    double score_model(const FCam &F_cam, size_t *inlier_count);
+    void refine_model(FCam *F_cam);
+
+    const size_t sample_sz = 7;
+    const size_t num_data;
+
+  private:
+    const RansacOptions &opt;
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+
+    RandomSampler sampler;
+    // pre-allocated vectors for sampling
+    std::vector<Eigen::Vector3d> x1s, x2s;
+    std::vector<Eigen::Vector2d> x1u, x2u;
+    std::vector<size_t> sample;
+    std::vector<double> rd_vals;
+    double last_k;
+};
+
 } // namespace poselib
 
 #endif

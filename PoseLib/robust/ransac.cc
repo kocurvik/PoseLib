@@ -139,7 +139,16 @@ RansacStats ransac_rd_shared_focal_relpose(const std::vector<Point2D> &x1, const
     essential_from_motion(best_model->pose, &E);
     Eigen::Matrix3d F = K_inv * (E * K_inv);
 
-    get_inliers(F, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+    std::vector<Point2D> x1_u, x2_u;
+    x1_u.resize(x1.size());
+    x2_u.resize(x2.size());
+
+    for (size_t k = 0; k < x1.size(); ++k){
+        x1_u[k] = best_model->camera1.undistort(x1[k]);
+        x2_u[k] = best_model->camera1.undistort(x2[k]);
+    }
+
+    get_inliers(F, x1_u, x2_u, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
 
     return stats;
 }
@@ -153,6 +162,30 @@ RansacStats ransac_fundamental(const std::vector<Point2D> &x1, const std::vector
     FundamentalEstimator estimator(opt, x1, x2);
     stats = ransac<FundamentalEstimator, Eigen::Matrix3d>(estimator, opt, best_model);
     get_inliers(*best_model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+
+    return stats;
+}
+
+RansacStats ransac_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const RansacOptions &opt,
+                                  FCam *best_model, std::vector<char> *best_inliers) {
+
+    best_model->F.setIdentity();
+    best_model->camera = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+    RansacStats stats;
+
+    RDFundamentalEstimator estimator(opt, x1, x2);
+    stats = ransac<RDFundamentalEstimator, FCam>(estimator, opt, best_model);
+
+    std::vector<Point2D> x1u, x2u;
+    x1u.resize(x1.size());
+    x2u.resize(x2.size());
+
+    for (size_t k = 0; k < x1.size(); ++k){
+        x1u[k] = best_model->camera.undistort(x1[k]);
+        x2u[k] = best_model->camera.undistort(x2[k]);
+    }
+
+    get_inliers(best_model->F, x1u, x2u, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
 
     return stats;
 }

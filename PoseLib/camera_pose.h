@@ -94,6 +94,15 @@ struct alignas(32) ImagePair {
 };
 
 typedef std::vector<ImagePair> ImagePairVector;
+
+struct alignas(32) FCam {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    Eigen::Matrix3d F;
+    Camera camera;
+    FCam() : F(Eigen::Matrix3d::Identity()), camera(Camera()) {}
+    FCam(Eigen::Matrix3d F, Camera camera) : F(F), camera(camera) {}
+};
+
 } // namespace poselib
 
 #endif
