@@ -284,10 +284,11 @@ RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &poin
     return stats;
 }
 
-RansacStats estimate_rd_shared_focal_relative_pose(const std::vector<Point2D> &points2D_1,
-                                                   const std::vector<Point2D> &points2D_2, const Point2D &pp,
-                                                   const RansacOptions &ransac_opt, const BundleOptions &bundle_opt,
-                                                   ImagePair *image_pair, std::vector<char> *inliers) {
+RansacStats
+estimate_rd_shared_focal_relative_pose(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
+                                       const Point2D &pp, std::vector<double> &ks, const RansacOptions &ransac_opt,
+                                       const BundleOptions &bundle_opt, ImagePair *image_pair,
+                                       std::vector<char> *inliers) {
 
     const size_t num_pts = points2D_1.size();
 
@@ -311,7 +312,12 @@ RansacStats estimate_rd_shared_focal_relative_pose(const std::vector<Point2D> &p
     BundleOptions bundle_opt_scaled = bundle_opt;
     bundle_opt_scaled.loss_scale /= scale;
 
-    RansacStats stats = ransac_rd_shared_focal_relpose(x1_norm, x2_norm, ransac_opt_scaled, image_pair, inliers);
+    for (size_t k = 0; k < ks.size(); ++k){
+        ks[k] *= scale * scale;
+    }
+
+    RansacStats stats = ransac_rd_shared_focal_relpose(x1_norm, x2_norm, ks, ransac_opt_scaled, image_pair,
+                                                       inliers);
 
     if (stats.num_inliers > 6) {
         std::vector<Point2D> x1_inliers;
@@ -389,8 +395,8 @@ RansacStats estimate_fundamental(const std::vector<Point2D> &x1, const std::vect
 }
 
 RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                    const RansacOptions &ransac_opt, const BundleOptions &bundle_opt,
-                                    FCam *F_cam, std::vector<char> *inliers) {
+                                    std::vector<double> &ks, const RansacOptions &ransac_opt,
+                                    const BundleOptions &bundle_opt, FCam *F_cam, std::vector<char> *inliers) {
 
     const size_t num_pts = x1.size();
     if (num_pts < 8) {
@@ -412,9 +418,13 @@ RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::v
     BundleOptions bundle_opt_scaled = bundle_opt;
     bundle_opt_scaled.loss_scale /= scale;
 
-    RansacStats stats = ransac_rd_fundamental(x1_norm, x2_norm, ransac_opt_scaled, F_cam, inliers);
+    for (size_t k = 0; k < ks.size(); ++k){
+        ks[k] *= scale * scale;
+    }
 
-    if (stats.num_inliers > 7) {
+    RansacStats stats = ransac_rd_fundamental(x1_norm, x2_norm, ks, ransac_opt_scaled, F_cam, inliers);
+
+    if (stats.num_inliers > 8) {
         // Collect inlier for additional non-linear refinement
         std::vector<Point2D> x1_inliers;
         std::vector<Point2D> x2_inliers;

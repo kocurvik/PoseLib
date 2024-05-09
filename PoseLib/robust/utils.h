@@ -52,6 +52,10 @@ double compute_sampson_msac_score(const Eigen::Matrix3d &F, const std::vector<Po
 double compute_homography_msac_score(const Eigen::Matrix3d &H, const std::vector<Point2D> &x1,
                                      const std::vector<Point2D> &x2, double sq_threshold, size_t *inlier_count);
 
+double compute_division_model_tangent_sampson_score(const Eigen::Matrix3d F, const double k1, const double k2,
+                                                    const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                                    double sq_threshold, size_t *inlier_count);
+
 // Compute inliers for absolute pose estimation (using reprojection error and cheirality check)
 void get_inliers(const CameraPose &pose, const std::vector<Point2D> &x, const std::vector<Point3D> &X,
                  double sq_threshold, std::vector<char> *inliers);
@@ -63,6 +67,9 @@ int get_inliers(const CameraPose &pose, const std::vector<Point2D> &x1, const st
                 double sq_threshold, std::vector<char> *inliers);
 int get_inliers(const Eigen::Matrix3d &E, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                 double sq_threshold, std::vector<char> *inliers);
+int get_rd_tangent_sampson_inliers(const Eigen::Matrix3d &F, const double &k1, const double &k2,
+                                   const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                   double sq_threshold, std::vector<char> *inliers);
 
 // inliers for homography
 void get_homography_inliers(const Eigen::Matrix3d &H, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
