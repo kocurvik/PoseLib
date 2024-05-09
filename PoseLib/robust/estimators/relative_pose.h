@@ -217,7 +217,7 @@ class RDFundamentalEstimator {
     double score_model(const FCam &F_cam, size_t *inlier_count);
     void refine_model(FCam *F_cam);
 
-    const size_t sample_sz = 7;
+    const size_t sample_sz = 8;
     const size_t num_data;
 
   private:

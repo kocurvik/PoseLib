@@ -34,6 +34,7 @@
 #include "PoseLib/solvers/relpose_5pt.h"
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
+#include "PoseLib/solvers/relpose_kFk.h"
 
 #include <iostream>
 
@@ -361,22 +362,29 @@ void FundamentalEstimator::refine_model(Eigen::Matrix3d *F) const {
 void RDFundamentalEstimator::generate_models(std::vector<FCam> *models) {
     sampler.generate_sample(&sample);
 
-    for (size_t i = 0; i < rd_vals.size(); ++i) {
-        double rd = rd_vals[i];
-        Camera rd_cam = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, rd}, -1, -1);
-        for (size_t k = 0; k < sample_sz; ++k) {
-            x1s[k] = rd_cam.undistort(x1[sample[k]]).homogeneous().normalized();
-            x2s[k] = rd_cam.undistort(x2[sample[k]]).homogeneous().normalized();
-        }
-
-        std::vector<Eigen::Matrix3d> local_models;
-        relpose_7pt(x1s, x2s, &local_models);
-        models->reserve(models->size() + distance(local_models.begin(),local_models.end()));
-        for (const Eigen::Matrix3d& F: local_models){
-            Camera camera = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, rd}, -1, -1);
-            models->emplace_back(FCam(F, camera));
-        }
+    for (size_t k = 0; k < sample_sz; ++k){
+        x1s[k] = x1[sample[k]].homogeneous();
+        x2s[k] = x2[sample[k]].homogeneous();
     }
+
+    relpose_kFk(x1s, x2s, models);
+
+//    for (size_t i = 0; i < rd_vals.size(); ++i) {
+//        double rd = rd_vals[i];
+//        Camera rd_cam = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, rd}, -1, -1);
+//        for (size_t k = 0; k < sample_sz; ++k) {
+//            x1s[k] = rd_cam.undistort(x1[sample[k]]).homogeneous().normalized();
+//            x2s[k] = rd_cam.undistort(x2[sample[k]]).homogeneous().normalized();
+//        }
+//
+//        std::vector<Eigen::Matrix3d> local_models;
+//        relpose_7pt(x1s, x2s, &local_models);
+//        models->reserve(models->size() + distance(local_models.begin(),local_models.end()));
+//        for (const Eigen::Matrix3d& F: local_models){
+//            Camera camera = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, rd}, -1, -1);
+//            models->emplace_back(FCam(F, camera));
+//        }
+//    }
 }
 
 double RDFundamentalEstimator::score_model(const FCam &F_cam, size_t *inlier_count) {
@@ -389,7 +397,11 @@ double RDFundamentalEstimator::score_model(const FCam &F_cam, size_t *inlier_cou
         last_k = k;
     }
 
-    return compute_sampson_msac_score(F_cam.F, x1u, x2u, opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
+    double score = compute_sampson_msac_score(F_cam.F, x1u, x2u, opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
+//    std::cout << "k: " << k << std::endl;
+//    std::cout << "F: " << std::endl << F_cam.F << std::endl;
+//    std::cout << "Inliers: " << inlier_count << std::endl;
+    return score;
 }
 
 void RDFundamentalEstimator::refine_model(FCam *F_cam) {
