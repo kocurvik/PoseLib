@@ -186,6 +186,8 @@ double compute_division_model_tangent_sampson_score(const Eigen::Matrix3d F, con
         Eigen::Matrix<double, 3, 1> d1, d2, h1, h2;
         d1 << x1[i](0), x1[i](1), 1 + k1 * x1[i].squaredNorm();
         d2 << x2[i](0), x2[i](1), 1 + k2 * x2[i].squaredNorm();
+        h1 = d1.normalized();
+        h2 = d2.normalized();
 
         double num = d2.transpose() * (F * d1);
         num *= num;
@@ -413,6 +415,8 @@ int get_rd_tangent_sampson_inliers(const Eigen::Matrix3d &F, const double &k1, c
         Eigen::Matrix<double, 3, 1> d1, d2, h1, h2;
         d1 << x1[i](0), x1[i](1), 1 + k1 * x1[i].squaredNorm();
         d2 << x2[i](0), x2[i](1), 1 + k2 * x2[i].squaredNorm();
+        h1 = d1.normalized();
+        h2 = d2.normalized();
 
         double num = d2.transpose() * (F * d1);
         num *= num;
