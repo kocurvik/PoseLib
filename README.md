@@ -1,3 +1,23 @@
+# RD Solvers
+
+Use in python:
+```python
+# see below for the params used in these dicts
+ransac_dict = {'max_iterations': 1000, 'max_epipolar_error': 2.0, 'progressive_sampling': False,
+               'min_iterations': 10}
+bundle_dict = {'verbose': False}
+
+rd_vals = [1e-7, 1e-8, 1e-9] # list of default k params for 7pt solver
+use_distorted = True # whether to calculate inliers and do refinement in undistorted space,
+                     # if false Tangential Sampson Error is used
+use_9pt = True # whether to use 9pt instead of 8pt solver, ignored when len(rd_vals) > 0
+F_cam, out = poselib.estimate_kFk(xx1, xx2, rd_vals, use_distorted, use_9pt, ransac_dict, bundle_dict)
+F = F_cam.F
+k = F_cam.camera.params[3]
+```
+
+In C++ you can use the function `estimate_kFk` in `robust.h` with the same arguments as the python version.
+
 # PoseLib
 This library provides a collection of minimal solvers for camera pose estimation. The focus is on calibrated absolute pose estimation problems from different types of correspondences (e.g. point-point, point-line, line-point, line-line).
 
