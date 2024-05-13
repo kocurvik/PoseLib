@@ -103,8 +103,12 @@ BundleStats refine_fundamental(const std::vector<Point2D> &x1, const std::vector
                                const BundleOptions &opt = BundleOptions(),
                                const std::vector<double> &weights = std::vector<double>());
 
-BundleStats refine_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
-                                  const BundleOptions &opt, const std::vector<double> &weights = std::vector<double>());
+BundleStats refine_kFk_tangent(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
+                               const BundleOptions &opt, const std::vector<double> &weights = std::vector<double>());
+
+BundleStats refine_kFk_undistorted(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
+                                   const BundleOptions &opt,
+                                   const std::vector<double> &weights = std::vector<double>());
 
 // Homography matrix refinement.
 BundleStats refine_homography(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, Eigen::Matrix3d *H,

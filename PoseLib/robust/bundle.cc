@@ -435,22 +435,22 @@ BundleStats refine_fundamental(const std::vector<Point2D> &x1, const std::vector
 // Uncalibrated relative pose (fundamental matrix) with rd refinement
 
 template <typename WeightType, typename LossFunction>
-BundleStats refine_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
-                                  const BundleOptions &opt, const WeightType &weights) {
+BundleStats refine_kFk_tangent(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
+                               const BundleOptions &opt, const WeightType &weights) {
     // We optimize over the SVD-based factorization from Bartoli and Sturm
     LossFunction loss_fn(opt.loss_scale);
     IterationCallback callback = setup_callback(opt, loss_fn);
-    RDFundamentalJacobianAccumulator<LossFunction, WeightType> accum(x1, x2, loss_fn, weights);
+    kFkTangentJacobianAccumulator<LossFunction, WeightType> accum(x1, x2, loss_fn, weights);
     BundleStats stats = lm_impl<decltype(accum)>(accum, F_cam, opt, callback);
     return stats;
 }
 
 template <typename WeightType>
-BundleStats refine_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
-                                  const BundleOptions &opt, const WeightType &weights) {
+BundleStats refine_kFk_tangent(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
+                               const BundleOptions &opt, const WeightType &weights) {
     switch (opt.loss_type) {
 #define SWITCH_LOSS_FUNCTION_CASE(LossFunction)                                                                        \
-    return refine_rd_fundamental<WeightType, LossFunction>(x1, x2, F_cam, opt, weights);
+    return refine_kFk_tangent<WeightType, LossFunction>(x1, x2, F_cam, opt, weights);
         SWITCH_LOSS_FUNCTIONS
     default:
         return BundleStats();
@@ -459,12 +459,49 @@ BundleStats refine_rd_fundamental(const std::vector<Point2D> &x1, const std::vec
 }
 
 // Entry point for fundamental matrix refinement
-BundleStats refine_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
-                                  const BundleOptions &opt, const std::vector<double> &weights) {
+BundleStats refine_kFk_tangent(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
+                               const BundleOptions &opt, const std::vector<double> &weights) {
     if (weights.size() == x1.size()) {
-        return refine_rd_fundamental<std::vector<double>>(x1, x2, F_cam, opt, weights);
+        return refine_kFk_tangent<std::vector<double>>(x1, x2, F_cam, opt, weights);
     } else {
-        return refine_rd_fundamental<UniformWeightVector>(x1, x2, F_cam, opt, UniformWeightVector());
+        return refine_kFk_tangent<UniformWeightVector>(x1, x2, F_cam, opt, UniformWeightVector());
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+// Uncalibrated relative pose (fundamental matrix) with rd refinement
+
+template <typename WeightType, typename LossFunction>
+BundleStats refine_kFk_undistorted(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
+                                   const BundleOptions &opt, const WeightType &weights) {
+    // We optimize over the SVD-based factorization from Bartoli and Sturm
+    LossFunction loss_fn(opt.loss_scale);
+    IterationCallback callback = setup_callback(opt, loss_fn);
+    kFkUndistortedJacobianAccumulator<LossFunction, WeightType> accum(x1, x2, loss_fn, weights);
+    BundleStats stats = lm_impl<decltype(accum)>(accum, F_cam, opt, callback);
+    return stats;
+}
+
+template <typename WeightType>
+BundleStats refine_kFk_undistorted(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
+                                   const BundleOptions &opt, const WeightType &weights) {
+    switch (opt.loss_type) {
+#define SWITCH_LOSS_FUNCTION_CASE(LossFunction)                                                                        \
+    return refine_kFk_undistorted<WeightType, LossFunction>(x1, x2, F_cam, opt, weights);
+        SWITCH_LOSS_FUNCTIONS
+    default:
+        return BundleStats();
+    }
+#undef SWITCH_LOSS_FUNCTION_CASE
+}
+
+// Entry point for fundamental matrix refinement
+BundleStats refine_kFk_undistorted(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCam *F_cam,
+                                   const BundleOptions &opt, const std::vector<double> &weights) {
+    if (weights.size() == x1.size()) {
+        return refine_kFk_undistorted<std::vector<double>>(x1, x2, F_cam, opt, weights);
+    } else {
+        return refine_kFk_undistorted<UniformWeightVector>(x1, x2, F_cam, opt, UniformWeightVector());
     }
 }
 

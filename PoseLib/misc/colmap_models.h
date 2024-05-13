@@ -79,7 +79,7 @@ struct Camera {
                                      Eigen::Matrix2d *jac);                                                            \
         static void unproject(const std::vector<double> &params, const Eigen::Vector2d &xp, Eigen::Vector2d *x);       \
         static void undistort(const std::vector<double> &params, const Eigen::Vector2d &xp, Eigen::Vector2d *x);       \
-        static void dxudk(const std::vector<double> &params, const Eigen::Vector2d &xp, Eigen::Vector3d *x);       \
+        static void dxudk(const std::vector<double> &params, const Eigen::Vector2d &xp, Eigen::Vector3d *x);           \
         static const std::vector<size_t> focal_idx;                                                                    \
         static const std::vector<size_t> principal_point_idx;                                                          \
         static const int model_id = ModelId;                                                                           \

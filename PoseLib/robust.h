@@ -81,12 +81,11 @@ RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &poin
 
 // Estimates relative pose with shared unknown focal length and rd using LO-RANSAC followed by non-linear refinement
 // Threshold for Sampson error is set by RansacOptions.max_epipolar_error
-    RansacStats estimate_rd_shared_focal_relative_pose(const std::vector<Point2D> &points2D_1,
-                                                       const std::vector<Point2D> &points2D_2,
-                                                       const Point2D &pp, std::vector<double> &ks,
-                                                       const RansacOptions &ransac_opt,
-                                                       const BundleOptions &bundle_opt, ImagePair *image_pair,
-                                                       std::vector<char> *inliers);
+RansacStats estimate_rd_shared_focal_relative_pose(const std::vector<Point2D> &points2D_1,
+                                                   const std::vector<Point2D> &points2D_2, const Point2D &pp,
+                                                   std::vector<double> &ks, const RansacOptions &ransac_opt,
+                                                   const BundleOptions &bundle_opt, ImagePair *image_pair,
+                                                   std::vector<char> *inliers);
 
 // Estimates a fundamental matrix using LO-RANSAC followed by non-linear refinement
 // NOTE: USE estimate_relative_pose IF YOU KNOW THE INTRINSICS!!!
@@ -95,9 +94,9 @@ RansacStats estimate_fundamental(const std::vector<Point2D> &points2D_1, const s
                                  const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, Eigen::Matrix3d *F,
                                  std::vector<char> *inliers);
 
-RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                    std::vector<double> &ks, const RansacOptions &ransac_opt,
-                                    const BundleOptions &bundle_opt, FCam *F_cam, std::vector<char> *inliers);
+RansacStats estimate_kFk(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, std::vector<double> &ks,
+                         bool use_undistorted, bool use_9pt, const RansacOptions &ransac_opt,
+                         const BundleOptions &bundle_opt, FCam *F_cam, std::vector<char> *inliers);
 
 // Estimates a homography matrix using LO-RANSAC followed by non-linear refinement
 // Convention is x2 = H*x1

@@ -137,7 +137,7 @@ void RDSharedFocalRelativePoseEstimator::generate_models(ImagePairVector *models
 
     sampler.generate_sample(&sample);
 
-    if (rd_vals.empty()){
+    if (rd_vals.empty()) {
         for (size_t k = 0; k < sample_sz; ++k) {
             x1s[k] = x1[sample[k]].homogeneous();
             x2s[k] = x2[sample[k]].homogeneous();
@@ -156,8 +156,8 @@ void RDSharedFocalRelativePoseEstimator::generate_models(ImagePairVector *models
 
         ImagePairVector local_models;
         relpose_6pt_shared_focal(x1s, x2s, &local_models);
-        models->reserve(models->size() + distance(local_models.begin(),local_models.end()));
-        for (ImagePair image_pair: local_models){
+        models->reserve(models->size() + distance(local_models.begin(), local_models.end()));
+        for (ImagePair image_pair : local_models) {
             double focal = image_pair.camera1.params[0];
             Camera camera = Camera("DIVISION_RADIAL", std::vector<double>{focal, 0.0, 0.0, rd}, -1, -1);
             models->emplace_back(ImagePair(image_pair.pose, camera, camera));
@@ -174,7 +174,8 @@ double RDSharedFocalRelativePoseEstimator::score_model(const ImagePair &image_pa
     Eigen::Matrix3d F = K_inv * (E * K_inv);
 
     double k = image_pair.camera1.params[3];
-    return compute_division_model_tangent_sampson_score(F, k, k, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
+    return compute_division_model_tangent_sampson_score(F, k, k, x1, x2,
+                                                        opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
 }
 
 void RDSharedFocalRelativePoseEstimator::refine_model(ImagePair *image_pair) {
@@ -183,40 +184,40 @@ void RDSharedFocalRelativePoseEstimator::refine_model(ImagePair *image_pair) {
     bundle_opt.loss_scale = opt.max_epipolar_error;
     bundle_opt.max_iterations = 25;
 
-//    Eigen::Matrix3d K_inv;
-//    // K_inv << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, calib_pose->camera.focal();
-//    K_inv << 1.0 / image_pair->camera1.focal(), 0.0, 0.0, 0.0, 1.0 / image_pair->camera1.focal(), 0.0, 0.0, 0.0, 1.0;
-//    Eigen::Matrix3d E;
-//    essential_from_motion(image_pair->pose, &E);
-//    Eigen::Matrix3d F = K_inv * (E * K_inv);
-//
-//    double k = image_pair->camera1.params[3];
-//    if (last_k != k) {
-//        for (size_t i = 0; i < x1.size(); ++i) {
-//            x1u[i] = image_pair->camera1.undistort(x1[i]);
-//            x2u[i] = image_pair->camera1.undistort(x2[i]);
-//        }
-//        last_k = k;
-//    }
-//
-//    // Find approximate inliers and bundle over these with a truncated loss
-//    std::vector<char> inliers;
-//    int num_inl = get_rd_tangent_sampson_inliers(F, k, k, x1, x2, 5 * (opt.max_epipolar_error * opt.max_epipolar_error), &inliers);
-//
-//    std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
-//    x1_inlier.reserve(num_inl);
-//    x2_inlier.reserve(num_inl);
-//
-//    if (num_inl <= 7) {
-//        return;
-//    }
-//
-//    for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
-//        if (inliers[pt_k]) {
-//            x1_inlier.push_back(x1[pt_k]);
-//            x2_inlier.push_back(x2[pt_k]);
-//        }
-//    }
+    //    Eigen::Matrix3d K_inv;
+    //    // K_inv << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, calib_pose->camera.focal();
+    //    K_inv << 1.0 / image_pair->camera1.focal(), 0.0, 0.0, 0.0, 1.0 / image_pair->camera1.focal(), 0.0, 0.0,
+    //    0.0, 1.0; Eigen::Matrix3d E; essential_from_motion(image_pair->pose, &E); Eigen::Matrix3d F = K_inv * (E *
+    //    K_inv);
+    //
+    //    double k = image_pair->camera1.params[3];
+    //    if (last_k != k) {
+    //        for (size_t i = 0; i < x1.size(); ++i) {
+    //            x1u[i] = image_pair->camera1.undistort(x1[i]);
+    //            x2u[i] = image_pair->camera1.undistort(x2[i]);
+    //        }
+    //        last_k = k;
+    //    }
+    //
+    //    // Find approximate inliers and bundle over these with a truncated loss
+    //    std::vector<char> inliers;
+    //    int num_inl = get_rd_tangent_sampson_inliers(F, k, k, x1, x2, 5 * (opt.max_epipolar_error *
+    //    opt.max_epipolar_error), &inliers);
+    //
+    //    std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
+    //    x1_inlier.reserve(num_inl);
+    //    x2_inlier.reserve(num_inl);
+    //
+    //    if (num_inl <= 7) {
+    //        return;
+    //    }
+    //
+    //    for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+    //        if (inliers[pt_k]) {
+    //            x1_inlier.push_back(x1[pt_k]);
+    //            x2_inlier.push_back(x2[pt_k]);
+    //        }
+    //    }
 
     refine_rd_shared_focal_relpose(x1, x2, image_pair, bundle_opt);
 }
@@ -366,32 +367,34 @@ void FundamentalEstimator::refine_model(Eigen::Matrix3d *F) const {
 void RDFundamentalEstimator::generate_models(std::vector<FCam> *models) {
     sampler.generate_sample(&sample);
 
-//    The standard solver
-    if (rd_vals.empty()){
-        for (size_t k = 0; k < sample_sz; ++k){
+    //    The standard solver
+    if (rd_vals.empty()) {
+        for (size_t k = 0; k < sample_sz; ++k) {
             x1s[k] = x1[sample[k]].homogeneous();
             x2s[k] = x2[sample[k]].homogeneous();
         }
 
+        if (use_9pt) {
+            throw std::runtime_error("nyi");
+            return;
+        }
         relpose_kFk_8pt(x1s, x2s, models);
         return;
     }
 
-//  solver with list of def vals
+    //  solver with list of def vals
     for (size_t i = 0; i < rd_vals.size(); ++i) {
         double rd = rd_vals[i];
         Camera rd_cam = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, rd}, -1, -1);
         for (size_t k = 0; k < sample_sz; ++k) {
             x1s[k] = rd_cam.undistort(x1[sample[k]]).homogeneous().normalized();
             x2s[k] = rd_cam.undistort(x2[sample[k]]).homogeneous().normalized();
-//            std::cout << "x1s: " << x1s[k].transpose() << std::endl;
-//            std::cout << "x1 : " << x1[sample[k]].transpose() << std::endl;
         }
 
         std::vector<Eigen::Matrix3d> local_models;
         relpose_7pt(x1s, x2s, &local_models);
-        models->reserve(models->size() + distance(local_models.begin(),local_models.end()));
-        for (const Eigen::Matrix3d& F: local_models){
+        models->reserve(models->size() + distance(local_models.begin(), local_models.end()));
+        for (const Eigen::Matrix3d &F : local_models) {
             Camera camera = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, rd}, -1, -1);
             models->emplace_back(FCam(F, camera));
         }
@@ -399,26 +402,19 @@ void RDFundamentalEstimator::generate_models(std::vector<FCam> *models) {
 }
 
 double RDFundamentalEstimator::score_model(const FCam &F_cam, size_t *inlier_count) {
-//    double scale = 0;
+    if (use_undistorted) {
+        for (size_t i = 0; i < x1.size(); ++i) {
+            x1u[i] = F_cam.camera.undistort(x1[i]);
+            x2u[i] = F_cam.camera.undistort(x2[i]);
+        }
 
-//    for (size_t i = 0; i < x1.size(); ++i) {
-//        x1u[i] = F_cam.camera.undistort(x1[i]);
-//        x2u[i] = F_cam.camera.undistort(x2[i]);
-//
-//        scale += x1u[i].norm();
-//        scale += x2u[i].norm();
-//    }
-//
-//    scale /= std::sqrt(2) * x1u.size();
-//    if (scale < 0.1){
-//        *inlier_count = 0;
-//        return 10000.0;
-//    }
+        return compute_sampson_msac_score(F_cam.F, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error,
+                                          inlier_count);
+    }
     double k = F_cam.camera.params[3];
 
-    double score = compute_division_model_tangent_sampson_score(F_cam.F, k, k, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
-
-    return score;
+    return compute_division_model_tangent_sampson_score(F_cam.F, k, k, x1, x2,
+                                                        opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
 }
 
 void RDFundamentalEstimator::refine_model(FCam *F_cam) {
@@ -427,17 +423,21 @@ void RDFundamentalEstimator::refine_model(FCam *F_cam) {
     bundle_opt.loss_scale = opt.max_epipolar_error;
     bundle_opt.max_iterations = 25;
 
-//    size_t inlier_count;
-//    double k = F_cam->camera.params[3];
-//    double score = compute_division_model_tangent_sampson_score(F_cam->F, k, k, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count);
-//    std::cout << "Inliers before: " << inlier_count << std::endl;
-//    std::cout << "Score before: " << score << std::endl;
+    //    size_t inlier_count;
+    //    double k = F_cam->camera.params[3];
+    //    double score = compute_division_model_tangent_sampson_score(F_cam->F, k, k, x1, x2, opt.max_epipolar_error *
+    //    opt.max_epipolar_error, &inlier_count); std::cout << "Inliers before: " << inlier_count << std::endl;
+    //    std::cout << "Score before: " << score << std::endl;
 
-    refine_rd_fundamental(x1, x2, F_cam, bundle_opt);
+    if (use_undistorted) {
+        refine_kFk_undistorted(x1, x2, F_cam, bundle_opt);
+    } else {
+        refine_kFk_tangent(x1, x2, F_cam, bundle_opt);
+    }
 
-//    score = compute_division_model_tangent_sampson_score(F_cam->F, k, k, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count);
-//    std::cout << "Inliers after: " << inlier_count << std::endl;
-//    std::cout << "Score after: " << score << std::endl;
+    //    score = compute_division_model_tangent_sampson_score(F_cam->F, k, k, x1, x2, opt.max_epipolar_error *
+    //    opt.max_epipolar_error, &inlier_count); std::cout << "Inliers after: " << inlier_count << std::endl; std::cout
+    //    << "Score after: " << score << std::endl;
 }
 
 } // namespace poselib

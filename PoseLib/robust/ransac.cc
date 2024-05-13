@@ -122,9 +122,9 @@ RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const st
     return stats;
 }
 
-RansacStats
-ransac_rd_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, std::vector<double> &ks,
-                               const RansacOptions &opt, ImagePair *best_model, std::vector<char> *best_inliers) {
+RansacStats ransac_rd_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                           std::vector<double> &ks, const RansacOptions &opt, ImagePair *best_model,
+                                           std::vector<char> *best_inliers) {
     best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
     best_model->pose.t.setZero();
     best_model->camera1 = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
@@ -139,7 +139,8 @@ ransac_rd_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector
     essential_from_motion(best_model->pose, &E);
     Eigen::Matrix3d F = K_inv * (E * K_inv);
 
-    get_rd_tangent_sampson_inliers(F, best_model->camera1.params[3], best_model->camera1.params[3], x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+    get_rd_tangent_sampson_inliers(F, best_model->camera1.params[3], best_model->camera1.params[3], x1, x2,
+                                   opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
 
     return stats;
 }
@@ -157,19 +158,30 @@ RansacStats ransac_fundamental(const std::vector<Point2D> &x1, const std::vector
     return stats;
 }
 
-RansacStats
-ransac_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, std::vector<double> &ks,
-                      const RansacOptions &opt, FCam *best_model, std::vector<char> *best_inliers) {
+RansacStats ransac_kFk(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, std::vector<double> &ks,
+                       bool use_undistorted, bool use_9pt, const RansacOptions &opt, FCam *best_model,
+                       std::vector<char> *best_inliers) {
 
     best_model->F.setIdentity();
     best_model->camera = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
     RansacStats stats;
 
-    RDFundamentalEstimator estimator(opt, x1, x2, ks);
+    RDFundamentalEstimator estimator(opt, x1, x2, ks, use_undistorted, use_9pt);
     stats = ransac<RDFundamentalEstimator, FCam>(estimator, opt, best_model);
 
-    get_rd_tangent_sampson_inliers(best_model->F, best_model->camera.params[3], best_model->camera.params[3], x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
-
+    if (use_undistorted) {
+        std::vector<Point2D> x1u, x2u;
+        x1u.resize(x1.size());
+        x2u.resize(x1.size());
+        for (size_t i = 0; i < x1.size(); ++i) {
+            x1u[i] = best_model->camera.undistort(x1[i]);
+            x2u[i] = best_model->camera.undistort(x2[i]);
+        }
+        get_inliers(best_model->F, x1u, x2u, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+    } else {
+        get_rd_tangent_sampson_inliers(best_model->F, best_model->camera.params[3], best_model->camera.params[3], x1,
+                                       x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+    }
     return stats;
 }
 

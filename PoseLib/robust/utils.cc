@@ -177,12 +177,11 @@ double compute_division_model_tangent_sampson_score(const Eigen::Matrix3d &F, co
     *inlier_count = 0;
     double score = 0;
 
-
     Eigen::Matrix<double, 3, 2> dd1dx1, dd2dx2;
     dd1dx1 << 1.0, 0.0, 0.0, 1.0, 0.0, 0.0;
     dd2dx2 << 1.0, 0.0, 0.0, 1.0, 0.0, 0.0;
 
-    for (size_t i = 0; i < x1.size(); ++i){
+    for (size_t i = 0; i < x1.size(); ++i) {
         Eigen::Matrix<double, 3, 1> d1, d2, h1, h2;
         d1 << x1[i](0), x1[i](1), 1 + k1 * x1[i].squaredNorm();
         d2 << x2[i](0), x2[i](1), 1 + k2 * x2[i].squaredNorm();
@@ -196,7 +195,6 @@ double compute_division_model_tangent_sampson_score(const Eigen::Matrix3d &F, co
         dd1dx1(2, 1) = 2 * k1 * x1[i](1);
         dd2dx2(2, 0) = 2 * k2 * x2[i](0);
         dd2dx2(2, 1) = 2 * k2 * x2[i](1);
-
 
         Eigen::Matrix<double, 3, 2> J1, J2;
         J1 = (Eigen::Matrix3d::Identity() - h1 * h1.transpose()) * dd1dx1 / d1.norm();
@@ -403,15 +401,15 @@ int get_inliers(const Eigen::Matrix3d &E, const std::vector<Point2D> &x1, const 
 }
 // Compute inliers for relative pose estimation (using Sampson error)
 int get_rd_tangent_sampson_inliers(const Eigen::Matrix3d &F, const double &k1, const double &k2,
-                                   const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                   double sq_threshold, std::vector<char> *inliers) {
+                                   const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, double sq_threshold,
+                                   std::vector<char> *inliers) {
     inliers->resize(x1.size());
     size_t inlier_count = 0.0;
     Eigen::Matrix<double, 3, 2> dd1dx1, dd2dx2;
     dd1dx1 << 1.0, 0.0, 0.0, 1.0, 0.0, 0.0;
     dd2dx2 << 1.0, 0.0, 0.0, 1.0, 0.0, 0.0;
 
-    for (size_t i = 0; i < x1.size(); ++i){
+    for (size_t i = 0; i < x1.size(); ++i) {
         Eigen::Matrix<double, 3, 1> d1, d2, h1, h2;
         d1 << x1[i](0), x1[i](1), 1 + k1 * x1[i].squaredNorm();
         d2 << x2[i](0), x2[i](1), 1 + k2 * x2[i].squaredNorm();
@@ -425,7 +423,6 @@ int get_rd_tangent_sampson_inliers(const Eigen::Matrix3d &F, const double &k1, c
         dd1dx1(2, 1) = 2 * k1 * x1[i](1);
         dd2dx2(2, 0) = 2 * k2 * x2[i](0);
         dd2dx2(2, 1) = 2 * k2 * x2[i](1);
-
 
         Eigen::Matrix<double, 3, 2> J1, J2;
         J1 = (Eigen::Matrix3d::Identity() - h1 * h1.transpose()) * dd1dx1 / d1.norm();
