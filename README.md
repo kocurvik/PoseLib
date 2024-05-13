@@ -8,10 +8,10 @@ ransac_dict = {'max_iterations': 1000, 'max_epipolar_error': 2.0, 'progressive_s
 bundle_dict = {'verbose': False}
 
 rd_vals = [1e-7, 1e-8, 1e-9] # list of default k params for 7pt solver
-use_distorted = True # whether to calculate inliers and do refinement in undistorted space,
+use_undistorted = True # whether to calculate inliers and do refinement in undistorted space,
                      # if false Tangential Sampson Error is used
 use_9pt = True # whether to use 9pt instead of 8pt solver, ignored when len(rd_vals) > 0
-F_cam, out = poselib.estimate_kFk(xx1, xx2, rd_vals, use_distorted, use_9pt, ransac_dict, bundle_dict)
+F_cam, out = poselib.estimate_kFk(xx1, xx2, rd_vals, use_undistorted, use_9pt, ransac_dict, bundle_dict)
 F = F_cam.F
 k = F_cam.camera.params[3]
 ```
