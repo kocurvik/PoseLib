@@ -123,7 +123,7 @@ int solver_new_kFk(const double *d, double *roots)
     return nroots;
 }
 
-int relpose_kFk(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2,
+int relpose_kFk_8pt(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2,
                 std::vector<FCam> *models){
     size_t kType = 2, kElim = 4;
     

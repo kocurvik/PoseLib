@@ -34,7 +34,7 @@
 #include "PoseLib/solvers/relpose_5pt.h"
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
-#include "PoseLib/solvers/relpose_kFk.h"
+#include "PoseLib/solvers/relpose_kFk_8pt.h"
 #include "PoseLib/solvers/relpose_kfEfk.h"
 
 #include <iostream>
@@ -373,7 +373,7 @@ void RDFundamentalEstimator::generate_models(std::vector<FCam> *models) {
             x2s[k] = x2[sample[k]].homogeneous();
         }
 
-        relpose_kFk(x1s, x2s, models);
+        relpose_kFk_8pt(x1s, x2s, models);
         return;
     }
 
@@ -384,6 +384,8 @@ void RDFundamentalEstimator::generate_models(std::vector<FCam> *models) {
         for (size_t k = 0; k < sample_sz; ++k) {
             x1s[k] = rd_cam.undistort(x1[sample[k]]).homogeneous().normalized();
             x2s[k] = rd_cam.undistort(x2[sample[k]]).homogeneous().normalized();
+//            std::cout << "x1s: " << x1s[k].transpose() << std::endl;
+//            std::cout << "x1 : " << x1[sample[k]].transpose() << std::endl;
         }
 
         std::vector<Eigen::Matrix3d> local_models;
@@ -426,13 +428,14 @@ void RDFundamentalEstimator::refine_model(FCam *F_cam) {
     bundle_opt.max_iterations = 25;
 
 //    size_t inlier_count;
-//    double score = compute_sampson_msac_score(F_cam->F, x1u, x2u, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count);
+//    double k = F_cam->camera.params[3];
+//    double score = compute_division_model_tangent_sampson_score(F_cam->F, k, k, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count);
 //    std::cout << "Inliers before: " << inlier_count << std::endl;
 //    std::cout << "Score before: " << score << std::endl;
 
     refine_rd_fundamental(x1, x2, F_cam, bundle_opt);
 
-//    score = compute_sampson_msac_score(F_cam->F, x1u, x2u, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count);
+//    score = compute_division_model_tangent_sampson_score(F_cam->F, k, k, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count);
 //    std::cout << "Inliers after: " << inlier_count << std::endl;
 //    std::cout << "Score after: " << score << std::endl;
 }

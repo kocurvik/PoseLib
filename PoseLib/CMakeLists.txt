@@ -24,7 +24,7 @@ set(SOURCES
     solvers/relpose_8pt.cc
     solvers/relpose_5pt.cc
     solvers/relpose_7pt.cc
-    solvers/relpose_kFk.cc
+        solvers/relpose_kFk_8pt.cc
     solvers/relpose_kfEfk.cc
     solvers/relpose_kfEfk_utils.cc
     solvers/rd_utils.cc
@@ -76,7 +76,7 @@ set(HEADERS_PUBLIC
     solvers/relpose_8pt.h
     solvers/relpose_5pt.h
     solvers/relpose_7pt.h
-    solvers/relpose_kFk.h
+        solvers/relpose_kFk_8pt.h
     solvers/relpose_kfEfk.h
     solvers/relpose_kfEfk_utils.h
     solvers/rd_utils.h

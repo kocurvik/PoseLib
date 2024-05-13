@@ -171,7 +171,7 @@ double compute_sampson_msac_score(const Eigen::Matrix3d &E, const std::vector<Po
     return score;
 }
 
-double compute_division_model_tangent_sampson_score(const Eigen::Matrix3d F, const double k1, const double k2,
+double compute_division_model_tangent_sampson_score(const Eigen::Matrix3d &F, const double &k1, const double &k2,
                                                     const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                                     double sq_threshold, size_t *inlier_count) {
     *inlier_count = 0;
