@@ -507,7 +507,9 @@ void DivisionRadialCameraModel::project_with_jac(const std::vector<double> &para
 }
 void DivisionRadialCameraModel::unproject(const std::vector<double> &params, const Eigen::Vector2d &xp,
                                         Eigen::Vector2d *x) {
-    throw std::runtime_error("NYI");
+    undistort(params, xp, x);
+    (*x)(0) = ((*x)(0) - params[1]) / params[0];
+    (*x)(1) = ((*x)(1) - params[2]) / params[0];
 }
 void DivisionRadialCameraModel::undistort(const std::vector<double> &params, const Eigen::Vector2d &x,
                                         Eigen::Vector2d *xp) {

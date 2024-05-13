@@ -35,6 +35,7 @@
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
 #include "PoseLib/solvers/relpose_kFk.h"
+#include "PoseLib/solvers/relpose_kfEfk.h"
 
 #include <iostream>
 
@@ -137,6 +138,11 @@ void RDSharedFocalRelativePoseEstimator::generate_models(ImagePairVector *models
     sampler.generate_sample(&sample);
 
     if (rd_vals.empty()){
+        for (size_t k = 0; k < sample_sz; ++k) {
+            x1s[k] = x1[sample[k]].homogeneous();
+            x2s[k] = x2[sample[k]].homogeneous();
+        }
+        relpose_kfEfk(x1s, x2s, models);
         return;
     }
 
@@ -169,7 +175,6 @@ double RDSharedFocalRelativePoseEstimator::score_model(const ImagePair &image_pa
 
     double k = image_pair.camera1.params[3];
     return compute_division_model_tangent_sampson_score(F, k, k, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
-
 }
 
 void RDSharedFocalRelativePoseEstimator::refine_model(ImagePair *image_pair) {
@@ -178,41 +183,42 @@ void RDSharedFocalRelativePoseEstimator::refine_model(ImagePair *image_pair) {
     bundle_opt.loss_scale = opt.max_epipolar_error;
     bundle_opt.max_iterations = 25;
 
-    Eigen::Matrix3d K_inv;
-    // K_inv << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, calib_pose->camera.focal();
-    K_inv << 1.0 / image_pair->camera1.focal(), 0.0, 0.0, 0.0, 1.0 / image_pair->camera1.focal(), 0.0, 0.0, 0.0, 1.0;
-    Eigen::Matrix3d E;
-    essential_from_motion(image_pair->pose, &E);
-    Eigen::Matrix3d F = K_inv * (E * K_inv);
+//    Eigen::Matrix3d K_inv;
+//    // K_inv << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, calib_pose->camera.focal();
+//    K_inv << 1.0 / image_pair->camera1.focal(), 0.0, 0.0, 0.0, 1.0 / image_pair->camera1.focal(), 0.0, 0.0, 0.0, 1.0;
+//    Eigen::Matrix3d E;
+//    essential_from_motion(image_pair->pose, &E);
+//    Eigen::Matrix3d F = K_inv * (E * K_inv);
+//
+//    double k = image_pair->camera1.params[3];
+//    if (last_k != k) {
+//        for (size_t i = 0; i < x1.size(); ++i) {
+//            x1u[i] = image_pair->camera1.undistort(x1[i]);
+//            x2u[i] = image_pair->camera1.undistort(x2[i]);
+//        }
+//        last_k = k;
+//    }
+//
+//    // Find approximate inliers and bundle over these with a truncated loss
+//    std::vector<char> inliers;
+//    int num_inl = get_rd_tangent_sampson_inliers(F, k, k, x1, x2, 5 * (opt.max_epipolar_error * opt.max_epipolar_error), &inliers);
+//
+//    std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
+//    x1_inlier.reserve(num_inl);
+//    x2_inlier.reserve(num_inl);
+//
+//    if (num_inl <= 7) {
+//        return;
+//    }
+//
+//    for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+//        if (inliers[pt_k]) {
+//            x1_inlier.push_back(x1[pt_k]);
+//            x2_inlier.push_back(x2[pt_k]);
+//        }
+//    }
 
-    double k = image_pair->camera1.params[3];
-    if (last_k != k) {
-        for (size_t i = 0; i < x1.size(); ++i) {
-            x1u[i] = image_pair->camera1.undistort(x1[i]);
-            x2u[i] = image_pair->camera1.undistort(x2[i]);
-        }
-        last_k = k;
-    }
-
-    // Find approximate inliers and bundle over these with a truncated loss
-    std::vector<char> inliers;
-    int num_inl = get_inliers(F, x1u, x2u, 5 * (opt.max_epipolar_error * opt.max_epipolar_error), &inliers);
-    std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
-    x1_inlier.reserve(num_inl);
-    x2_inlier.reserve(num_inl);
-
-    if (num_inl <= 7) {
-        return;
-    }
-
-    for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
-        if (inliers[pt_k]) {
-            x1_inlier.push_back(x1[pt_k]);
-            x2_inlier.push_back(x2[pt_k]);
-        }
-    }
-
-    refine_rd_shared_focal_relpose(x1_inlier, x2_inlier, image_pair, bundle_opt);
+    refine_rd_shared_focal_relpose(x1, x2, image_pair, bundle_opt);
 }
 
 void GeneralizedRelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {
