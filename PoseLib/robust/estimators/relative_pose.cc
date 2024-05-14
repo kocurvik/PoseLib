@@ -511,7 +511,7 @@ void k2Fk1Estimator::refine_model(FCamPair *F_cam_pair) {
     if (use_undistorted) {
         refine_k2Fk1_undistorted(x1, x2, F_cam_pair, bundle_opt);
     } else {
-//        refine_k2Fk1_tangent(x1, x2, F_cam, bundle_opt);
+        refine_k2Fk1_tangent(x1, x2, F_cam_pair, bundle_opt);
     }
 
     //    score = compute_division_model_tangent_sampson_score(F_cam->F, k, k, x1, x2, opt.max_epipolar_error *

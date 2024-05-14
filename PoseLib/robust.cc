@@ -498,7 +498,7 @@ RansacStats estimate_k2Fk1(const std::vector<Point2D> &x1, const std::vector<Poi
         if (use_undistorted) {
             refine_k2Fk1_undistorted(x1_inliers, x2_inliers, F_cam_pair, bundle_opt_scaled);
         } else {
-//            refine_k2Fk1_tangent(x1_inliers, x2_inliers, F_cam_pair, bundle_opt_scaled);
+            refine_k2Fk1_tangent(x1_inliers, x2_inliers, F_cam_pair, bundle_opt_scaled);
         }
     }
 

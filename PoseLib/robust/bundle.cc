@@ -508,7 +508,7 @@ BundleStats refine_kFk_undistorted(const std::vector<Point2D> &x1, const std::ve
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 // Uncalibrated relative pose (fundamental matrix) with rd refinement
 
-/*template <typename WeightType, typename LossFunction>
+template <typename WeightType, typename LossFunction>
 BundleStats refine_k2Fk1_tangent(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCamPair *F_cam_pair_pair,
                                const BundleOptions &opt, const WeightType &weights) {
     // We optimize over the SVD-based factorization from Bartoli and Sturm
@@ -540,7 +540,7 @@ BundleStats refine_k2Fk1_tangent(const std::vector<Point2D> &x1, const std::vect
     } else {
         return refine_k2Fk1_tangent<UniformWeightVector>(x1, x2, F_cam_pair_pair, opt, UniformWeightVector());
     }
-}*/
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 // Uncalibrated relative pose (fundamental matrix) with rd refinement
