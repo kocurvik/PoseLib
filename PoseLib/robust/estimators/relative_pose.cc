@@ -36,6 +36,7 @@
 #include "PoseLib/solvers/relpose_7pt.h"
 #include "PoseLib/solvers/relpose_kFk_8pt.h"
 #include "PoseLib/solvers/relpose_kfEfk.h"
+#include "PoseLib/solvers/relpose_k2Fk1_9pt.h"
 
 #include <iostream>
 
@@ -454,8 +455,7 @@ void k2Fk1Estimator::generate_models(std::vector<FCamPair> *models) {
             throw std::runtime_error("nyi");
             return;
         }
-        // relpose_k2Fk1_8pt(x1s, x2s, models);
-        throw std::runtime_error("nyi");
+        relpose_k2Fk1_9pt(x1s, x2s, models);
         return;
     }
 
