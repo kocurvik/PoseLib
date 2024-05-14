@@ -103,6 +103,14 @@ struct alignas(32) FCam {
     FCam(Eigen::Matrix3d F, Camera camera) : F(F), camera(camera) {}
 };
 
+struct alignas(32) FCamPair {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    Eigen::Matrix3d F;
+    Camera camera1, camera2;
+    FCamPair() : F(Eigen::Matrix3d::Identity()), camera1(Camera()), camera2(Camera()) {}
+    FCamPair(Eigen::Matrix3d F, Camera camera1, Camera camera2) : F(F), camera1(camera1), camera2(camera2) {}
+};
+
 } // namespace poselib
 
 #endif

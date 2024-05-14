@@ -198,12 +198,12 @@ class FundamentalEstimator {
     std::vector<size_t> sample;
 };
 
-class RDFundamentalEstimator {
+class kFkEstimator {
   public:
-    RDFundamentalEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
-                           const std::vector<Point2D> &points2D_2, const std::vector<double> &ks, bool use_undistorted,
-                           bool use_9pt)
-        : sample_sz(ks.empty() ? 8 : 7), num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2),
+    kFkEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
+                 const std::vector<Point2D> &points2D_2, const std::vector<double> &ks, bool use_undistorted,
+                 bool use_9pt)
+        : sample_sz(ks.empty() ? (use_9pt ? 9 : 8) : 7), num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2),
           sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations),
           use_undistorted(use_undistorted), use_9pt(use_9pt) {
         x1s.resize(sample_sz);
@@ -234,6 +234,44 @@ class RDFundamentalEstimator {
     std::vector<double> rd_vals;
     const bool use_undistorted;
     const bool use_9pt;
+};
+
+class k2Fk1Estimator {
+  public:
+    k2Fk1Estimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
+                   const std::vector<Point2D> &points2D_2, const std::vector<double> &ks, bool use_undistorted,
+                   bool use_10pt)
+        : sample_sz(ks.empty() ? (use_10pt ? 10 : 9) : 7), num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2),
+          sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations),
+          use_undistorted(use_undistorted), use_10pt(use_10pt) {
+        x1s.resize(sample_sz);
+        x2s.resize(sample_sz);
+        x1u.resize(x1.size());
+        x2u.resize(x1.size());
+        sample.resize(sample_sz);
+        rd_vals = ks;
+    }
+
+    void generate_models(std::vector<FCamPair> *models);
+    double score_model(const FCamPair &F_cam_pair, size_t *inlier_count);
+    void refine_model(FCamPair *F_cam_pair);
+
+    const size_t sample_sz;
+    const size_t num_data;
+
+  private:
+    const RansacOptions &opt;
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+
+    RandomSampler sampler;
+    // pre-allocated vectors for sampling
+    std::vector<Eigen::Vector3d> x1s, x2s;
+    std::vector<Eigen::Vector2d> x1u, x2u;
+    std::vector<size_t> sample;
+    std::vector<double> rd_vals;
+    const bool use_undistorted;
+    const bool use_10pt;
 };
 
 } // namespace poselib

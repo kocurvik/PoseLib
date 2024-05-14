@@ -364,7 +364,7 @@ void FundamentalEstimator::refine_model(Eigen::Matrix3d *F) const {
     refine_fundamental(x1, x2, F, bundle_opt);
 }
 
-void RDFundamentalEstimator::generate_models(std::vector<FCam> *models) {
+void kFkEstimator::generate_models(std::vector<FCam> *models) {
     sampler.generate_sample(&sample);
 
     //    The standard solver
@@ -401,7 +401,7 @@ void RDFundamentalEstimator::generate_models(std::vector<FCam> *models) {
     }
 }
 
-double RDFundamentalEstimator::score_model(const FCam &F_cam, size_t *inlier_count) {
+double kFkEstimator::score_model(const FCam &F_cam, size_t *inlier_count) {
     if (use_undistorted) {
         for (size_t i = 0; i < x1.size(); ++i) {
             x1u[i] = F_cam.camera.undistort(x1[i]);
@@ -417,7 +417,7 @@ double RDFundamentalEstimator::score_model(const FCam &F_cam, size_t *inlier_cou
                                                         opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
 }
 
-void RDFundamentalEstimator::refine_model(FCam *F_cam) {
+void kFkEstimator::refine_model(FCam *F_cam) {
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
@@ -433,6 +433,85 @@ void RDFundamentalEstimator::refine_model(FCam *F_cam) {
         refine_kFk_undistorted(x1, x2, F_cam, bundle_opt);
     } else {
         refine_kFk_tangent(x1, x2, F_cam, bundle_opt);
+    }
+
+    //    score = compute_division_model_tangent_sampson_score(F_cam->F, k, k, x1, x2, opt.max_epipolar_error *
+    //    opt.max_epipolar_error, &inlier_count); std::cout << "Inliers after: " << inlier_count << std::endl; std::cout
+    //    << "Score after: " << score << std::endl;
+}
+
+void k2Fk1Estimator::generate_models(std::vector<FCamPair> *models) {
+    sampler.generate_sample(&sample);
+
+    //    The standard solver
+    if (rd_vals.empty()) {
+        for (size_t k = 0; k < sample_sz; ++k) {
+            x1s[k] = x1[sample[k]].homogeneous();
+            x2s[k] = x2[sample[k]].homogeneous();
+        }
+
+        if (use_10pt) {
+            throw std::runtime_error("nyi");
+            return;
+        }
+        // relpose_k2Fk1_8pt(x1s, x2s, models);
+        throw std::runtime_error("nyi");
+        return;
+    }
+
+    //  solver with list of def vals
+    for (double k1 : rd_vals) {
+        for (double k2 : rd_vals) {
+            Camera cam1 = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, k1}, -1, -1);
+            Camera cam2 = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, k2}, -1, -1);
+            for (size_t k = 0; k < sample_sz; ++k) {
+                x1s[k] = cam1.undistort(x1[sample[k]]).homogeneous().normalized();
+                x2s[k] = cam2.undistort(x2[sample[k]]).homogeneous().normalized();
+            }
+
+            std::vector<Eigen::Matrix3d> local_models;
+            relpose_7pt(x1s, x2s, &local_models);
+            models->reserve(models->size() + distance(local_models.begin(), local_models.end()));
+            for (const Eigen::Matrix3d &F: local_models) {
+                models->emplace_back(F, cam1, cam2);
+            }
+        }
+    }
+}
+
+double k2Fk1Estimator::score_model(const FCamPair &F_cam_pair, size_t *inlier_count) {
+    if (use_undistorted) {
+        for (size_t i = 0; i < x1.size(); ++i) {
+            x1u[i] = F_cam_pair.camera1.undistort(x1[i]);
+            x2u[i] = F_cam_pair.camera2.undistort(x2[i]);
+        }
+
+        return compute_sampson_msac_score(F_cam_pair.F, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error,
+                                          inlier_count);
+    }
+    double k1 = F_cam_pair.camera1.params[3];
+    double k2 = F_cam_pair.camera2.params[3];
+
+    return compute_division_model_tangent_sampson_score(F_cam_pair.F, k1, k2, x1, x2,
+                                                        opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
+}
+
+void k2Fk1Estimator::refine_model(FCamPair *F_cam_pair) {
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_epipolar_error;
+    bundle_opt.max_iterations = 25;
+
+    //    size_t inlier_count;
+    //    double k = F_cam->camera.params[3];
+    //    double score = compute_division_model_tangent_sampson_score(F_cam->F, k, k, x1, x2, opt.max_epipolar_error *
+    //    opt.max_epipolar_error, &inlier_count); std::cout << "Inliers before: " << inlier_count << std::endl;
+    //    std::cout << "Score before: " << score << std::endl;
+
+    if (use_undistorted) {
+        refine_k2Fk1_undistorted(x1, x2, F_cam_pair, bundle_opt);
+    } else {
+//        refine_k2Fk1_tangent(x1, x2, F_cam, bundle_opt);
     }
 
     //    score = compute_division_model_tangent_sampson_score(F_cam->F, k, k, x1, x2, opt.max_epipolar_error *

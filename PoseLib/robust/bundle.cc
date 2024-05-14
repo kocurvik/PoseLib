@@ -506,6 +506,80 @@ BundleStats refine_kFk_undistorted(const std::vector<Point2D> &x1, const std::ve
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
+// Uncalibrated relative pose (fundamental matrix) with rd refinement
+
+/*template <typename WeightType, typename LossFunction>
+BundleStats refine_k2Fk1_tangent(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCamPair *F_cam_pair_pair,
+                               const BundleOptions &opt, const WeightType &weights) {
+    // We optimize over the SVD-based factorization from Bartoli and Sturm
+    LossFunction loss_fn(opt.loss_scale);
+    IterationCallback callback = setup_callback(opt, loss_fn);
+    k2Fk1TangentJacobianAccumulator<LossFunction, WeightType> accum(x1, x2, loss_fn, weights);
+    BundleStats stats = lm_impl<decltype(accum)>(accum, F_cam_pair_pair, opt, callback);
+    return stats;
+}
+
+template <typename WeightType>
+BundleStats refine_k2Fk1_tangent(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCamPair *F_cam_pair_pair,
+                               const BundleOptions &opt, const WeightType &weights) {
+    switch (opt.loss_type) {
+#define SWITCH_LOSS_FUNCTION_CASE(LossFunction)                                                                        \
+    return refine_k2Fk1_tangent<WeightType, LossFunction>(x1, x2, F_cam_pair_pair, opt, weights);
+        SWITCH_LOSS_FUNCTIONS
+    default:
+        return BundleStats();
+    }
+#undef SWITCH_LOSS_FUNCTION_CASE
+}
+
+// Entry point for fundamental matrix refinement
+BundleStats refine_k2Fk1_tangent(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCamPair *F_cam_pair_pair,
+                               const BundleOptions &opt, const std::vector<double> &weights) {
+    if (weights.size() == x1.size()) {
+        return refine_k2Fk1_tangent<std::vector<double>>(x1, x2, F_cam_pair_pair, opt, weights);
+    } else {
+        return refine_k2Fk1_tangent<UniformWeightVector>(x1, x2, F_cam_pair_pair, opt, UniformWeightVector());
+    }
+}*/
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+// Uncalibrated relative pose (fundamental matrix) with rd refinement
+
+template <typename WeightType, typename LossFunction>
+BundleStats refine_k2Fk1_undistorted(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCamPair *F_cam_pair,
+                                   const BundleOptions &opt, const WeightType &weights) {
+    // We optimize over the SVD-based factorization from Bartoli and Sturm
+    LossFunction loss_fn(opt.loss_scale);
+    IterationCallback callback = setup_callback(opt, loss_fn);
+    k2Fk1UndistortedJacobianAccumulator<LossFunction, WeightType> accum(x1, x2, loss_fn, weights);
+    BundleStats stats = lm_impl<decltype(accum)>(accum, F_cam_pair, opt, callback);
+    return stats;
+}
+
+template <typename WeightType>
+BundleStats refine_k2Fk1_undistorted(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCamPair *F_cam_pair,
+                                   const BundleOptions &opt, const WeightType &weights) {
+    switch (opt.loss_type) {
+#define SWITCH_LOSS_FUNCTION_CASE(LossFunction)                                                                        \
+    return refine_k2Fk1_undistorted<WeightType, LossFunction>(x1, x2, F_cam_pair, opt, weights);
+        SWITCH_LOSS_FUNCTIONS
+    default:
+        return BundleStats();
+    }
+#undef SWITCH_LOSS_FUNCTION_CASE
+}
+
+// Entry point for fundamental matrix refinement
+BundleStats refine_k2Fk1_undistorted(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, FCamPair *F_cam_pair,
+                                   const BundleOptions &opt, const std::vector<double> &weights) {
+    if (weights.size() == x1.size()) {
+        return refine_k2Fk1_undistorted<std::vector<double>>(x1, x2, F_cam_pair, opt, weights);
+    } else {
+        return refine_k2Fk1_undistorted<UniformWeightVector>(x1, x2, F_cam_pair, opt, UniformWeightVector());
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
 // Homography matrix refinement
 
 template <typename WeightType, typename LossFunction>

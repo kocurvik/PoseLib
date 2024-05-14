@@ -166,8 +166,8 @@ RansacStats ransac_kFk(const std::vector<Point2D> &x1, const std::vector<Point2D
     best_model->camera = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
     RansacStats stats;
 
-    RDFundamentalEstimator estimator(opt, x1, x2, ks, use_undistorted, use_9pt);
-    stats = ransac<RDFundamentalEstimator, FCam>(estimator, opt, best_model);
+    kFkEstimator estimator(opt, x1, x2, ks, use_undistorted, use_9pt);
+    stats = ransac<kFkEstimator, FCam>(estimator, opt, best_model);
 
     if (use_undistorted) {
         std::vector<Point2D> x1u, x2u;
@@ -180,6 +180,34 @@ RansacStats ransac_kFk(const std::vector<Point2D> &x1, const std::vector<Point2D
         get_inliers(best_model->F, x1u, x2u, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
     } else {
         get_rd_tangent_sampson_inliers(best_model->F, best_model->camera.params[3], best_model->camera.params[3], x1,
+                                       x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+    }
+    return stats;
+}
+
+RansacStats ransac_k2Fk1(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, std::vector<double> &ks,
+                         bool use_undistorted, bool use_10pt, const RansacOptions &opt, FCamPair *best_model,
+                         std::vector<char> *best_inliers) {
+
+    best_model->F.setIdentity();
+    best_model->camera1 = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+    best_model->camera2 = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+    RansacStats stats;
+
+    k2Fk1Estimator estimator(opt, x1, x2, ks, use_undistorted, use_10pt);
+    stats = ransac<k2Fk1Estimator, FCamPair>(estimator, opt, best_model);
+
+    if (use_undistorted) {
+        std::vector<Point2D> x1u, x2u;
+        x1u.resize(x1.size());
+        x2u.resize(x1.size());
+        for (size_t i = 0; i < x1.size(); ++i) {
+            x1u[i] = best_model->camera1.undistort(x1[i]);
+            x2u[i] = best_model->camera2.undistort(x2[i]);
+        }
+        get_inliers(best_model->F, x1u, x2u, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+    } else {
+        get_rd_tangent_sampson_inliers(best_model->F, best_model->camera1.params[3], best_model->camera2.params[3], x1,
                                        x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
     }
     return stats;

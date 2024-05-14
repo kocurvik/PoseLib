@@ -517,6 +517,7 @@ void DivisionRadialCameraModel::dxudk(const std::vector<double> &params, const E
                                       Eigen::Vector3d *xp) {
     double div = (1 + params[3] * x.squaredNorm());
     *xp << -x * x.squaredNorm() / (div * div), 0.0;
+    //*xp << 0.0, 0.0, x.squaredNorm();
 }
 const std::vector<size_t> DivisionRadialCameraModel::focal_idx = {0};
 const std::vector<size_t> DivisionRadialCameraModel::principal_point_idx = {1, 2};
