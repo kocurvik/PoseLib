@@ -202,10 +202,10 @@ class kFkEstimator {
   public:
     kFkEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
                  const std::vector<Point2D> &points2D_2, const std::vector<double> &ks, bool use_undistorted,
-                 bool use_9pt)
+                 bool use_9pt, const double min_k, const double max_k)
         : sample_sz(ks.empty() ? (use_9pt ? 9 : 8) : 7), num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2),
           sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations),
-          use_undistorted(use_undistorted), use_9pt(use_9pt) {
+          use_undistorted(use_undistorted), use_9pt(use_9pt), min_k(min_k), max_k(max_k) {
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);
         x1u.resize(x1.size());
@@ -234,16 +234,17 @@ class kFkEstimator {
     std::vector<double> rd_vals;
     const bool use_undistorted;
     const bool use_9pt;
+    const double min_k, max_k;
 };
 
 class k2Fk1Estimator {
   public:
     k2Fk1Estimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
                    const std::vector<Point2D> &points2D_2, const std::vector<double> &ks, bool use_undistorted,
-                   bool use_10pt)
+                   bool use_10pt, const double min_k, const double max_k)
         : sample_sz(ks.empty() ? (use_10pt ? 10 : 9) : 7), num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2),
           sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations),
-          use_undistorted(use_undistorted), use_10pt(use_10pt) {
+          use_undistorted(use_undistorted), use_10pt(use_10pt), min_k(min_k), max_k(max_k) {
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);
         x1u.resize(x1.size());
@@ -272,6 +273,8 @@ class k2Fk1Estimator {
     std::vector<double> rd_vals;
     const bool use_undistorted;
     const bool use_10pt;
+    const double min_k;
+    const double max_k;
 };
 
 } // namespace poselib

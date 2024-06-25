@@ -405,6 +405,13 @@ void kFkEstimator::generate_models(std::vector<FCam> *models) {
 }
 
 double kFkEstimator::score_model(const FCam &F_cam, size_t *inlier_count) {
+    double k = F_cam.camera.params[3];
+
+    if (k < min_k || k > max_k){
+        *inlier_count = 0;
+        return 1e10;
+    }
+
     if (use_undistorted) {
         for (size_t i = 0; i < x1.size(); ++i) {
             x1u[i] = F_cam.camera.undistort(x1[i]);
@@ -414,7 +421,7 @@ double kFkEstimator::score_model(const FCam &F_cam, size_t *inlier_count) {
         return compute_sampson_msac_score(F_cam.F, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error,
                                           inlier_count);
     }
-    double k = F_cam.camera.params[3];
+
 
     return compute_division_model_tangent_sampson_score(F_cam.F, k, k, x1, x2,
                                                         opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
@@ -424,7 +431,7 @@ void kFkEstimator::refine_model(FCam *F_cam) {
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
-    bundle_opt.max_iterations = 25;
+    bundle_opt.max_iterations = opt.lo_iterations;
 
     //    size_t inlier_count;
     //    double k = F_cam->camera.params[3];
@@ -482,6 +489,14 @@ void k2Fk1Estimator::generate_models(std::vector<FCamPair> *models) {
 }
 
 double k2Fk1Estimator::score_model(const FCamPair &F_cam_pair, size_t *inlier_count) {
+    double k1 = F_cam_pair.camera1.params[3];
+    double k2 = F_cam_pair.camera2.params[3];
+
+    if (k1 < min_k || k1 > max_k || k2 < min_k || k2 > max_k){
+        *inlier_count = 0;
+        return 1e10;
+    }
+
     if (use_undistorted) {
         for (size_t i = 0; i < x1.size(); ++i) {
             x1u[i] = F_cam_pair.camera1.undistort(x1[i]);
@@ -491,8 +506,6 @@ double k2Fk1Estimator::score_model(const FCamPair &F_cam_pair, size_t *inlier_co
         return compute_sampson_msac_score(F_cam_pair.F, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error,
                                           inlier_count);
     }
-    double k1 = F_cam_pair.camera1.params[3];
-    double k2 = F_cam_pair.camera2.params[3];
 
     return compute_division_model_tangent_sampson_score(F_cam_pair.F, k1, k2, x1, x2,
                                                         opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
@@ -502,7 +515,7 @@ void k2Fk1Estimator::refine_model(FCamPair *F_cam_pair) {
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
-    bundle_opt.max_iterations = 25;
+    bundle_opt.max_iterations = opt.lo_iterations;
 
     //    size_t inlier_count;
     //    double k = F_cam->camera.params[3];

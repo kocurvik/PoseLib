@@ -421,7 +421,11 @@ RansacStats estimate_kFk(const std::vector<Point2D> &x1, const std::vector<Point
         ks[k] *= scale * scale;
     }
 
-    RansacStats stats = ransac_kFk(x1_norm, x2_norm, ks, use_undistorted, use_9pt, ransac_opt_scaled, F_cam, inliers);
+    double min_limit = -2.0 * scale * scale;
+    double max_limit = 0.5 * scale * scale;
+
+    RansacStats stats = ransac_kFk(x1_norm, x2_norm, ks, use_undistorted, use_9pt, min_limit, max_limit,
+                                   ransac_opt_scaled, F_cam, inliers);
 
     if (stats.num_inliers > 8) {
         // Collect inlier for additional non-linear refinement
@@ -479,7 +483,11 @@ RansacStats estimate_k2Fk1(const std::vector<Point2D> &x1, const std::vector<Poi
         ks[k] *= scale * scale;
     }
 
-    RansacStats stats = ransac_k2Fk1(x1_norm, x2_norm, ks, use_undistorted, use_10pt, ransac_opt_scaled, F_cam_pair, inliers);
+    double min_limit = -2.0 * scale * scale;
+    double max_limit = 0.5 * scale * scale;
+
+    RansacStats stats = ransac_k2Fk1(x1_norm, x2_norm, ks, use_undistorted, use_10pt, min_limit, max_limit,
+                                     ransac_opt_scaled, F_cam_pair, inliers);
 
     if (stats.num_inliers > 8) {
         // Collect inlier for additional non-linear refinement

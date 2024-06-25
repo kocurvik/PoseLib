@@ -159,14 +159,14 @@ RansacStats ransac_fundamental(const std::vector<Point2D> &x1, const std::vector
 }
 
 RansacStats ransac_kFk(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, std::vector<double> &ks,
-                       bool use_undistorted, bool use_9pt, const RansacOptions &opt, FCam *best_model,
-                       std::vector<char> *best_inliers) {
+                       bool use_undistorted, bool use_9pt, const double min_k, const double max_k,
+                       const RansacOptions &opt, FCam *best_model, std::vector<char> *best_inliers) {
 
     best_model->F.setIdentity();
     best_model->camera = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
     RansacStats stats;
 
-    kFkEstimator estimator(opt, x1, x2, ks, use_undistorted, use_9pt);
+    kFkEstimator estimator(opt, x1, x2, ks, use_undistorted, use_9pt, min_k, max_k);
     stats = ransac<kFkEstimator, FCam>(estimator, opt, best_model);
 
     if (use_undistorted) {
@@ -185,16 +185,17 @@ RansacStats ransac_kFk(const std::vector<Point2D> &x1, const std::vector<Point2D
     return stats;
 }
 
-RansacStats ransac_k2Fk1(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, std::vector<double> &ks,
-                         bool use_undistorted, bool use_10pt, const RansacOptions &opt, FCamPair *best_model,
-                         std::vector<char> *best_inliers) {
+RansacStats
+ransac_k2Fk1(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, std::vector<double> &ks,
+             bool use_undistorted, bool use_10pt, const double min_k, const double max_k, const RansacOptions &opt,
+             FCamPair *best_model, std::vector<char> *best_inliers) {
 
     best_model->F.setIdentity();
     best_model->camera1 = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
     best_model->camera2 = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
     RansacStats stats;
 
-    k2Fk1Estimator estimator(opt, x1, x2, ks, use_undistorted, use_10pt);
+    k2Fk1Estimator estimator(opt, x1, x2, ks, use_undistorted, use_10pt, min_k, max_k);
     stats = ransac<k2Fk1Estimator, FCamPair>(estimator, opt, best_model);
 
     if (use_undistorted) {
