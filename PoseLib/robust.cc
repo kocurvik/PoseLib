@@ -332,6 +332,68 @@ RansacStats estimate_3v_relative_pose(const std::vector<Point2D> &x1, const std:
     return stats;
 }
 
+RansacStats estimate_3v_shared_focal_relative_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                                   const std::vector<Point2D> &x3, const RansacOptions &ransac_opt,
+                                                   const BundleOptions &bundle_opt, ImageTriplet *image_triplet,
+                                                   std::vector<char> *inliers, const Point2D &pp) {
+    std::vector<Point2D> x1_norm = x1;
+    std::vector<Point2D> x2_norm = x2;
+    std::vector<Point2D> x3_norm = x3;
+
+    for (size_t i = 0; i < x1_norm.size(); i++) {
+        x1_norm[i] -= pp;
+        x2_norm[i] -= pp;
+        x3_norm[i] -= pp;
+    }
+
+    double scale = 0.0;
+    for (size_t k = 0; k < x1.size(); ++k) {
+        scale += x1_norm[k].norm();
+        scale += x2_norm[k].norm();
+        scale += x3_norm[k].norm();
+    }
+    scale /= 3.0 * x1.size() / std::sqrt(2);
+
+    for (size_t i = 0; i < x1_norm.size(); i++) {
+        x1_norm[i] /= scale;
+        x2_norm[i] /= scale;
+        x3_norm[i] /= scale;
+    }
+
+    RansacOptions ransac_opt_scaled = ransac_opt;
+    ransac_opt_scaled.max_epipolar_error = ransac_opt.max_epipolar_error / scale;
+
+    RansacStats stats = ransac_3v_shared_focal_relpose(x1_norm, x2_norm, x3_norm, ransac_opt_scaled, image_triplet, inliers);
+
+    if (stats.num_inliers > 4) {
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        std::vector<Point2D> x3_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+        x3_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < x1.size(); ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1_norm[k]);
+            x2_inliers.push_back(x2_norm[k]);
+            x3_inliers.push_back(x3_norm[k]);
+        }
+
+        BundleOptions bundle_opt_scaled = bundle_opt;
+        bundle_opt_scaled.loss_scale = bundle_opt.loss_scale / scale;
+
+         refine_3v_shared_focal_relpose(x1_inliers, x2_inliers, x3_inliers, image_triplet, bundle_opt_scaled);
+    }
+
+    image_triplet->camera.params[0] *= scale;
+    image_triplet->camera.params[1] = pp(0);
+    image_triplet->camera.params[2] = pp(1);
+
+    return stats;
+}
+
 RansacStats estimate_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                  const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, Eigen::Matrix3d *F,
                                  std::vector<char> *inliers) {

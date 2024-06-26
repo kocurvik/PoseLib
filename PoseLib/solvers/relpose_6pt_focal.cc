@@ -1129,9 +1129,9 @@ int relpose_6pt_focal(const std::vector<Eigen::Vector3d> &x1, const std::vector<
         x1_u.reserve(6);
         x2_u.reserve(6);
 
-        for (int i = 0; i < 6; i++) {
-            x1_u.push_back(Eigen::Vector3d(x1[i](0) / focal, x1[i](1) / focal, x1[i](2)).normalized());
-            x2_u.push_back(Eigen::Vector3d(x2[i](0) / focal, x2[i](1) / focal, x2[i](2)).normalized());
+        for (int j = 0; j < 6; j++) {
+            x1_u.push_back(Eigen::Vector3d(x1[j](0) / focal, x1[j](1) / focal, x1[j](2)).normalized());
+            x2_u.push_back(Eigen::Vector3d(x2[j](0) / focal, x2[j](1) / focal, x2[j](2)).normalized());
         }
 
         motion_from_essential(E, x1_u, x2_u, &poses);

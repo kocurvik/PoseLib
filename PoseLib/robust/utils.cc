@@ -345,6 +345,40 @@ int get_inliers(const ThreeViewCameraPose &three_view_pose, const std::vector<Po
     return count;
 }
 
+int get_inliers(const ImageTriplet &image_triplet, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const std::vector<Point2D> &x3, double sq_threshold, std::vector<char> *inliers){
+    std::vector<char> best_inliers12;
+    std::vector<char> best_inliers13;
+    std::vector<char> best_inliers23;
+
+    inliers->resize(x1.size());
+
+    Eigen::DiagonalMatrix<double, 3> K_inv(1, 1, image_triplet.camera.focal());
+    Eigen::Matrix3d F12, F13, F23;
+    essential_from_motion(image_triplet.poses.pose12, &F12);
+    essential_from_motion(image_triplet.poses.pose13, &F13);
+    essential_from_motion(image_triplet.poses.pose23(), &F23);
+    F12 = K_inv * F12 * K_inv;
+    F13 = K_inv * F13 * K_inv;
+    F23 = K_inv * F23 * K_inv;
+
+    get_inliers(F12, x1, x2, sq_threshold, &best_inliers12);
+    get_inliers(F13, x1, x3, sq_threshold, &best_inliers13);
+    get_inliers(F23, x2, x3, sq_threshold, &best_inliers23);
+
+    int count = 0;
+    bool val;
+
+    for (size_t i = 0; i < x1.size(); i++){
+//        std::cout << "At: " << i << ": " << best_inliers12[i] << ", " << best_inliers13[i] << ", " << best_inliers23[i] << std::endl;
+        val = (best_inliers12[i] and best_inliers13[i]) and best_inliers23[i];
+        (*inliers)[i] = val;
+        if (val)
+            count++;
+    }
+
+    return count;
+}
+
 // Compute inliers for relative pose estimation (using Sampson error)
 int get_inliers(const Eigen::Matrix3d &E, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                 double sq_threshold, std::vector<char> *inliers) {
@@ -502,6 +536,29 @@ Point3D triangulate(const CameraPose &pose, const Point3D &x1, const Point3D &x2
 //    Eigen::Vector3d x2_p = P * X_h;
 //    std::cout << "x2_p: " << x2_p / x2_p(2) << std::endl;
 //    std::cout << "x2: " << x2 << std::endl;
+
+    Eigen::Vector3d X(X_h(0) / X_h(3), X_h(1) / X_h(3), X_h(2) / X_h(3));
+    return X;
+}
+
+
+Point3D triangulate(const ImagePair &pair, const Point3D &x1, const Point3D &x2) {
+    Eigen::Matrix4d A;
+    Eigen::Matrix<double, 3, 4> P1;
+    P1 << pair.camera1.focal(), 0.0, 0.0, 0.0,
+          0.0, pair.camera1.focal(), 0.0, 0.0,
+          0.0, 0.0, 1.0, 0.0;
+    Eigen::DiagonalMatrix<double, 3> K2(pair.camera2.focal(), pair.camera2.focal(), 1.0);
+    Eigen::MatrixXd P2 = K2 * pair.pose.Rt();
+    //    TODO fix this    
+    A <<    P1(2, 0) * x1(0) - P1(0, 0), P1(2, 1) * x1(0) - P1(0, 1), P1(2, 2) * x1(0) - P1(0, 2), P1(2, 3) * x1(0) - P1(0, 3),
+            P1(2, 0) * x1(1) - P1(1, 0), P1(2, 1) * x1(1) - P1(1, 1), P1(2, 2) * x1(1) - P1(1, 2), P1(2, 3) * x1(1) - P1(1, 3),
+            P2(2, 0) * x2(0) - P2(0, 0), P2(2, 1) * x2(0) - P2(0, 1), P2(2, 2) * x2(0) - P2(0, 2), P2(2, 3) * x2(0) - P2(0, 3),
+            P2(2, 0) * x2(1) - P2(1, 0), P2(2, 1) * x2(1) - P2(1, 1), P2(2, 2) * x2(1) - P2(1, 2), P2(2, 3) * x2(1) - P2(1, 3);
+    
+    Eigen::JacobiSVD<Eigen::Matrix4d> svd(A, Eigen::ComputeFullV);
+    
+    Eigen::Vector4d X_h = svd.matrixV().col(3);
 
     Eigen::Vector3d X(X_h(0) / X_h(3), X_h(1) / X_h(3), X_h(2) / X_h(3));
     return X;

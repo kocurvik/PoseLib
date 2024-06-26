@@ -117,6 +117,23 @@ ransac_3v_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2
     return stats;
 }
 
+RansacStats ransac_3v_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                           const std::vector<Point2D> &x3, const RansacOptions &opt,
+                                           ImageTriplet *image_triplet, std::vector<char> *best_inliers) {
+    image_triplet->poses.pose12.q << 1.0, 0.0, 0.0, 0.0;
+    image_triplet->poses.pose13.q << 1.0, 0.0, 0.0, 0.0;
+    image_triplet->poses.pose12.t.setZero();
+    image_triplet->poses.pose13.t.setZero();
+    image_triplet->camera = Camera("SIMPLE_PINHOLE", std::vector<double>{1.0, 0.0, 0.0}, -1, -1);
+
+    ThreeViewSharedFocalRelativePoseEstimator estimator(opt, x1, x2, x3);
+    RansacStats stats = ransac<ThreeViewSharedFocalRelativePoseEstimator>(estimator, opt, image_triplet);
+
+    get_inliers(*image_triplet, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+
+    return stats;
+}
+
 RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         const RansacOptions &opt, ImagePair *best_model,
                                         std::vector<char> *best_inliers) {

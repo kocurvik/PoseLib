@@ -75,11 +75,19 @@ RansacStats estimate_relative_pose(const std::vector<Point2D> &points2D_1, const
 // Estimates relative pose in three views using LO-RANSAC jointly for 5p for first two cameras
 // and P3P for the third camera followed by non-linear refinement
 // Threshold for Sampson error is set by RansacOptions.max_epipolar_error
-    RansacStats estimate_3v_relative_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                          const std::vector<Point2D> &x3, const Camera &camera1, const Camera &camera2,
-                                          const Camera &camera3, const RansacOptions &ransac_opt,
-                                          const BundleOptions &bundle_opt, ThreeViewCameraPose *three_view_pose,
-                                          std::vector<char> *inliers);
+RansacStats estimate_3v_relative_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                      const std::vector<Point2D> &x3, const Camera &camera1, const Camera &camera2,
+                                      const Camera &camera3, const RansacOptions &ransac_opt,
+                                      const BundleOptions &bundle_opt, ThreeViewCameraPose *three_view_pose,
+                                      std::vector<char> *inliers);
+
+// Estimates shared focal relative pose in three views using LO-RANSAC jointly for 6p for first two cameras
+// and P4Pf for the third camera followed by non-linear refinement
+// Threshold for Sampson error is set by RansacOptions.max_epipolar_error
+RansacStats estimate_3v_shared_focal_relative_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                                   const std::vector<Point2D> &x3, const RansacOptions &ransac_opt,
+                                                   const BundleOptions &bundle_opt, ImageTriplet *image_triplet,
+                                                   std::vector<char> *inliers, const Point2D &pp);
 
 // Estimates relative pose with shared unknown focal length using LO-RANSAC followed by non-linear refinement
 // Threshold for Sampson error is set by RansacOptions.max_epipolar_error

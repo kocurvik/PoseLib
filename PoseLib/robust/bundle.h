@@ -93,6 +93,11 @@ BundleStats refine_3v_relpose(const std::vector<Point2D> &x1, const std::vector<
                               const BundleOptions &opt = BundleOptions(),
                               const std::vector<double> &weights = std::vector<double>());
 
+BundleStats refine_3v_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                           const std::vector<Point2D> &x3, ImageTriplet *pose,
+                                           const BundleOptions &opt,
+                                           const std::vector<double> &weights = std::vector<double>());
+
 // Relative pose with single unknown focal refinement. Minimizes Sampson error error. Assumes identity intrinsics
 // (calibrated camera)
 BundleStats refine_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,

@@ -305,6 +305,275 @@ void ThreeViewRelativePoseEstimator::refine_model(ThreeViewCameraPose *pose) con
 //    std::cout << "Inliers after: " << inliers_after <<std::endl;
 }
 
+void ThreeViewSharedFocalRelativePoseEstimator::generate_models(std::vector<ImageTriplet> *models) {
+    sampler.generate_sample(&sample);
+    for (size_t k = 0; k < sample_sz; ++k) {
+        x1n[k] = x1[sample[k]].homogeneous().normalized();
+        x2n[k] = x2[sample[k]].homogeneous().normalized();
+    }
+
+    // if we use 5 pts we approx the last as the mean of the first 3 pts
+    if (sample_sz < 6){
+        x1n[5] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
+        x2n[5] = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0).homogeneous().normalized();
+    }
+
+    if (sample_sz < 5){
+        x1n[4] = ((x1[sample[3]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
+        x2n[4] = ((x2[sample[3]] + x2[sample[1]] + x2[sample[2]]) / 3.0).homogeneous().normalized();
+    }
+
+    for (size_t k = 0; k < sample_sz_13; ++k) {
+        x1s[k] = x1[sample[k]].homogeneous();
+        x2s[k] = x2[sample[k]].homogeneous();
+    }
+    estimate_models(models);
+
+    if (sample_sz < 6 and opt.delta > 0.0){
+        delta(models);
+    }
+}
+
+void ThreeViewSharedFocalRelativePoseEstimator::delta(std::vector<ImageTriplet> *models) {
+    Point2D x2n5 = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0);
+    double mx2 = x2n5(0), my2 = x2n5(1);
+
+    double tr_xA = x2[sample[0]](0), tr_yA = x2[sample[0]](1);
+    double tr_xB = x2[sample[1]](0), tr_yB = x2[sample[1]](1);
+    double tr_xC = x2[sample[2]](0), tr_yC = x2[sample[2]](1);
+
+    int idx;
+    double scale;
+    get_triangle_scale(mx2, my2, tr_xA, tr_yA, tr_xB, tr_yB, tr_xC, tr_yC, idx, scale);
+
+    if (sample_sz == 5) {
+        x2n5(idx) += opt.delta * scale;
+        x2n[5] = x2n5.homogeneous().normalized();
+        estimate_models(models);
+
+        x2n5(idx) -= 2 * opt.delta * scale;
+        x2n[5] = x2n5.homogeneous().normalized();
+        estimate_models(models);
+        return;
+    }
+
+    if (sample_sz == 4) {
+        Point2D x2n4 = ((x2[sample[3]] + x2[sample[1]] + x2[sample[2]]) / 3.0);
+        double mx2p = x2n4(0), my2p = x2n4(1);
+
+        double tr_xAp = x2[sample[3]](0), tr_yAp = x2[sample[3]](1);
+        double tr_xBp = x2[sample[1]](0), tr_yBp = x2[sample[1]](1);
+        double tr_xCp = x2[sample[2]](0), tr_yCp = x2[sample[2]](1);
+
+        int idxp;
+        double scalep;
+        get_triangle_scale(mx2p, my2p, tr_xAp, tr_yAp, tr_xBp, tr_yBp, tr_xCp, tr_yCp, idxp, scalep);
+
+        x2n5(idx) += opt.delta * scale;
+        x2n4(idxp) += opt.delta * scalep;
+        x2n[5] = x2n5.homogeneous().normalized();
+        x2n[4] = x2n4.homogeneous().normalized();
+        estimate_models(models);
+
+        x2n5(idx) -= 2 * opt.delta * scale;
+        x2n4(idxp) -= 2 * opt.delta * scalep;
+        x2n[5] = x2n5.homogeneous().normalized();
+        x2n[4] = x2n4.homogeneous().normalized();
+        estimate_models(models);
+        return;
+    }
+}
+
+void ThreeViewSharedFocalRelativePoseEstimator::get_triangle_scale(double mx2, double my2, double tr_xA, double tr_yA,
+                                                                  double tr_xB, double tr_yB, double tr_xC,
+                                                                  double tr_yC, int &idx, double &scale) const {
+    double slopeAB = (tr_yB - tr_yA) / (tr_xB - tr_xA);
+    double slopeAC = (tr_yC - tr_yA) / (tr_xC - tr_xA);
+    double slopeBC = (tr_yC - tr_yB) / (tr_xC - tr_xB);
+
+    double interceptAB = tr_yA - slopeAB * tr_xA;
+    double interceptAC = tr_yA - slopeAC * tr_xA;
+    double interceptBC = tr_yB - slopeBC * tr_xB;
+
+    // find y coord in lines AB, AC, and BC, in the 2nd view for x=mean
+    double yAB = slopeAB * mx2 + interceptAB;
+    double yAC = slopeAC * mx2 + interceptAC;
+    double yBC = slopeBC * mx2 + interceptBC;
+
+    // find x coord in lines AB, AC, and BC, in the 2nd view for y=mean
+    double xAB = (my2 - interceptAB) / slopeAB;
+    double xAC = (my2 - interceptAC) / slopeAC;
+    double xBC = (my2 - interceptBC) / slopeBC;
+
+    // find min and max y and min and max x of thriangle vertices
+    double min_y = std::min(std::min(tr_yA, tr_yB), tr_yC);
+    double max_y = std::max(std::max(tr_yA, tr_yB), tr_yC);
+    double min_x = std::min(std::min(tr_xA, tr_xB), tr_xC);
+    double max_x = std::max(std::max(tr_xA, tr_xB), tr_xC);
+
+    double max_distY;
+    if (yAB>max_y || yAB<min_y) {
+        max_distY = std::abs(yAC-yBC);
+    } else if (yAC>max_y || yAC<min_y) {
+        max_distY = std::abs(yAB-yBC);
+    } else {
+        max_distY = std::abs(yAB-yAC);
+    }
+
+    double max_distX;
+    if (xAB>max_x || xAB<min_x) {
+        max_distX = std::abs(xAC-xBC);
+    } else if (xAC>max_x || xAC<min_x) {
+        max_distX = std::abs(xAB-xBC);
+    } else {
+        max_distX = std::abs(xAB-xAC);
+    }
+    if (max_distX > max_distY){
+        scale = max_distX;
+        idx = 0;
+    } else {
+        scale = max_distY;
+        idx = 1;
+    }
+}
+
+void ThreeViewSharedFocalRelativePoseEstimator::estimate_models(std::vector<ImageTriplet> *models) {
+    std::vector<ImagePair> models12;
+    relpose_6pt_focal(x1n, x2n, &models12);
+
+    std::vector<Point3D> triangulated_12;
+    triangulated_12.reserve(3);
+
+    for (ImagePair pair12 : models12){
+        for (size_t i = 0; i < sample_sz_13; i++){
+            triangulated_12[i] = triangulate(pair12, x1s[i], x2s[i]);
+        }
+
+        for (size_t k = 0; k < sample_sz_13; ++k) {
+            Eigen::Vector2d x;
+            pair12.camera1.unproject(x3[sample[k]], &x);
+            x3s[k] = x.homogeneous().normalized();
+        }
+
+        std::vector<CameraPose> models13;
+
+        p3p(x3s, triangulated_12, &models13);
+
+        for (CameraPose pose13 : models13){
+            ImageTriplet image_triplet = ImageTriplet(ThreeViewCameraPose(pair12.pose, pose13), pair12.camera1);
+//            std::cout << "R: " << std::endl << pose13.R() << std::endl;
+//            std::cout << "t: " << pose13.t.transpose() << std::endl;
+            if (opt.threeview_check){
+                size_t inlier_4p_13 = 0;
+                size_t inlier_4p_23 = 0;
+                std::vector<Point2D> x1c = {x1[sample[3]]};
+                std::vector<Point2D> x2c = {x2[sample[3]]};
+                std::vector<Point2D> x3c = {x3[sample[3]]};
+
+                Eigen::DiagonalMatrix<double, 3> K_inv(1, 1, image_triplet.camera.focal());
+                Eigen::Matrix3d F13, F23;
+                essential_from_motion(image_triplet.poses.pose13, &F13);
+                essential_from_motion(image_triplet.poses.pose23(), &F23);
+                F13 = K_inv * F13 * K_inv;
+                F23 = K_inv * F23 * K_inv;
+
+                compute_sampson_msac_score(F13, x1c, x3c, 4 * opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_13);
+                compute_sampson_msac_score(F23, x2c, x3c, 4 * opt.max_epipolar_error * opt.max_epipolar_error, &inlier_4p_23);
+                if (inlier_4p_13 + inlier_4p_23 < 2) {
+                    continue;
+                }
+            }
+
+//            if (opt.inner_refine > 0) {
+//                inner_refine(&three_view_pose);
+//            }
+            models->emplace_back(image_triplet);
+        }
+    }
+}
+
+//void ThreeViewSharedFocalRelativePoseEstimator::inner_refine(ImageTriplet *three_view_pose) const {
+//    std::vector<Point2D> x1r, x2r, x3r;
+//    x1r.resize(4);
+//    x2r.resize(4);
+//    x3r.resize(4);
+//    for (size_t k = 0; k < 4; ++k) {
+//        x1r[k] = x1[sample[k]];
+//        x2r[k] = x2[sample[k]];
+//        x3r[k] = x3[sample[k]];
+//    }
+//
+//    BundleOptions bundle_opt;
+//    bundle_opt.loss_type = BundleOptions::CAUCHY;
+//    bundle_opt.loss_scale = opt.max_epipolar_error;
+//    bundle_opt.max_iterations = opt.inner_refine;
+//    refine_3v_relpose(x1r, x2r, x3r, three_view_pose, bundle_opt);
+//}
+
+double ThreeViewSharedFocalRelativePoseEstimator::score_model(const ImageTriplet &image_triplet, size_t *inlier_count) const {
+    size_t inlier_count12, inlier_count13, inlier_count23;
+    // TODO: calc inliers better w/o redundant computation
+
+    Eigen::DiagonalMatrix<double, 3> K_inv(1, 1, image_triplet.camera.focal());
+    Eigen::Matrix3d F12, F13, F23;
+    essential_from_motion(image_triplet.poses.pose12, &F12);
+    essential_from_motion(image_triplet.poses.pose13, &F13);
+    essential_from_motion(image_triplet.poses.pose23(), &F23);
+    F12 = K_inv * F12 * K_inv;
+    F13 = K_inv * F13 * K_inv;
+    F23 = K_inv * F23 * K_inv;
+    double score12 = compute_sampson_msac_score(F12, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count12);
+    double score13 = compute_sampson_msac_score(F13, x1, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count13);
+    double score23 = compute_sampson_msac_score(F23, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count23);
+
+    std::vector<char> inliers;
+    *inlier_count = get_inliers(image_triplet, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inliers);
+    return score12 + score13 + score23;
+}
+
+void ThreeViewSharedFocalRelativePoseEstimator::refine_model(ImageTriplet *image_triplet) const {
+    if (opt.lo_iterations == 0)
+        return;
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_epipolar_error;
+    bundle_opt.max_iterations = opt.lo_iterations;
+//    bundle_opt.verbose = true;
+
+    // Find approximate inliers and bundle over these with a truncated loss
+    std::vector<char> inliers;
+    int num_inl = get_inliers(*image_triplet, x1, x2, x3, 5 * (opt.max_epipolar_error * opt.max_epipolar_error), &inliers);
+    std::vector<Eigen::Vector2d> x1_inlier, x2_inlier, x3_inlier;
+    x1_inlier.reserve(num_inl);
+    x2_inlier.reserve(num_inl);
+    x3_inlier.reserve(num_inl);
+
+    if (num_inl <= 4) {
+        return;
+    }
+
+    for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+        if (inliers[pt_k]) {
+            x1_inlier.push_back(x1[pt_k]);
+            x2_inlier.push_back(x2[pt_k]);
+            x3_inlier.push_back(x3[pt_k]);
+        }
+    }
+
+//    size_t inliers_before;
+//    double score_before = score_model(*image_triplet, &inliers_before);
+//    std::cout << "Score before: " << score_before <<std::endl;
+//    std::cout << "Inliers before: " << inliers_before <<std::endl;
+
+    refine_3v_shared_focal_relpose(x1_inlier, x2_inlier, x3_inlier, image_triplet, bundle_opt);
+
+//    size_t inliers_after;
+//    double score_after = score_model(*image_triplet, &inliers_after);
+//    std::cout << "Score after: " << score_after <<std::endl;
+//    std::cout << "Inliers after: " << inliers_after <<std::endl;
+}
+
 void SharedFocalRelativePoseEstimator::generate_models(ImagePairVector *models) {
     sampler.generate_sample(&sample);
     for (size_t k = 0; k < sample_sz; ++k) {

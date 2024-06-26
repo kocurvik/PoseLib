@@ -113,6 +113,19 @@ struct alignas(32) ThreeViewCameraPose {
     }
 };
 
+struct alignas(32) ImageTriplet {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    // Rotation is represented as a unit quaternion
+    // with real part first, i.e. QW, QX, QY, QZ
+    ThreeViewCameraPose poses;
+    Camera camera;
+
+    // Constructors (Defaults to identity camera)
+    ImageTriplet() : poses(ThreeViewCameraPose()), camera(Camera()) {}
+    ImageTriplet(ThreeViewCameraPose poses, Camera camera) : poses(poses), camera(camera) {}
+};
+
 typedef std::vector<ImagePair> ImagePairVector;
 } // namespace poselib
 
