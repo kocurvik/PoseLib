@@ -29,6 +29,7 @@ set(SOURCES
     solvers/gen_relpose_5p1pt.cc
     solvers/gen_relpose_6pt.cc
     solvers/homography_4pt.cc
+    solvers/threeview_hc.cc
     misc/qep.cc
     misc/univariate.cc
     misc/essential.cc
@@ -77,6 +78,8 @@ set(HEADERS_PUBLIC
     solvers/gen_relpose_5p1pt.h
     solvers/gen_relpose_6pt.h
     solvers/homography_4pt.h
+    solvers/homotopy.h
+    solvers/threeview_hc.h
     misc/quaternion.h
     misc/colmap_models.h
     misc/qep.h

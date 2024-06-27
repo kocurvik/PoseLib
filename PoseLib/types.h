@@ -55,6 +55,7 @@ struct RansacOptions {
     size_t inner_refine = 0;
     bool threeview_check = false;
     double delta = 0.0;
+    bool use_hc = false;
 };
 
 struct RansacStats {

@@ -38,6 +38,7 @@
 #include "PoseLib/solvers/p3p.h"
 #include "PoseLib/solvers/relpose_5pt.h"
 #include "ransac_impl.h"
+#include "PoseLib/solvers/threeview_hc.h"
 
 namespace poselib {
 
@@ -109,8 +110,15 @@ ransac_3v_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2
     three_view_pose->pose12.t.setZero();
     three_view_pose->pose13.t.setZero();
 
-    ThreeViewRelativePoseEstimator estimator(opt, x1, x2, x3);
-    RansacStats stats = ransac<ThreeViewRelativePoseEstimator>(estimator, opt, three_view_pose);
+    RansacStats stats;
+
+    if (opt.use_hc) {
+        ThreeViewRelativePoseHCEstimator estimator(opt, x1, x2, x3);
+        stats = ransac<ThreeViewRelativePoseHCEstimator>(estimator, opt, three_view_pose);
+    } else {
+        ThreeViewRelativePoseEstimator estimator(opt, x1, x2, x3);
+        stats = ransac<ThreeViewRelativePoseEstimator>(estimator, opt, three_view_pose);
+    }
 
     get_inliers(*three_view_pose, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
 
