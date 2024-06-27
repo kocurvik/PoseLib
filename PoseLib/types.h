@@ -56,6 +56,9 @@ struct RansacOptions {
     bool threeview_check = false;
     double delta = 0.0;
     bool use_hc = false;
+    bool use_net = false;
+    bool init_net = false;
+    Eigen::Matrix3d gt_E = Eigen::Matrix3d::Zero();
 };
 
 struct RansacStats {

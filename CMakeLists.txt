@@ -10,8 +10,15 @@ include(${PROJECT_SOURCE_DIR}/cmake/SetEnv.cmake)
 # Eigen
 find_package(Eigen3)
 
+set(Torch_DIR /mnt/d/Research/code/libtorch/share/cmake/Torch)
+find_package(Torch REQUIRED)
+include_directories(${TORCH_INCLUDE_DIRS})
+
 # Library sources
 add_subdirectory(${LIBRARY_FOLDER})
+
+cmake_policy(SET CMP0079 NEW)
+target_link_libraries(PoseLib "${TORCH_LIBRARIES}")
 
 # Benchmark
 option(WITH_BENCHMARK "Build benchmark example." OFF)

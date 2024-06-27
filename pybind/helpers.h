@@ -41,6 +41,9 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "real_focal_check", ransac_opt.real_focal_check);
     update(input, "sample_sz", ransac_opt.sample_sz);
     update(input, "use_hc", ransac_opt.use_hc);
+    update(input, "use_net", ransac_opt.use_net);
+    update(input, "init_net", ransac_opt.init_net);
+    update(input, "gt_E", ransac_opt.gt_E);
     update(input, "inner_refine", ransac_opt.inner_refine);
     update(input, "threeview_check", ransac_opt.threeview_check);
     update(input, "delta", ransac_opt.delta);
@@ -85,6 +88,9 @@ void write_to_dict(const RansacOptions &ransac_opt, py::dict &dict) {
     dict["max_prosac_iterations"] = ransac_opt.max_prosac_iterations;
     dict["real_focal_check"] = ransac_opt.real_focal_check;
     dict["use_hc"] = ransac_opt.use_hc;
+    dict["use_net"] = ransac_opt.use_net;
+    dict["init_net"] = ransac_opt.init_net;
+    dict["gt_E"] = ransac_opt.gt_E;
 }
 
 void write_to_dict(const BundleOptions &bundle_opt, py::dict &dict) {

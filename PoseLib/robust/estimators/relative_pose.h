@@ -29,6 +29,8 @@
 #ifndef POSELIB_ROBUST_ESTIMATORS_RELATIVE_POSE_H
 #define POSELIB_ROBUST_ESTIMATORS_RELATIVE_POSE_H
 
+#include <torch/csrc/jit/api/module.h>
+#include <torch/csrc/jit/serialization/import.h>
 #include "PoseLib/camera_pose.h"
 #include "PoseLib/robust/sampling.h"
 #include "PoseLib/robust/utils.h"
@@ -70,13 +72,16 @@ class ThreeViewRelativePoseEstimator {
     ThreeViewRelativePoseEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
                                    const std::vector<Point2D> &points2D_2, const std::vector<Point2D> &points2D_3                                   )
         : sample_sz((ransac_opt.sample_sz == 0) ? 5 : ransac_opt.sample_sz), num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2), x3(points2D_3),
-          sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
+        sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
         x1n.resize(5);
         x2n.resize(5);
         x1s.resize(sample_sz_13);
         x2s.resize(sample_sz_13);
         x3s.resize(sample_sz_13);
         sample.resize(sample_sz);
+        if (opt.use_net || opt.init_net){
+            module = torch::jit::load("res/epoch28_sampson.pt");
+        }
     }
 
     void generate_models(std::vector<ThreeViewCameraPose> *models);
@@ -93,6 +98,7 @@ class ThreeViewRelativePoseEstimator {
     const std::vector<Point2D> &x1;
     const std::vector<Point2D> &x2;
     const std::vector<Point2D> &x3;
+    torch::jit::script::Module module;
 
     RandomSampler sampler;
     // pre-allocated vectors for sampling
@@ -100,7 +106,17 @@ class ThreeViewRelativePoseEstimator {
     std::vector<size_t> sample;
 
     void estimate_models(std::vector<ThreeViewCameraPose> *models);
-    void delta(std::vector<ThreeViewCameraPose> *models);
+    void triangle_calc(double mx, double my, int &idx, double &scale);
+    void delta(double mx, double my, std::vector<ThreeViewCameraPose> *models);
+    int normalize(std::vector<Eigen::Vector3f> &P, std::vector<Eigen::Vector3f> &Q, std::vector<Eigen::Vector2f> &P1,
+                   std::vector<Eigen::Vector2f> &Q1, Eigen::Matrix3f &CP1, Eigen::Matrix3f &CQ1) const;
+
+    int normalize(std::vector<Eigen::Vector3f> &P, std::vector<Eigen::Vector3f> &Q, std::vector<Eigen::Vector3f> &T,
+                  std::vector<Eigen::Vector2f> &P1, std::vector<Eigen::Vector2f> &Q1, std::vector<Eigen::Vector2f> &T1,
+                  Eigen::Matrix3f &CP1, Eigen::Matrix3f &CQ1, Eigen::Matrix3f &CT1) const;
+
+    Eigen::Vector3d get_network_point();
+    void generate_nn_init_delta_models(std::vector<ThreeViewCameraPose> *models);
 };
 
 class ThreeViewSharedFocalRelativePoseEstimator {

@@ -36,6 +36,7 @@
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
 
+#include <torch/script.h>
 #include <iostream>
 
 namespace poselib {
@@ -79,6 +80,104 @@ void RelativePoseEstimator::refine_model(CameraPose *pose) const {
     refine_relpose(x1_inlier, x2_inlier, pose, bundle_opt);
 }
 
+Eigen::Vector3d ThreeViewRelativePoseEstimator::get_network_point(){
+    std::vector<Eigen::Vector3f> P(5);
+    std::vector<Eigen::Vector3f> Q(5);
+    std::vector<Eigen::Vector3f> R(5);
+
+    for (size_t k = 0; k < 4; ++k){
+        P[k] = x1[sample[k]].homogeneous().cast<float>();
+        Q[k] = x2[sample[k]].homogeneous().cast<float>();
+        R[k] = x3[sample[k]].homogeneous().cast<float>();
+    }
+    P[4] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().cast<float>();
+    Q[4] = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0).homogeneous().cast<float>();
+    R[4] = ((x3[sample[0]] + x3[sample[1]] + x3[sample[2]]) / 3.0).homogeneous().cast<float>();
+
+    std::vector<Eigen::Vector2f>  P1(5), Q1(5), R1(5);
+    Eigen::Matrix3f RP1, RQ1, RR1;
+
+    normalize(P, Q, R, P1, Q1, R1, RP1, RQ1, RR1);
+
+//    std::cout << "RR1" << std::endl << RR1 << std::endl;
+
+    float data[] = {P1[0][0], P1[0][1], Q1[0][0], Q1[0][1], R1[0][0], R1[0][1],
+                    P1[1][0], P1[1][1], Q1[1][0], Q1[1][1], R1[1][0], R1[1][1],
+                    P1[2][0], P1[2][1], Q1[2][0], Q1[2][1], R1[2][0], R1[2][1],
+                    P1[3][0], P1[3][1], Q1[3][0], Q1[3][1], R1[3][0], R1[3][1]};
+
+    std::vector<torch::jit::IValue> inputs;
+    torch::Tensor f = torch::from_blob(data, {1, 4, 6});
+    inputs.push_back(f);
+
+    at::Tensor output_tensor;
+    output_tensor = module.forward(inputs).toTensor();
+    // vectorize prediction
+    Eigen::Vector3f pred1, pred2;
+
+    pred1 << output_tensor[0][0].item<float>(), output_tensor[0][1].item<float>(), 1.0;
+    pred1 = pred1 / pred1.norm();
+    Eigen::Vector3f rp = RQ1.transpose() * pred1;
+    return rp.normalized().cast<double>();
+}
+
+void ThreeViewRelativePoseEstimator::generate_nn_init_delta_models(std::vector<ThreeViewCameraPose> *models){
+    std::vector<Eigen::Vector3f> P(5);
+    std::vector<Eigen::Vector3f> Q(5);
+    std::vector<Eigen::Vector3f> R(5);
+
+    for (size_t k = 0; k < 4; ++k){
+        P[k] = x1[sample[k]].homogeneous().cast<float>();
+        Q[k] = x2[sample[k]].homogeneous().cast<float>();
+        R[k] = x3[sample[k]].homogeneous().cast<float>();
+    }
+    P[4] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().cast<float>();
+    R[4] = ((x3[sample[0]] + x3[sample[1]] + x3[sample[2]]) / 3.0).homogeneous().cast<float>();
+
+    std::vector<Eigen::Vector2f>  P1(5), Q1(5), R1(5);
+    Eigen::Matrix3f RP1, RQ1, RR1;
+
+    Eigen::Vector2d q4 = (x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0;
+    int idx;
+    double scale;
+    triangle_calc(q4(0), q4(1), idx, scale);
+
+    for (size_t k = 0; k < 3; ++k){
+        if (k == 0)
+            Q[4] = q4.homogeneous().cast<float>();
+        if (k == 1) {
+            q4[idx] += scale * opt.delta;
+            Q[4] = q4.homogeneous().cast<float>();
+        }
+        if (k == 2){
+            q4[idx] -= 2 * scale * opt.delta;
+            Q[4] = q4.homogeneous().cast<float>();
+        }
+
+        normalize(P, Q, R, P1, Q1, R1, RP1, RQ1, RR1);
+
+        float data[] = {P1[0][0], P1[0][1], Q1[0][0], Q1[0][1], R1[0][0], R1[0][1],
+                        P1[1][0], P1[1][1], Q1[1][0], Q1[1][1], R1[1][0], R1[1][1],
+                        P1[2][0], P1[2][1], Q1[2][0], Q1[2][1], R1[2][0], R1[2][1],
+                        P1[3][0], P1[3][1], Q1[3][0], Q1[3][1], R1[3][0], R1[3][1]};
+
+        std::vector<torch::jit::IValue> inputs;
+        torch::Tensor f = torch::from_blob(data, {1, 4, 6});
+        inputs.emplace_back(f);
+
+        at::Tensor output_tensor;
+        output_tensor = module.forward(inputs).toTensor();
+        Eigen::Vector3f pred1, pred2;
+        pred1 << output_tensor[0][0].item<float>(), output_tensor[0][1].item<float>(), 1.0;
+        pred1 = pred1 / pred1.norm();
+        Eigen::Vector3f rp = RQ1.transpose() * pred1;
+        x2n[4] = rp.normalized().cast<double>();
+//        std::cout << "Predicted: " << x2n[4](0)/x2n[4](2) << ", " << x2n[4](1)/x2n[4](2) << std::endl;
+//        x2n[4] = q4.homogeneous().normalized().cast<double>();
+        estimate_models(models);
+    }
+}
+
 void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCameraPose> *models) {
     sampler.generate_sample(&sample);
     for (size_t k = 0; k < sample_sz; ++k) {
@@ -86,31 +185,247 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
         x2n[k] = x2[sample[k]].homogeneous().normalized();
     }
 
-    // if we use 4 pts we approx the last as the mean of the prev 4 pts
-    if (sample_sz == 4){
-//        x1n[4] = (0.25 * (x1[sample[0]] + x1[sample[1]] + x1[sample[2]] + x1[sample[3]])).homogeneous().normalized();
-//        x2n[4] = (0.25 * (x2[sample[0]] + x2[sample[1]] + x2[sample[2]] + x2[sample[3]])).homogeneous().normalized();
-        x1n[4] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
-        x2n[4] = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0).homogeneous().normalized();
-    }
-
     for (size_t k = 0; k < sample_sz_13; ++k) {
         x1s[k] = x1[sample[k]].homogeneous();
         x2s[k] = x2[sample[k]].homogeneous();
         x3s[k] = x3[sample[k]].homogeneous().normalized();
     }
+
+//    std::cout << "GT E: " << std::endl << opt.gt_E << std::endl;
+
+    if (sample_sz == 4){
+        x1n[4] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
+        if (opt.init_net){
+            generate_nn_init_delta_models(models);
+            return;
+        }
+
+        if (opt.gt_E.norm() > 0.0){
+            Eigen::Vector3d epipolar_line = opt.gt_E * x1n[4];
+            double x_0 = (x2[sample[0]](0) + x2[sample[1]](0) + x2[sample[2]](0)) / 3.0;
+            double y = - (epipolar_line(2) + epipolar_line(0) * x_0) / epipolar_line(1);
+            x2n[4] = Eigen::Vector2d(x_0, y).homogeneous().normalized();
+            estimate_models(models);
+            return;
+        }
+
+        if (opt.use_net){
+            x2n[4] = get_network_point();
+        } else {
+            x2n[4] = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0).homogeneous().normalized();
+        }
+    }
+
     estimate_models(models);
 
     if (sample_sz == 4 and opt.delta > 0.0){
-        delta(models);
-
+        delta(x2n[4](0) / x2n[4](2), x2n[4](1) / x2n[4](2), models);
     }
 }
 
-void ThreeViewRelativePoseEstimator::delta(std::vector<ThreeViewCameraPose> *models) {
-    Point2D x2n4 = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0);
-    double mx2 = x2n4(0), my2 = x2n4(1);
+int ThreeViewRelativePoseEstimator::normalize(std::vector<Eigen::Vector3f> &P, std::vector<Eigen::Vector3f> &Q,
+                                              std::vector<Eigen::Vector3f> &T, std::vector<Eigen::Vector2f> &P1,
+                                              std::vector<Eigen::Vector2f> &Q1, std::vector<Eigen::Vector2f> &T1,
+                                              Eigen::Matrix3f &CP1, Eigen::Matrix3f &CQ1, Eigen::Matrix3f &CT1) const
+{
+//    Eigen::Vector3f centroidP = Eigen::Vector3f::Zero();
+//    Eigen::Vector3f centroidQ = Eigen::Vector3f::Zero();
+    for(int i=0;i<5;++i){
+        P[i] = P[i]/P[i].norm();
+        Q[i] = Q[i]/Q[i].norm();
+        T[i] = T[i]/T[i].norm();
+    }
 
+    // generate the rotation matrix that sends first point to (0, 0) and second point to (0, x)
+
+    // for view #1
+    Eigen::Vector3f p0 = P[4]/P[4].norm();
+    Eigen::Vector3f p1 = p0.cross(P[3]);
+    p1 = p1/p1.norm();
+    Eigen::Vector3f p2 = p0.cross(p1);
+    p2 = p2/p2.norm();
+    Eigen::Matrix3f Zp;
+    Zp << p0, p1, p2;
+
+    // for view #2
+    Eigen::Vector3f q0 = Q[4]/Q[4].norm();
+    Eigen::Vector3f q1 = q0.cross(Q[3]);
+    q1 = q1/q1.norm();
+    Eigen::Vector3f q2 = q0.cross(q1);
+    q2 = q2/q2.norm();
+    Eigen::Matrix3f Zq;
+    Zq << q0, q1, q2;
+
+    // for view #3
+    Eigen::Vector3f t0 = T[4]/T[4].norm();
+    Eigen::Vector3f t1 = t0.cross(T[3]);
+    t1 = t1/t1.norm();
+    Eigen::Vector3f t2 = t0.cross(t1);
+    t2 = t2/t2.norm();
+    Eigen::Matrix3f Zt;
+    Zt << t0, t1, t2;
+
+    Eigen::Matrix3f ZZ;
+    ZZ << 0,-1,0,0,0,-1,1,0,0;
+    Eigen::Matrix3f CP = ZZ * Zp.transpose();
+    Eigen::Matrix3f CQ = ZZ * Zq.transpose();
+    Eigen::Matrix3f CT = ZZ * Zt.transpose();
+
+    // rotate the points and project them back to the plane
+    for(int i=0;i<5;++i){
+        P[i] = CP * P[i];
+        P[i] = P[i]/P[i](2);
+
+        Q[i] = CQ * Q[i];
+        Q[i] = Q[i]/Q[i](2);
+
+        T[i] = CT * T[i];
+        T[i] = T[i]/T[i](2);
+    }
+
+    // hardcode the "0" values because of the limitation of numerical precision
+    //P[0][0] = 0.0;
+    //P[0][1] = 0.0;
+    //P[1][0] = 0.0;
+    P[3][0] = 0.0;
+
+    //Q[0][0] = 0.0;
+    //Q[0][1] = 0.0;
+    //Q[1][0] = 0.0;
+    Q[3][0] = 0.0;
+
+    //T[0][0] = 0.0;
+    //T[0][1] = 0.0;
+    //T[1][0] = 0.0;
+    T[3][0] = 0.0;
+
+    for(int i=0;i<5;++i){
+        Eigen::Vector2f p;
+        p(0) = P[i](0);
+        p(1) = P[i](1);
+        P1[i] = p;
+
+        Eigen::Vector2f q;
+        q(0) = Q[i](0);
+        q(1) = Q[i](1);
+        Q1[i] = q;
+
+        Eigen::Vector2f t;
+        t(0) = T[i](0);
+        t(1) = T[i](1);
+        T1[i] = t;
+    }
+    CP1 = CP;
+    CQ1 = CQ;
+    CT1 = CT;
+
+    return 1;
+}
+
+int ThreeViewRelativePoseEstimator::normalize(std::vector<Eigen::Vector3f> &P, std::vector<Eigen::Vector3f> &Q,
+                                              std::vector<Eigen::Vector2f> &P1, std::vector<Eigen::Vector2f> &Q1,
+                                              Eigen::Matrix3f &CP1,Eigen::Matrix3f &CQ1) const {
+//    Eigen::Vector3f centroidP = Eigen::Vector3f::Zero();
+//    Eigen::Vector3f centroidQ = Eigen::Vector3f::Zero();
+    for(int i=0;i<5;++i){
+        P[i] = P[i]/P[i].norm();
+        Q[i] = Q[i]/Q[i].norm();
+    }
+
+    // generate the rotation matrix that sends first point to (0, 0) and second point to (0, x)
+
+    // for view #1
+    Eigen::Vector3f p0 = P[0]/P[0].norm();
+    Eigen::Vector3f p1 = p0.cross(P[1]);
+    p1 = p1/p1.norm();
+    Eigen::Vector3f p2 = p0.cross(p1);
+    p2 = p2/p2.norm();
+    Eigen::Matrix3f Zp;
+    Zp << p0, p1, p2;
+
+    // for view #2
+    Eigen::Vector3f q0 = Q[0]/Q[0].norm();
+    Eigen::Vector3f q1 = q0.cross(Q[1]);
+    q1 = q1/q1.norm();
+    Eigen::Vector3f q2 = q0.cross(q1);
+    q2 = q2/q2.norm();
+    Eigen::Matrix3f Zq;
+    Zq << q0, q1, q2;
+
+    Eigen::Matrix3f ZZ;
+    ZZ << 0,-1,0,0,0,-1,1,0,0;
+    Eigen::Matrix3f CP = ZZ * Zp.transpose();
+    Eigen::Matrix3f CQ = ZZ * Zq.transpose();
+
+
+    // rotate the points and project them back to the plane
+    for(int i=0;i<5;++i){
+        P[i] = CP * P[i];
+        P[i] = P[i]/P[i](2);
+
+        Q[i] = CQ * Q[i];
+        Q[i] = Q[i]/Q[i](2);
+    }
+
+    // hardcode the "0" values because of the limitation of numerical precision
+    P[0][0] = 0.0;
+    P[0][1] = 0.0;
+    P[1][0] = 0.0;
+
+    Q[0][0] = 0.0;
+    Q[0][1] = 0.0;
+    Q[1][0] = 0.0;
+
+    for(int i=0;i<5;++i){
+        Eigen::Vector2f p;
+        p(0) = P[i](0);
+        p(1) = P[i](1);
+        P1[i] = p;
+
+        Eigen::Vector2f q;
+        q(0) = Q[i](0);
+        q(1) = Q[i](1);
+        Q1[i] = q;
+    }
+    CP1 = CP;
+    CQ1 = CQ;
+
+    return 1;
+}
+
+void ThreeViewRelativePoseEstimator::delta(double mx, double my, std::vector<ThreeViewCameraPose> *models) {
+    int idx;
+    double scale;
+    triangle_calc(mx, my, idx, scale);
+
+    //    Point2D x2n4 = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0);
+//
+//    double min_x = std::min({x2[sample[0]][0], x2[sample[1]][0], x2[sample[2]][0]});
+//    double min_y = std::min({x2[sample[0]][1], x2[sample[1]][1], x2[sample[2]][1]});
+//    double max_x = std::max({x2[sample[0]][0], x2[sample[1]][0], x2[sample[2]][0]});
+//    double max_y = std::max({x2[sample[0]][1], x2[sample[1]][1], x2[sample[2]][1]});
+//
+//    int idx;
+//    double scale;
+//    if ((max_x - min_x) > (max_y - min_y)) {
+//        scale = max_x - min_x;
+//        idx = 0;
+//    } else {
+//        scale = max_y - min_y;
+//        idx = 1;
+//    }
+
+    Eigen::Vector2d x2n4(mx, my);
+    x2n4(idx) += opt.delta * scale;
+    x2n[4] = x2n4.homogeneous().normalized();
+    estimate_models(models);
+
+    x2n4(idx) -= 2 * opt.delta * scale;
+    x2n[4] = x2n4.homogeneous().normalized();
+    estimate_models(models);
+}
+
+void ThreeViewRelativePoseEstimator::triangle_calc(double mx2, double my2, int &idx, double &scale) {
     double tr_xA = x2[sample[0]](0), tr_yA = x2[sample[0]](1);
     double tr_xB = x2[sample[1]](0), tr_yB = x2[sample[1]](1);
     double tr_xC = x2[sample[2]](0), tr_yC = x2[sample[2]](1);
@@ -156,9 +471,6 @@ void ThreeViewRelativePoseEstimator::delta(std::vector<ThreeViewCameraPose> *mod
     } else {
         max_distX = std::abs(xAB-xAC);
     }
-
-    int idx;
-    double scale;
     if (max_distX > max_distY){
         scale = max_distX;
         idx = 0;
@@ -166,39 +478,13 @@ void ThreeViewRelativePoseEstimator::delta(std::vector<ThreeViewCameraPose> *mod
         scale = max_distY;
         idx = 1;
     }
-
-//    Point2D x2n4 = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0);
-//
-//    double min_x = std::min({x2[sample[0]][0], x2[sample[1]][0], x2[sample[2]][0]});
-//    double min_y = std::min({x2[sample[0]][1], x2[sample[1]][1], x2[sample[2]][1]});
-//    double max_x = std::max({x2[sample[0]][0], x2[sample[1]][0], x2[sample[2]][0]});
-//    double max_y = std::max({x2[sample[0]][1], x2[sample[1]][1], x2[sample[2]][1]});
-//
-//    int idx;
-//    double scale;
-//    if ((max_x - min_x) > (max_y - min_y)) {
-//        scale = max_x - min_x;
-//        idx = 0;
-//    } else {
-//        scale = max_y - min_y;
-//        idx = 1;
-//    }
-
-    x2n4(idx) += opt.delta * scale;
-    x2n[4] = x2n4.homogeneous().normalized();
-    estimate_models(models);
-
-    x2n4(idx) -= 2 * opt.delta * scale;
-    x2n[4] = x2n4.homogeneous().normalized();
-    estimate_models(models);
 }
 
 void ThreeViewRelativePoseEstimator::estimate_models(std::vector<ThreeViewCameraPose> *models) {
     std::vector<CameraPose> models12;
     relpose_5pt(x1n, x2n, &models12);
 
-    std::vector<Point3D> triangulated_12;
-    triangulated_12.reserve(3);
+    std::vector<Point3D> triangulated_12(3);
 
     for (CameraPose pose12 : models12){
         for (size_t i = 0; i < sample_sz_13; i++){
