@@ -200,8 +200,9 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
             return;
         }
 
-        if (opt.gt_E.norm() > 0.0){
-            Eigen::Vector3d epipolar_line = opt.gt_E * x1n[4];
+        if (opt.oracle){
+            Eigen::Vector3d epipolar_line = (opt.gt_E * x1n[4]).normalized();
+
             double x_0 = (x2[sample[0]](0) + x2[sample[1]](0) + x2[sample[2]](0)) / 3.0;
             double y = - (epipolar_line(2) + epipolar_line(0) * x_0) / epipolar_line(1);
             x2n[4] = Eigen::Vector2d(x_0, y).homogeneous().normalized();
@@ -770,31 +771,31 @@ void ThreeViewSharedFocalRelativePoseEstimator::estimate_models(std::vector<Imag
                 }
             }
 
-//            if (opt.inner_refine > 0) {
-//                inner_refine(&three_view_pose);
-//            }
+            if (opt.inner_refine > 0) {
+                inner_refine(&image_triplet);
+            }
             models->emplace_back(image_triplet);
         }
     }
 }
 
-//void ThreeViewSharedFocalRelativePoseEstimator::inner_refine(ImageTriplet *three_view_pose) const {
-//    std::vector<Point2D> x1r, x2r, x3r;
-//    x1r.resize(4);
-//    x2r.resize(4);
-//    x3r.resize(4);
-//    for (size_t k = 0; k < 4; ++k) {
-//        x1r[k] = x1[sample[k]];
-//        x2r[k] = x2[sample[k]];
-//        x3r[k] = x3[sample[k]];
-//    }
-//
-//    BundleOptions bundle_opt;
-//    bundle_opt.loss_type = BundleOptions::CAUCHY;
-//    bundle_opt.loss_scale = opt.max_epipolar_error;
-//    bundle_opt.max_iterations = opt.inner_refine;
-//    refine_3v_relpose(x1r, x2r, x3r, three_view_pose, bundle_opt);
-//}
+void ThreeViewSharedFocalRelativePoseEstimator::inner_refine(ImageTriplet *image_triplet) const {
+    std::vector<Point2D> x1r, x2r, x3r;
+    x1r.resize(4);
+    x2r.resize(4);
+    x3r.resize(4);
+    for (size_t k = 0; k < 4; ++k) {
+        x1r[k] = x1[sample[k]];
+        x2r[k] = x2[sample[k]];
+        x3r[k] = x3[sample[k]];
+    }
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::CAUCHY;
+    bundle_opt.loss_scale = opt.max_epipolar_error;
+    bundle_opt.max_iterations = opt.inner_refine;
+    refine_3v_shared_focal_relpose(x1r, x2r, x3r, image_triplet, bundle_opt);
+}
 
 double ThreeViewSharedFocalRelativePoseEstimator::score_model(const ImageTriplet &image_triplet, size_t *inlier_count) const {
     size_t inlier_count12, inlier_count13, inlier_count23;

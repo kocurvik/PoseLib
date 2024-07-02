@@ -160,6 +160,8 @@ class ThreeViewSharedFocalRelativePoseEstimator {
     void
     get_triangle_scale(double mx2, double my2, double tr_xA, double tr_yA, double tr_xB, double tr_yB, double tr_xC,
                        double tr_yC, int &idx, double &scale) const;
+
+    void inner_refine(ImageTriplet *image_triplet) const;
 };
 
 class SharedFocalRelativePoseEstimator {

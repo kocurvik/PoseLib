@@ -58,6 +58,7 @@ struct RansacOptions {
     bool use_hc = false;
     bool use_net = false;
     bool init_net = false;
+    bool oracle = false;
     Eigen::Matrix3d gt_E = Eigen::Matrix3d::Zero();
 };
 
