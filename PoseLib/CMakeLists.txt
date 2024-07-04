@@ -78,7 +78,6 @@ set(HEADERS_PUBLIC
     solvers/gen_relpose_5p1pt.h
     solvers/gen_relpose_6pt.h
     solvers/homography_4pt.h
-    solvers/homotopy.h
     solvers/threeview_hc.h
     misc/quaternion.h
     misc/colmap_models.h
