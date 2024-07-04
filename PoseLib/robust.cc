@@ -302,7 +302,7 @@ RansacStats estimate_3v_relative_pose(const std::vector<Point2D> &x1, const std:
 
     RansacOptions ransac_opt_scaled = ransac_opt;
     ransac_opt_scaled.max_epipolar_error =
-        ransac_opt.max_epipolar_error * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal() + 1.0 / camera3.focal());
+        ransac_opt.max_epipolar_error * (3.0 / (camera1.focal() + camera2.focal() + camera3.focal()));
 
     RansacStats stats = ransac_3v_relpose(x1_calib, x2_calib, x3_calib, ransac_opt_scaled, three_view_pose, inliers);
 
@@ -362,6 +362,12 @@ RansacStats estimate_3v_shared_focal_relative_pose(const std::vector<Point2D> &x
 
     RansacOptions ransac_opt_scaled = ransac_opt;
     ransac_opt_scaled.max_epipolar_error = ransac_opt.max_epipolar_error / scale;
+
+    if (ransac_opt_scaled.oracle) {
+        Eigen::Matrix3d T;
+        T << scale, 0.0, pp(0), 0.0, scale, pp(1), 0.0, 0.0, 1.0;
+        ransac_opt_scaled.gt_E = T.transpose() * ransac_opt.gt_E * T;
+    }
 
     RansacStats stats = ransac_3v_shared_focal_relpose(x1_norm, x2_norm, x3_norm, ransac_opt_scaled, image_triplet, inliers);
 

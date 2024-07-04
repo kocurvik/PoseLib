@@ -133,6 +133,9 @@ class ThreeViewSharedFocalRelativePoseEstimator {
         x2s.resize(sample_sz_13);
         x3s.resize(sample_sz_13);
         sample.resize(sample_sz);
+        if (opt.use_net || opt.init_net){
+            module = torch::jit::load("res/epoch28_sampson.pt");
+        }
     }
 
     void generate_models(std::vector<ImageTriplet> *models);
@@ -148,6 +151,7 @@ class ThreeViewSharedFocalRelativePoseEstimator {
     const std::vector<Point2D> &x1;
     const std::vector<Point2D> &x2;
     const std::vector<Point2D> &x3;
+    torch::jit::script::Module module;
 
     RandomSampler sampler;
     // pre-allocated vectors for sampling
@@ -157,11 +161,16 @@ class ThreeViewSharedFocalRelativePoseEstimator {
     void estimate_models(std::vector<ImageTriplet> *models);
     void delta(std::vector<ImageTriplet> *models);
 
-    void
-    get_triangle_scale(double mx2, double my2, double tr_xA, double tr_yA, double tr_xB, double tr_yB, double tr_xC,
-                       double tr_yC, int &idx, double &scale) const;
+    void triangle_calc(double mx, double my, int idx_t, int &idx, double &scale);
 
     void inner_refine(ImageTriplet *image_triplet) const;
+
+    Eigen::Vector3d get_network_point(int idx_t);
+
+    int normalize(std::vector<Eigen::Vector3f> &P, std::vector<Eigen::Vector3f> &Q, std::vector<Eigen::Vector3f> &T,
+                  std::vector<Eigen::Vector2f> &P1, std::vector<Eigen::Vector2f> &Q1, std::vector<Eigen::Vector2f> &T1,
+                  Eigen::Matrix3f &CP1, Eigen::Matrix3f &CQ1, Eigen::Matrix3f &CT1) const;
+    void generate_nn_init_delta_models(std::vector<ImageTriplet> *models);
 };
 
 class SharedFocalRelativePoseEstimator {

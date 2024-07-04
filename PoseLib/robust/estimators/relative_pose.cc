@@ -592,6 +592,139 @@ void ThreeViewRelativePoseEstimator::refine_model(ThreeViewCameraPose *pose) con
 //    std::cout << "Inliers after: " << inliers_after <<std::endl;
 }
 
+void ThreeViewSharedFocalRelativePoseEstimator::generate_nn_init_delta_models(std::vector<ImageTriplet> *models){
+    std::vector<Eigen::Vector3f> P(5), PP(5);
+    std::vector<Eigen::Vector3f> Q(5), QP(5);
+    std::vector<Eigen::Vector3f> R(5), RP(5);
+
+    for (size_t k = 0; k < 4; ++k){
+        P[k] = x1[sample[k]].homogeneous().cast<float>();
+        Q[k] = x2[sample[k]].homogeneous().cast<float>();
+        R[k] = x3[sample[k]].homogeneous().cast<float>();
+        PP[k] = x1[sample[k]].homogeneous().cast<float>();
+        QP[k] = x2[sample[k]].homogeneous().cast<float>();
+        RP[k] = x3[sample[k]].homogeneous().cast<float>();
+    }
+
+    P[4] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().cast<float>();
+    R[4] = ((x3[sample[0]] + x3[sample[1]] + x3[sample[2]]) / 3.0).homogeneous().cast<float>();
+    PP[4] = ((x1[sample[3]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().cast<float>();
+    RP[4] = ((x3[sample[3]] + x3[sample[1]] + x3[sample[2]]) / 3.0).homogeneous().cast<float>();
+
+    std::vector<Eigen::Vector2f>  P1(5), Q1(5), R1(5), P1P(5), Q1P(5), R1P(5);
+    Eigen::Matrix3f RP1, RQ1, RR1, RP1P, RQ1P, RR1P;
+
+    Eigen::Vector2d q4 = (x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0;
+    int idx;
+    double scale;
+    triangle_calc(q4(0), q4(1), 0, idx, scale);
+
+    Eigen::Vector2d q4p = (x2[sample[3]] + x2[sample[1]] + x2[sample[2]]) / 3.0;
+    int idxp;
+    double scalep;
+    triangle_calc(q4p(0), q4p(1), 3, idxp, scalep);
+
+    for (size_t k = 0; k < 3; ++k){
+        if (k == 0)
+            Q[4] = q4.homogeneous().cast<float>();
+        QP[4] = q4p.homogeneous().cast<float>();
+
+        if (k == 1) {
+            q4[idx] += scale * opt.delta;
+            q4p[idx] += scalep * opt.delta;
+            Q[4] = q4.homogeneous().cast<float>();
+            QP[4] = q4p.homogeneous().cast<float>();
+        }
+        if (k == 2){
+            q4[idx] -= 2 * scale * opt.delta;
+            q4p[idx] -= 2 * scalep * opt.delta;
+            Q[4] = q4.homogeneous().cast<float>();
+            QP[4] = q4p.homogeneous().cast<float>();
+        }
+
+        normalize(P, Q, R, P1, Q1, R1, RP1, RQ1, RR1);
+        normalize(PP, QP, RP, P1P, Q1P, R1P, RP1P, RQ1P, RR1P);
+
+        float data[] = {P1[0][0], P1[0][1], Q1[0][0], Q1[0][1], R1[0][0], R1[0][1],
+                        P1[1][0], P1[1][1], Q1[1][0], Q1[1][1], R1[1][0], R1[1][1],
+                        P1[2][0], P1[2][1], Q1[2][0], Q1[2][1], R1[2][0], R1[2][1],
+                        P1[3][0], P1[3][1], Q1[3][0], Q1[3][1], R1[3][0], R1[3][1]};
+
+        std::vector<torch::jit::IValue> inputs;
+        torch::Tensor f = torch::from_blob(data, {1, 4, 6});
+        inputs.emplace_back(f);
+
+        at::Tensor output_tensor;
+        output_tensor = module.forward(inputs).toTensor();
+        Eigen::Vector3f pred1, pred2;
+        pred1 << output_tensor[0][0].item<float>(), output_tensor[0][1].item<float>(), 1.0;
+        pred1 = pred1 / pred1.norm();
+        Eigen::Vector3f rp = RQ1.transpose() * pred1;
+        x2n[5] = rp.normalized().cast<double>();
+
+
+        float datap[] = {P1P[0][0], P1P[0][1], Q1P[0][0], Q1P[0][1], R1P[0][0], R1P[0][1],
+                         P1P[1][0], P1P[1][1], Q1P[1][0], Q1P[1][1], R1P[1][0], R1P[1][1],
+                         P1P[2][0], P1P[2][1], Q1P[2][0], Q1P[2][1], R1P[2][0], R1P[2][1],
+                         P1P[3][0], P1P[3][1], Q1P[3][0], Q1P[3][1], R1P[3][0], R1P[3][1]};
+
+        std::vector<torch::jit::IValue> inputsp;
+        torch::Tensor fp = torch::from_blob(datap, {1, 4, 6});
+        inputsp.emplace_back(fp);
+
+        at::Tensor output_tensorp;
+        output_tensorp = module.forward(inputsp).toTensor();
+        Eigen::Vector3f pred1p, pred2p;
+        pred1p << output_tensorp[0][0].item<float>(), output_tensorp[0][1].item<float>(), 1.0;
+        pred1p = pred1p / pred1p.norm();
+        Eigen::Vector3f rpp = RQ1P.transpose() * pred1p;
+        x2n[4] = rpp.normalized().cast<double>();
+
+        estimate_models(models);
+    }
+}
+
+Eigen::Vector3d ThreeViewSharedFocalRelativePoseEstimator::get_network_point(int idx_t){
+    std::vector<Eigen::Vector3f> P(5);
+    std::vector<Eigen::Vector3f> Q(5);
+    std::vector<Eigen::Vector3f> R(5);
+
+    for (size_t k = 0; k < 4; ++k){
+        P[k] = x1[sample[k]].homogeneous().cast<float>();
+        Q[k] = x2[sample[k]].homogeneous().cast<float>();
+        R[k] = x3[sample[k]].homogeneous().cast<float>();
+    }
+    P[4] = ((x1[sample[idx_t]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().cast<float>();
+    Q[4] = ((x2[sample[idx_t]] + x2[sample[1]] + x2[sample[2]]) / 3.0).homogeneous().cast<float>();
+    R[4] = ((x3[sample[idx_t]] + x3[sample[1]] + x3[sample[2]]) / 3.0).homogeneous().cast<float>();
+
+    std::vector<Eigen::Vector2f>  P1(5), Q1(5), R1(5);
+    Eigen::Matrix3f RP1, RQ1, RR1;
+
+    normalize(P, Q, R, P1, Q1, R1, RP1, RQ1, RR1);
+
+//    std::cout << "RR1" << std::endl << RR1 << std::endl;
+
+    float data[] = {P1[0][0], P1[0][1], Q1[0][0], Q1[0][1], R1[0][0], R1[0][1],
+                    P1[1][0], P1[1][1], Q1[1][0], Q1[1][1], R1[1][0], R1[1][1],
+                    P1[2][0], P1[2][1], Q1[2][0], Q1[2][1], R1[2][0], R1[2][1],
+                    P1[3][0], P1[3][1], Q1[3][0], Q1[3][1], R1[3][0], R1[3][1]};
+
+    std::vector<torch::jit::IValue> inputs;
+    torch::Tensor f = torch::from_blob(data, {1, 4, 6});
+    inputs.push_back(f);
+
+    at::Tensor output_tensor;
+    output_tensor = module.forward(inputs).toTensor();
+    // vectorize prediction
+    Eigen::Vector3f pred1, pred2;
+
+    pred1 << output_tensor[0][0].item<float>(), output_tensor[0][1].item<float>(), 1.0;
+    pred1 = pred1 / pred1.norm();
+    Eigen::Vector3f rp = RQ1.transpose() * pred1;
+    return rp.normalized().cast<double>();
+}
+
 void ThreeViewSharedFocalRelativePoseEstimator::generate_models(std::vector<ImageTriplet> *models) {
     sampler.generate_sample(&sample);
     for (size_t k = 0; k < sample_sz; ++k) {
@@ -599,21 +732,59 @@ void ThreeViewSharedFocalRelativePoseEstimator::generate_models(std::vector<Imag
         x2n[k] = x2[sample[k]].homogeneous().normalized();
     }
 
-    // if we use 5 pts we approx the last as the mean of the first 3 pts
-    if (sample_sz < 6){
-        x1n[5] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
-        x2n[5] = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0).homogeneous().normalized();
-    }
-
-    if (sample_sz < 5){
-        x1n[4] = ((x1[sample[3]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
-        x2n[4] = ((x2[sample[3]] + x2[sample[1]] + x2[sample[2]]) / 3.0).homogeneous().normalized();
-    }
-
     for (size_t k = 0; k < sample_sz_13; ++k) {
         x1s[k] = x1[sample[k]].homogeneous();
         x2s[k] = x2[sample[k]].homogeneous();
     }
+
+    if (opt.init_net){
+        x1n[5] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
+        x1n[4] = ((x1[sample[3]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
+        generate_nn_init_delta_models(models);
+        return;
+    }
+
+    if (opt.oracle){
+        if (sample_sz < 6){
+            x1n[5] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
+            Eigen::Vector3d epipolar_line = (opt.gt_E * x1n[5]).normalized();
+
+            double x_0 = (x2[sample[0]](0) + x2[sample[1]](0) + x2[sample[2]](0)) / 3.0;
+            double y = - (epipolar_line(2) + epipolar_line(0) * x_0) / epipolar_line(1);
+            x2n[5] = Eigen::Vector2d(x_0, y).homogeneous().normalized();
+        }
+
+        if (sample_sz < 5) {
+            x1n[4] = ((x1[sample[3]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
+            Eigen::Vector3d epipolar_line = (opt.gt_E * x1n[4]).normalized();
+            double x_0 = (x2[sample[3]](0) + x2[sample[1]](0) + x2[sample[2]](0)) / 3.0;
+            double y = -(epipolar_line(2) + epipolar_line(0) * x_0) / epipolar_line(1);
+            x2n[4] = Eigen::Vector2d(x_0, y).homogeneous().normalized();
+        }
+        estimate_models(models);
+        return;
+    }
+
+    // if we use 5 pts we approx the last as the mean of the first 3 pts
+    if (sample_sz < 6){
+        x1n[5] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
+        if (opt.use_net){
+            x2n[5] = get_network_point(0);
+        } else {
+            x2n[5] = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0).homogeneous().normalized();
+
+        }
+    }
+
+    if (sample_sz < 5){
+        x1n[4] = ((x1[sample[3]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
+        if (opt.use_net) {
+            x2n[4] = get_network_point(3);
+        } else {
+            x2n[4] = ((x2[sample[3]] + x2[sample[1]] + x2[sample[2]]) / 3.0).homogeneous().normalized();
+        }
+    }
+
     estimate_models(models);
 
     if (sample_sz < 6 and opt.delta > 0.0){
@@ -622,18 +793,14 @@ void ThreeViewSharedFocalRelativePoseEstimator::generate_models(std::vector<Imag
 }
 
 void ThreeViewSharedFocalRelativePoseEstimator::delta(std::vector<ImageTriplet> *models) {
-    Point2D x2n5 = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]]) / 3.0);
-    double mx2 = x2n5(0), my2 = x2n5(1);
-
-    double tr_xA = x2[sample[0]](0), tr_yA = x2[sample[0]](1);
-    double tr_xB = x2[sample[1]](0), tr_yB = x2[sample[1]](1);
-    double tr_xC = x2[sample[2]](0), tr_yC = x2[sample[2]](1);
+    double mx = x2n[5](0) / x2n[5](1), my = x2n[5](1) / x2n[5](1);
 
     int idx;
     double scale;
-    get_triangle_scale(mx2, my2, tr_xA, tr_yA, tr_xB, tr_yB, tr_xC, tr_yC, idx, scale);
+    triangle_calc(mx, my, 0, idx, scale);
 
     if (sample_sz == 5) {
+        Eigen::Vector2d x2n5(mx, my);
         x2n5(idx) += opt.delta * scale;
         x2n[5] = x2n5.homogeneous().normalized();
         estimate_models(models);
@@ -645,17 +812,14 @@ void ThreeViewSharedFocalRelativePoseEstimator::delta(std::vector<ImageTriplet> 
     }
 
     if (sample_sz == 4) {
-        Point2D x2n4 = ((x2[sample[3]] + x2[sample[1]] + x2[sample[2]]) / 3.0);
-        double mx2p = x2n4(0), my2p = x2n4(1);
-
-        double tr_xAp = x2[sample[3]](0), tr_yAp = x2[sample[3]](1);
-        double tr_xBp = x2[sample[1]](0), tr_yBp = x2[sample[1]](1);
-        double tr_xCp = x2[sample[2]](0), tr_yCp = x2[sample[2]](1);
+        double mxp = x2n[4](0) / x2n[4](2), myp = x2n[4](1) / x2n[4](2);
 
         int idxp;
         double scalep;
-        get_triangle_scale(mx2p, my2p, tr_xAp, tr_yAp, tr_xBp, tr_yBp, tr_xCp, tr_yCp, idxp, scalep);
+        triangle_calc(mxp, myp, 3, idxp, scalep);
 
+        Eigen::Vector2d x2n5(mx, my);
+        Eigen::Vector2d x2n4(mxp, myp);
         x2n5(idx) += opt.delta * scale;
         x2n4(idxp) += opt.delta * scalep;
         x2n[5] = x2n5.homogeneous().normalized();
@@ -668,59 +832,6 @@ void ThreeViewSharedFocalRelativePoseEstimator::delta(std::vector<ImageTriplet> 
         x2n[4] = x2n4.homogeneous().normalized();
         estimate_models(models);
         return;
-    }
-}
-
-void ThreeViewSharedFocalRelativePoseEstimator::get_triangle_scale(double mx2, double my2, double tr_xA, double tr_yA,
-                                                                  double tr_xB, double tr_yB, double tr_xC,
-                                                                  double tr_yC, int &idx, double &scale) const {
-    double slopeAB = (tr_yB - tr_yA) / (tr_xB - tr_xA);
-    double slopeAC = (tr_yC - tr_yA) / (tr_xC - tr_xA);
-    double slopeBC = (tr_yC - tr_yB) / (tr_xC - tr_xB);
-
-    double interceptAB = tr_yA - slopeAB * tr_xA;
-    double interceptAC = tr_yA - slopeAC * tr_xA;
-    double interceptBC = tr_yB - slopeBC * tr_xB;
-
-    // find y coord in lines AB, AC, and BC, in the 2nd view for x=mean
-    double yAB = slopeAB * mx2 + interceptAB;
-    double yAC = slopeAC * mx2 + interceptAC;
-    double yBC = slopeBC * mx2 + interceptBC;
-
-    // find x coord in lines AB, AC, and BC, in the 2nd view for y=mean
-    double xAB = (my2 - interceptAB) / slopeAB;
-    double xAC = (my2 - interceptAC) / slopeAC;
-    double xBC = (my2 - interceptBC) / slopeBC;
-
-    // find min and max y and min and max x of thriangle vertices
-    double min_y = std::min(std::min(tr_yA, tr_yB), tr_yC);
-    double max_y = std::max(std::max(tr_yA, tr_yB), tr_yC);
-    double min_x = std::min(std::min(tr_xA, tr_xB), tr_xC);
-    double max_x = std::max(std::max(tr_xA, tr_xB), tr_xC);
-
-    double max_distY;
-    if (yAB>max_y || yAB<min_y) {
-        max_distY = std::abs(yAC-yBC);
-    } else if (yAC>max_y || yAC<min_y) {
-        max_distY = std::abs(yAB-yBC);
-    } else {
-        max_distY = std::abs(yAB-yAC);
-    }
-
-    double max_distX;
-    if (xAB>max_x || xAB<min_x) {
-        max_distX = std::abs(xAC-xBC);
-    } else if (xAC>max_x || xAC<min_x) {
-        max_distX = std::abs(xAB-xBC);
-    } else {
-        max_distX = std::abs(xAB-xAC);
-    }
-    if (max_distX > max_distY){
-        scale = max_distX;
-        idx = 0;
-    } else {
-        scale = max_distY;
-        idx = 1;
     }
 }
 
@@ -860,6 +971,160 @@ void ThreeViewSharedFocalRelativePoseEstimator::refine_model(ImageTriplet *image
 //    std::cout << "Score after: " << score_after <<std::endl;
 //    std::cout << "Inliers after: " << inliers_after <<std::endl;
 }
+
+void ThreeViewSharedFocalRelativePoseEstimator::triangle_calc(double mx, double my, int idx_t, int &idx, double &scale) {
+    double tr_xA = x2[sample[idx_t]](0), tr_yA = x2[sample[idx_t]](1);
+    double tr_xB = x2[sample[1]](0), tr_yB = x2[sample[1]](1);
+    double tr_xC = x2[sample[2]](0), tr_yC = x2[sample[2]](1);
+
+    double slopeAB = (tr_yB - tr_yA) / (tr_xB - tr_xA);
+    double slopeAC = (tr_yC - tr_yA) / (tr_xC - tr_xA);
+    double slopeBC = (tr_yC - tr_yB) / (tr_xC - tr_xB);
+
+    double interceptAB = tr_yA - slopeAB * tr_xA;
+    double interceptAC = tr_yA - slopeAC * tr_xA;
+    double interceptBC = tr_yB - slopeBC * tr_xB;
+
+    // find y coord in lines AB, AC, and BC, in the 2nd view for x=mean
+    double yAB = slopeAB * mx + interceptAB;
+    double yAC = slopeAC * mx + interceptAC;
+    double yBC = slopeBC * mx + interceptBC;
+
+    // find x coord in lines AB, AC, and BC, in the 2nd view for y=mean
+    double xAB = (my - interceptAB) / slopeAB;
+    double xAC = (my - interceptAC) / slopeAC;
+    double xBC = (my - interceptBC) / slopeBC;
+
+    // find min and max y and min and max x of thriangle vertices
+    double min_y = std::min(std::min(tr_yA, tr_yB), tr_yC);
+    double max_y = std::max(std::max(tr_yA, tr_yB), tr_yC);
+    double min_x = std::min(std::min(tr_xA, tr_xB), tr_xC);
+    double max_x = std::max(std::max(tr_xA, tr_xB), tr_xC);
+
+    double max_distY;
+    if (yAB>max_y || yAB<min_y) {
+        max_distY = std::abs(yAC-yBC);
+    } else if (yAC>max_y || yAC<min_y) {
+        max_distY = std::abs(yAB-yBC);
+    } else {
+        max_distY = std::abs(yAB-yAC);
+    }
+
+    double max_distX;
+    if (xAB>max_x || xAB<min_x) {
+        max_distX = std::abs(xAC-xBC);
+    } else if (xAC>max_x || xAC<min_x) {
+        max_distX = std::abs(xAB-xBC);
+    } else {
+        max_distX = std::abs(xAB-xAC);
+    }
+    if (max_distX > max_distY){
+        scale = max_distX;
+        idx = 0;
+    } else {
+        scale = max_distY;
+        idx = 1;
+    }
+}
+
+int ThreeViewSharedFocalRelativePoseEstimator::normalize(std::vector<Eigen::Vector3f> &P, std::vector<Eigen::Vector3f> &Q,
+                                                  std::vector<Eigen::Vector3f> &T, std::vector<Eigen::Vector2f> &P1,
+                                                  std::vector<Eigen::Vector2f> &Q1, std::vector<Eigen::Vector2f> &T1,
+                                                  Eigen::Matrix3f &CP1, Eigen::Matrix3f &CQ1, Eigen::Matrix3f &CT1) const
+    {
+//    Eigen::Vector3f centroidP = Eigen::Vector3f::Zero();
+//    Eigen::Vector3f centroidQ = Eigen::Vector3f::Zero();
+        for(int i=0;i<5;++i){
+            P[i] = P[i]/P[i].norm();
+            Q[i] = Q[i]/Q[i].norm();
+            T[i] = T[i]/T[i].norm();
+        }
+
+        // generate the rotation matrix that sends first point to (0, 0) and second point to (0, x)
+
+        // for view #1
+        Eigen::Vector3f p0 = P[4]/P[4].norm();
+        Eigen::Vector3f p1 = p0.cross(P[3]);
+        p1 = p1/p1.norm();
+        Eigen::Vector3f p2 = p0.cross(p1);
+        p2 = p2/p2.norm();
+        Eigen::Matrix3f Zp;
+        Zp << p0, p1, p2;
+
+        // for view #2
+        Eigen::Vector3f q0 = Q[4]/Q[4].norm();
+        Eigen::Vector3f q1 = q0.cross(Q[3]);
+        q1 = q1/q1.norm();
+        Eigen::Vector3f q2 = q0.cross(q1);
+        q2 = q2/q2.norm();
+        Eigen::Matrix3f Zq;
+        Zq << q0, q1, q2;
+
+        // for view #3
+        Eigen::Vector3f t0 = T[4]/T[4].norm();
+        Eigen::Vector3f t1 = t0.cross(T[3]);
+        t1 = t1/t1.norm();
+        Eigen::Vector3f t2 = t0.cross(t1);
+        t2 = t2/t2.norm();
+        Eigen::Matrix3f Zt;
+        Zt << t0, t1, t2;
+
+        Eigen::Matrix3f ZZ;
+        ZZ << 0,-1,0,0,0,-1,1,0,0;
+        Eigen::Matrix3f CP = ZZ * Zp.transpose();
+        Eigen::Matrix3f CQ = ZZ * Zq.transpose();
+        Eigen::Matrix3f CT = ZZ * Zt.transpose();
+
+        // rotate the points and project them back to the plane
+        for(int i=0;i<5;++i){
+            P[i] = CP * P[i];
+            P[i] = P[i]/P[i](2);
+
+            Q[i] = CQ * Q[i];
+            Q[i] = Q[i]/Q[i](2);
+
+            T[i] = CT * T[i];
+            T[i] = T[i]/T[i](2);
+        }
+
+        // hardcode the "0" values because of the limitation of numerical precision
+        //P[0][0] = 0.0;
+        //P[0][1] = 0.0;
+        //P[1][0] = 0.0;
+        P[3][0] = 0.0;
+
+        //Q[0][0] = 0.0;
+        //Q[0][1] = 0.0;
+        //Q[1][0] = 0.0;
+        Q[3][0] = 0.0;
+
+        //T[0][0] = 0.0;
+        //T[0][1] = 0.0;
+        //T[1][0] = 0.0;
+        T[3][0] = 0.0;
+
+        for(int i=0;i<5;++i){
+            Eigen::Vector2f p;
+            p(0) = P[i](0);
+            p(1) = P[i](1);
+            P1[i] = p;
+
+            Eigen::Vector2f q;
+            q(0) = Q[i](0);
+            q(1) = Q[i](1);
+            Q1[i] = q;
+
+            Eigen::Vector2f t;
+            t(0) = T[i](0);
+            t(1) = T[i](1);
+            T1[i] = t;
+        }
+        CP1 = CP;
+        CQ1 = CQ;
+        CT1 = CT;
+
+        return 1;
+    }
 
 void SharedFocalRelativePoseEstimator::generate_models(ImagePairVector *models) {
     sampler.generate_sample(&sample);
