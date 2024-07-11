@@ -455,6 +455,66 @@ RansacStats estimate_kFk(const std::vector<Point2D> &x1, const std::vector<Point
     return stats;
 }
 
+RansacStats estimate_kFk_final_only(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                    const bool use_undistorted, const RansacOptions &ransac_opt,
+                                    const BundleOptions &bundle_opt, FCam *F_cam, std::vector<char> *inliers) {
+
+    const size_t num_pts = x1.size();
+    if (num_pts < 7) {
+        return RansacStats();
+    }
+
+    // We normalize points here to improve conditioning. Note that the normalization
+    // only ammounts to a uniform rescaling and shift of the image coordinate system
+    // and the cost we minimize is equivalent to the cost in the original image
+    // we do not perform the shift as the pp needs to remain at [0, 0]
+
+    Eigen::Matrix3d T1, T2;
+    std::vector<Point2D> x1_norm = x1;
+    std::vector<Point2D> x2_norm = x2;
+
+    double scale = normalize_points(x1_norm, x2_norm, T1, T2, true, false, true);
+    RansacOptions ransac_opt_scaled = ransac_opt;
+    ransac_opt_scaled.max_epipolar_error /= scale;
+    BundleOptions bundle_opt_scaled = bundle_opt;
+    bundle_opt_scaled.loss_scale /= scale;
+    bundle_opt_scaled.loss_type = BundleOptions::LossType::TRUNCATED;
+
+    Eigen::Matrix3d F;
+
+    RansacStats stats = ransac_fundamental(x1_norm, x2_norm, ransac_opt_scaled, &F, inliers);
+
+    F_cam->F = F;
+    F_cam->camera = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+
+    if (stats.num_inliers > 7) {
+        // Collect inlier for additional non-linear refinement
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < num_pts; ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1_norm[k]);
+            x2_inliers.push_back(x2_norm[k]);
+        }
+
+        if (use_undistorted) {
+            refine_kFk_undistorted(x1_inliers, x2_inliers, F_cam, bundle_opt_scaled);
+        } else {
+            refine_kFk_tangent(x1_inliers, x2_inliers, F_cam, bundle_opt_scaled);
+        }
+    }
+
+    F_cam->F = T2.transpose() * (F_cam->F) * T1;
+    F_cam->F /= F_cam->F.norm();
+    F_cam->camera.params[3] /= scale * scale;
+
+    return stats;
+}
+
 RansacStats estimate_k2Fk1(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, std::vector<double> &ks,
                            bool use_undistorted, bool use_10pt, const RansacOptions &ransac_opt,
                            const BundleOptions &bundle_opt, FCamPair *F_cam_pair, std::vector<char> *inliers) {
@@ -488,6 +548,69 @@ RansacStats estimate_k2Fk1(const std::vector<Point2D> &x1, const std::vector<Poi
 
     RansacStats stats = ransac_k2Fk1(x1_norm, x2_norm, ks, use_undistorted, use_10pt, min_limit, max_limit,
                                      ransac_opt_scaled, F_cam_pair, inliers);
+
+    if (stats.num_inliers > 8) {
+        // Collect inlier for additional non-linear refinement
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < num_pts; ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1_norm[k]);
+            x2_inliers.push_back(x2_norm[k]);
+        }
+
+        if (use_undistorted) {
+            refine_k2Fk1_undistorted(x1_inliers, x2_inliers, F_cam_pair, bundle_opt_scaled);
+        } else {
+            refine_k2Fk1_tangent(x1_inliers, x2_inliers, F_cam_pair, bundle_opt_scaled);
+        }
+    }
+
+    F_cam_pair->F = T2.transpose() * (F_cam_pair->F) * T1;
+    F_cam_pair->F /= F_cam_pair->F.norm();
+    F_cam_pair->camera1.params[3] /= scale * scale;
+    F_cam_pair->camera2.params[3] /= scale * scale;
+
+    return stats;
+}
+
+RansacStats estimate_k2Fk1_final_only(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                      bool use_undistorted, const RansacOptions &ransac_opt,
+                                      const BundleOptions &bundle_opt, FCamPair *F_cam_pair,
+                                      std::vector<char> *inliers) {
+
+    const size_t num_pts = x1.size();
+    if (num_pts < 7) {
+        return RansacStats();
+    }
+
+    // We normalize points here to improve conditioning. Note that the normalization
+    // only ammounts to a uniform rescaling and shift of the image coordinate system
+    // and the cost we minimize is equivalent to the cost in the original image
+    // we do not perform the shift as the pp needs to remain at [0, 0]
+
+    Eigen::Matrix3d T1, T2;
+    std::vector<Point2D> x1_norm = x1;
+    std::vector<Point2D> x2_norm = x2;
+
+    double scale = normalize_points(x1_norm, x2_norm, T1, T2, true, false, true);
+    RansacOptions ransac_opt_scaled = ransac_opt;
+    ransac_opt_scaled.max_epipolar_error /= scale;
+    BundleOptions bundle_opt_scaled = bundle_opt;
+    bundle_opt_scaled.loss_scale /= scale;
+    bundle_opt_scaled.loss_type = BundleOptions::LossType::TRUNCATED;
+
+    Eigen::Matrix3d F;
+    RansacStats stats = ransac_fundamental(x1_norm, x2_norm, ransac_opt_scaled, &F, inliers);
+
+    F_cam_pair->F = F;
+    F_cam_pair->camera1 = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+    F_cam_pair->camera2 = Camera("DIVISION_RADIAL", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+
 
     if (stats.num_inliers > 8) {
         // Collect inlier for additional non-linear refinement

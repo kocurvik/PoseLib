@@ -98,9 +98,18 @@ RansacStats estimate_kFk(const std::vector<Point2D> &x1, const std::vector<Point
                          bool use_undistorted, bool use_9pt, const RansacOptions &ransac_opt,
                          const BundleOptions &bundle_opt, FCam *F_cam, std::vector<char> *inliers);
 
+RansacStats estimate_kFk_final_only(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                    bool use_undistorted, const RansacOptions &ransac_opt,
+                                    const BundleOptions &bundle_opt, FCam *F_cam, std::vector<char> *inliers);
+
 RansacStats estimate_k2Fk1(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, std::vector<double> &ks,
                            bool use_undistorted, bool use_10pt, const RansacOptions &ransac_opt,
                            const BundleOptions &bundle_opt, FCamPair *F_cam_pair, std::vector<char> *inliers);
+
+RansacStats estimate_k2Fk1_final_only(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                      bool use_undistorted, const RansacOptions &ransac_opt,
+                                      const BundleOptions &bundle_opt, FCamPair *F_cam_pair,
+                                      std::vector<char> *inliers);
 
 // Estimates a homography matrix using LO-RANSAC followed by non-linear refinement
 // Convention is x2 = H*x1

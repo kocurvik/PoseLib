@@ -595,6 +595,31 @@ std::pair<FCam, py::dict> estimate_kFk_wrapper(const std::vector<Eigen::Vector2d
     return std::make_pair(F_cam, output_dict);
 }
 
+
+std::pair<FCam, py::dict> estimate_kFk_fo_wrapper(const std::vector<Eigen::Vector2d> points2D_1,
+                                               const std::vector<Eigen::Vector2d> points2D_2,
+                                               bool use_distorted,
+                                               const py::dict &ransac_opt_dict,
+                                               const py::dict &bundle_opt_dict) {
+    RansacOptions ransac_opt;
+    update_ransac_options(ransac_opt_dict, ransac_opt);
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_scale = 0.5 * ransac_opt.max_epipolar_error;
+    update_bundle_options(bundle_opt_dict, bundle_opt);
+
+    FCam F_cam;
+    std::vector<char> inlier_mask;
+
+    RansacStats stats = estimate_kFk_final_only(points2D_1, points2D_2, use_distorted, ransac_opt, bundle_opt,
+                                                &F_cam, &inlier_mask);
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(F_cam, output_dict);
+}
+
 std::pair<FCamPair, py::dict> estimate_k2Fk1_wrapper(const std::vector<Eigen::Vector2d> points2D_1,
                                                      const std::vector<Eigen::Vector2d> points2D_2,
                                                      std::vector<double> ks,
@@ -614,6 +639,30 @@ std::pair<FCamPair, py::dict> estimate_k2Fk1_wrapper(const std::vector<Eigen::Ve
 
     RansacStats stats = estimate_k2Fk1(points2D_1, points2D_2, ks, use_distorted, use_10pt, ransac_opt, bundle_opt,
                                        &F_cam_pair, &inlier_mask);
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(F_cam_pair, output_dict);
+}
+
+std::pair<FCamPair, py::dict> estimate_k2Fk1_fo_wrapper(const std::vector<Eigen::Vector2d> points2D_1,
+                                                        const std::vector<Eigen::Vector2d> points2D_2,
+                                                        bool use_distorted,
+                                                        const py::dict &ransac_opt_dict,
+                                                        const py::dict &bundle_opt_dict) {
+    RansacOptions ransac_opt;
+    update_ransac_options(ransac_opt_dict, ransac_opt);
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_scale = 0.5 * ransac_opt.max_epipolar_error;
+    update_bundle_options(bundle_opt_dict, bundle_opt);
+
+    FCamPair F_cam_pair;
+    std::vector<char> inlier_mask;
+
+    RansacStats stats = estimate_k2Fk1_final_only(points2D_1, points2D_2, use_distorted, ransac_opt, bundle_opt,
+                                                  &F_cam_pair, &inlier_mask);
 
     py::dict output_dict;
     write_to_dict(stats, output_dict);
@@ -974,9 +1023,15 @@ PYBIND11_MODULE(poselib, m) {
           py::arg("ks") = py::list(), py::arg("use_undistorted") = false, py::arg("use_9pt") = false,
           py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
           "Fundamental matrix + rd estimation with non-linear refinement.");
+    m.def("estimate_kFk_final_only", &poselib::estimate_kFk_fo_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
+          py::arg("use_undistorted") = false, py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
+          "Fundamental matrix + rd estimation with non-linear refinement.");
     m.def("estimate_k2Fk1", &poselib::estimate_k2Fk1_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
           py::arg("ks") = py::list(), py::arg("use_undistorted") = false, py::arg("use_10pt") = false,
           py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
+          "Fundamental matrix + rd estimation with non-linear refinement.");
+    m.def("estimate_k2Fk1_final_only", &poselib::estimate_k2Fk1_fo_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
+          py::arg("use_undistorted") = false, py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
           "Fundamental matrix + rd estimation with non-linear refinement.");
     m.def("estimate_homography", &poselib::estimate_homography_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
           py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
