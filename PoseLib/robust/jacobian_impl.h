@@ -2273,10 +2273,8 @@ class k2Fk1TangentJacobianAccumulator {
     }
 
     size_t accumulate(const FCamPair F_cam_pair, Eigen::Matrix<double, 9, 9> &JtJ, Eigen::Matrix<double, 9, 1> &Jtr) const {
-
-        const Eigen::Matrix3d F = F_cam_pair.F;
-
-        FactorizedFundamentalMatrix FF = FactorizedFundamentalMatrix(F);
+        FactorizedFundamentalMatrix FF = FactorizedFundamentalMatrix(F_cam_pair.F);
+        const Eigen::Matrix3d F = FF.F();
 
         // Matrices contain the jacobians of F w.r.t. the factorized fundamental matrix (U,V,sigma)
         const Eigen::Matrix3d U = quat_to_rotmat(FF.qU);
