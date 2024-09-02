@@ -28,9 +28,11 @@
 
 #include "relative_pose.h"
 
+#include "PoseLib/misc/decompositions.h"
 #include "PoseLib/misc/essential.h"
 #include "PoseLib/robust/bundle.h"
 #include "PoseLib/solvers/gen_relpose_5p1pt.h"
+#include "PoseLib/solvers/homography_4pt.h"
 #include "PoseLib/solvers/relpose_5pt.h"
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
@@ -45,6 +47,36 @@ void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {
         x1s[k] = x1[sample[k]].homogeneous().normalized();
         x2s[k] = x2[sample[k]].homogeneous().normalized();
     }
+
+    if (opt.use_homography){
+        // use virtual correspondence
+        if (sample_sz == 3) {
+            x1s[3] = (x1[sample[0]] + x1[sample[1]] + x1[sample[2]]).homogeneous().normalized();
+            x2s[3] = (x2[sample[0]] + x2[sample[1]] + x2[sample[2]]).homogeneous().normalized();
+        }
+
+        Eigen::Matrix3d H;
+        int sols = homography_4pt(x1s, x2s, &H, true);
+        if (sols > 0) {
+            std::vector<Eigen::Matrix3d> Rs;
+            std::vector<Eigen::Vector3d> ts;
+            std::vector<Eigen::Vector3d> ns;
+
+//            hdecom_ding(H, Rs, ts, ns);
+            hdecom_svd(H, Rs, ts, ns);
+            for (size_t k = 0; k < Rs.size(); ++k){
+                models->emplace_back(Rs[k], ts[k]);
+            }
+        }
+        return;
+    }
+
+    // use virtual correspondence
+    if (sample_sz == 4) {
+        x1s[4] = (x1[sample[0]] + x1[sample[1]] + x1[sample[2]]).homogeneous().normalized();
+        x2s[4] = (x2[sample[0]] + x2[sample[1]] + x2[sample[2]]).homogeneous().normalized();
+    }
+
     relpose_5pt(x1s, x2s, models);
 }
 

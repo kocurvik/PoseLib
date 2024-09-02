@@ -40,10 +40,11 @@ class RelativePoseEstimator {
   public:
     RelativePoseEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
                           const std::vector<Point2D> &points2D_2)
-        : num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2),
+        : sample_sz(ransac_opt.use_homography ? (ransac_opt.use_virtual ? 3 : 4) : (ransac_opt.use_virtual ? 4 : 5)),
+          num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2),
           sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
-        x1s.resize(sample_sz);
-        x2s.resize(sample_sz);
+        x1s.resize(ransac_opt.use_homography ? 4 : 5);
+        x2s.resize(ransac_opt.use_homography ? 4 : 5);
         sample.resize(sample_sz);
     }
 
@@ -51,7 +52,7 @@ class RelativePoseEstimator {
     double score_model(const CameraPose &pose, size_t *inlier_count) const;
     void refine_model(CameraPose *pose) const;
 
-    const size_t sample_sz = 5;
+    const size_t sample_sz;
     const size_t num_data;
 
   private:
