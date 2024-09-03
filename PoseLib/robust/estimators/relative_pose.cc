@@ -51,8 +51,8 @@ void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {
     if (opt.use_homography){
         // use virtual correspondence
         if (sample_sz == 3) {
-            x1s[3] = (x1[sample[0]] + x1[sample[1]] + x1[sample[2]]).homogeneous().normalized();
-            x2s[3] = (x2[sample[0]] + x2[sample[1]] + x2[sample[2]]).homogeneous().normalized();
+            x1s[3] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]])/3).homogeneous().normalized();
+            x2s[3] = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]])/3).homogeneous().normalized();
         }
 
         Eigen::Matrix3d H;
@@ -73,8 +73,8 @@ void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {
 
     // use virtual correspondence
     if (sample_sz == 4) {
-        x1s[4] = (x1[sample[0]] + x1[sample[1]] + x1[sample[2]]).homogeneous().normalized();
-        x2s[4] = (x2[sample[0]] + x2[sample[1]] + x2[sample[2]]).homogeneous().normalized();
+        x1s[4] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]])/3).homogeneous().normalized();
+        x2s[4] = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]])/3).homogeneous().normalized();
     }
 
     relpose_5pt(x1s, x2s, models);
