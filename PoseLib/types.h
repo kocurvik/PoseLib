@@ -53,6 +53,7 @@ struct RansacOptions {
     bool use_virtual = false;
     bool use_homography = false;
     double delta = 0.0;
+    bool all_triangles = false;
 };
 
 struct RansacStats {

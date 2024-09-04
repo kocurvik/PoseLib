@@ -41,6 +41,7 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "use_virtual", ransac_opt.use_virtual);
     update(input, "use_homography", ransac_opt.use_homography);
     update(input, "delta", ransac_opt.delta);
+    update(input, "all_triangles", ransac_opt.all_triangles);
 }
 
 void update_bundle_options(const py::dict &input, BundleOptions &bundle_opt) {
@@ -84,6 +85,7 @@ void write_to_dict(const RansacOptions &ransac_opt, py::dict &dict) {
     dict["use_virtual"] = ransac_opt.use_virtual;
     dict["use_homography"] = ransac_opt.use_homography;
     dict["delta"] = ransac_opt.delta;
+    dict["all_triangles"] = ransac_opt.all_triangles;
 }
 
 void write_to_dict(const BundleOptions &bundle_opt, py::dict &dict) {

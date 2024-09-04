@@ -143,6 +143,22 @@ void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {
     }
 
     relpose_5pt(x1s, x2s, models);
+
+    if (opt.all_triangles){
+        Point2D all1 = x1[sample[0]] + x1[sample[1]] + x1[sample[3]] + x1[sample[4]];
+        Point2D all2 = x2[sample[0]] + x2[sample[1]] + x2[sample[3]] + x2[sample[4]];
+
+        std::vector<CameraPose> all_models;
+
+        for (int i = 0; i < 4; ++i) {
+            x1s[4] = ((all1 - x1[sample[i]]) / 3).homogeneous().normalized();
+            x2s[4] = ((all2 - x2[sample[i]]) / 3).homogeneous().normalized();
+            relpose_5pt(x1s, x2s, &all_models);
+            models->reserve(models->size() + all_models.size());
+            models->insert(models->end(), all_models.begin(), all_models.end());
+        }
+    }
+
     if (opt.use_virtual and opt.delta > 0.0){
         Point2D dir = triangle_calc();
 
