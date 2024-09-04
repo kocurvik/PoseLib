@@ -41,6 +41,61 @@
 
 namespace poselib {
 
+Point2D RelativePoseEstimator::triangle_calc() {
+    double mx2 = m2(0);
+    double my2 = m2(1);
+    double tr_xA = x2[sample[0]](0), tr_yA = x2[sample[0]](1);
+    double tr_xB = x2[sample[1]](0), tr_yB = x2[sample[1]](1);
+    double tr_xC = x2[sample[2]](0), tr_yC = x2[sample[2]](1);
+
+    double slopeAB = (tr_yB - tr_yA) / (tr_xB - tr_xA);
+    double slopeAC = (tr_yC - tr_yA) / (tr_xC - tr_xA);
+    double slopeBC = (tr_yC - tr_yB) / (tr_xC - tr_xB);
+
+    double interceptAB = tr_yA - slopeAB * tr_xA;
+    double interceptAC = tr_yA - slopeAC * tr_xA;
+    double interceptBC = tr_yB - slopeBC * tr_xB;
+
+    // find y coord in lines AB, AC, and BC, in the 2nd view for x=mean
+    double yAB = slopeAB * mx2 + interceptAB;
+    double yAC = slopeAC * mx2 + interceptAC;
+    double yBC = slopeBC * mx2 + interceptBC;
+
+    // find x coord in lines AB, AC, and BC, in the 2nd view for y=mean
+    double xAB = (my2 - interceptAB) / slopeAB;
+    double xAC = (my2 - interceptAC) / slopeAC;
+    double xBC = (my2 - interceptBC) / slopeBC;
+
+    // find min and max y and min and max x of thriangle vertices
+    double min_y = std::min(std::min(tr_yA, tr_yB), tr_yC);
+    double max_y = std::max(std::max(tr_yA, tr_yB), tr_yC);
+    double min_x = std::min(std::min(tr_xA, tr_xB), tr_xC);
+    double max_x = std::max(std::max(tr_xA, tr_xB), tr_xC);
+
+    double max_distY;
+    if (yAB>max_y || yAB<min_y) {
+        max_distY = std::abs(yAC-yBC);
+    } else if (yAC>max_y || yAC<min_y) {
+        max_distY = std::abs(yAB-yBC);
+    } else {
+        max_distY = std::abs(yAB-yAC);
+    }
+
+    double max_distX;
+    if (xAB>max_x || xAB<min_x) {
+        max_distX = std::abs(xAC-xBC);
+    } else if (xAC>max_x || xAC<min_x) {
+        max_distX = std::abs(xAB-xBC);
+    } else {
+        max_distX = std::abs(xAB-xAC);
+    }
+    if (max_distX > max_distY){
+        return Point2D(max_distX, 0);
+    } else {
+        return Point2D(0, max_distY);
+    }
+}
+
 void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {
     sampler.generate_sample(&sample);
     for (size_t k = 0; k < sample_sz; ++k) {
@@ -48,36 +103,71 @@ void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {
         x2s[k] = x2[sample[k]].homogeneous().normalized();
     }
 
+    if (opt.use_virtual){
+        m1 = (x1[sample[0]] + x1[sample[1]] + x1[sample[2]])/3;
+        m2 = (x2[sample[0]] + x2[sample[1]] + x2[sample[2]])/3;
+    }
+
     if (opt.use_homography){
         // use virtual correspondence
-        if (sample_sz == 3) {
-            x1s[3] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]])/3).homogeneous().normalized();
-            x2s[3] = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]])/3).homogeneous().normalized();
+        if (opt.use_virtual) {
+            x1s[3] = m1.homogeneous().normalized();
+            x2s[3] = m2.homogeneous().normalized();
         }
 
         Eigen::Matrix3d H;
         int sols = homography_4pt(x1s, x2s, &H, true);
-        if (sols > 0) {
-            std::vector<Eigen::Matrix3d> Rs;
-            std::vector<Eigen::Vector3d> ts;
-            std::vector<Eigen::Vector3d> ns;
+        if (sols > 0)
+            pose_from_H(H, models);
 
-//            hdecom_ding(H, Rs, ts, ns);
-            hdecom_svd(H, Rs, ts, ns);
-            for (size_t k = 0; k < Rs.size(); ++k){
-                models->emplace_back(Rs[k], ts[k]);
-            }
+        if (opt.use_virtual and opt.delta > 0.0) {
+            Point2D dir = triangle_calc();
+            x2s[3] = (m2 + opt.delta * dir).homogeneous().normalized();
+            sols = homography_4pt(x1s, x2s, &H, true);
+            if (sols > 0)
+                pose_from_H(H, models);
+
+            x2s[3] = (m2 - opt.delta * dir).homogeneous().normalized();
+            sols = homography_4pt(x1s, x2s, &H, true);
+            if (sols > 0)
+                pose_from_H(H, models);
         }
+
         return;
     }
 
     // use virtual correspondence
     if (sample_sz == 4) {
-        x1s[4] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]])/3).homogeneous().normalized();
-        x2s[4] = ((x2[sample[0]] + x2[sample[1]] + x2[sample[2]])/3).homogeneous().normalized();
+        x1s[4] = m1.homogeneous().normalized();
+        x2s[4] = m2.homogeneous().normalized();
     }
 
     relpose_5pt(x1s, x2s, models);
+    if (opt.use_virtual and opt.delta > 0.0){
+        Point2D dir = triangle_calc();
+
+        std::vector<CameraPose> delta_models;
+
+        x2s[4] = (m2 + opt.delta * dir).homogeneous().normalized();
+        relpose_5pt(x1s, x2s, &delta_models);
+        models->reserve(models->size() + delta_models.size());
+        models->insert(models->end(), delta_models.begin(), delta_models.end());
+
+        x2s[4] = (m2 - opt.delta * dir).homogeneous().normalized();
+        relpose_5pt(x1s, x2s, &delta_models);
+        models->reserve(models->size() + delta_models.size());
+        models->insert(models->end(), delta_models.begin(), delta_models.end());
+    }
+}
+void RelativePoseEstimator::pose_from_H(Eigen::Matrix3d &H, std::vector<CameraPose> *models) const {
+    std::vector<Eigen::Matrix3d> Rs;
+    std::vector<Eigen::Vector3d> ts;
+    std::vector<Eigen::Vector3d> ns;
+//    hdecom_ding(H, Rs, ts, ns);
+    hdecom_svd(H, Rs, ts, ns);
+    for (size_t k = 0; k < Rs.size(); ++k){
+        models->emplace_back(Rs[k], ts[k]);
+    }
 }
 
 double RelativePoseEstimator::score_model(const CameraPose &pose, size_t *inlier_count) const {

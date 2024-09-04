@@ -48,6 +48,7 @@ class RelativePoseEstimator {
         sample.resize(sample_sz);
     }
 
+    Point2D triangle_calc();
     void generate_models(std::vector<CameraPose> *models);
     double score_model(const CameraPose &pose, size_t *inlier_count) const;
     void refine_model(CameraPose *pose) const;
@@ -59,11 +60,13 @@ class RelativePoseEstimator {
     const RansacOptions &opt;
     const std::vector<Point2D> &x1;
     const std::vector<Point2D> &x2;
+    Point2D m1, m2;
 
     RandomSampler sampler;
     // pre-allocated vectors for sampling
     std::vector<Eigen::Vector3d> x1s, x2s;
     std::vector<size_t> sample;
+    void pose_from_H(Eigen::Matrix3d &H, std::vector<CameraPose> *models) const;
 };
 
 class SharedFocalRelativePoseEstimator {
