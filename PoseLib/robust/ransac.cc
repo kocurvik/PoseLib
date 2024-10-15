@@ -119,6 +119,20 @@ RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
     return stats;
 }
 
+RansacStats ransac_calib_known_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                    const Eigen::Matrix3d &R, const Point3D &t, CalibMethod method, bool optimize_relpose,
+                                    const RansacOptions &opt, ImagePair *best_model, std::vector<char> *best_inliers) {
+    best_model->pose = CameraPose(R, t);
+    best_model->camera1 = Camera("SIMPLE_PINHOLE", std::vector<double>{1.0, 0.0, 0.0}, -1, -1);
+    best_model->camera2 = best_model->camera2;
+
+    CalibWithKnownPoseEstimator estimator(opt, method, x1, x2, R, t, optimize_relpose);
+    RansacStats stats = ransac<CalibWithKnownPoseEstimator>(estimator, opt, best_model);
+
+//    get_inliers(*best_model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+    return stats;
+}
+
 RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         const RansacOptions &opt, ImagePair *best_model,
                                         std::vector<char> *best_inliers) {

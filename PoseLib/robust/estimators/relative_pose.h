@@ -33,6 +33,7 @@
 #include "PoseLib/robust/sampling.h"
 #include "PoseLib/robust/utils.h"
 #include "PoseLib/types.h"
+#include "PoseLib/misc/essential.h"
 
 namespace poselib {
 
@@ -91,6 +92,59 @@ class SharedFocalRelativePoseEstimator {
     RandomSampler sampler;
     // pre-allocated vectors for sampling
     std::vector<Eigen::Vector3d> x1s, x2s;
+    std::vector<size_t> sample;
+};
+
+class CalibWithKnownPoseEstimator {
+  public:
+    CalibWithKnownPoseEstimator(const RansacOptions &ransac_opt, const CalibMethod &method,
+                                const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                const Eigen::Matrix3d &R, const Point3D &t, bool optimize_relpose)
+        : num_data(x1.size()), opt(ransac_opt), method(method), x1(x1), x2(x2), optimize_relpose(optimize_relpose),
+          sampler(num_data, 2, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
+        switch (method){
+            case (CALIB_SHARED_FOCAL_1P):
+                sample_sz = 1; break;
+            case (CALIB_SHARED_FOCAL_2P):
+            case (CALIB_FOCAL_2P):
+                sample_sz = 2; break;
+            case (CALIB_FOCAL_3P):
+                sample_sz = 3; break;
+            case (CALIB_SHARED_FOCAL_PRINCIPAL_4P):
+                sample_sz = 4; break;
+            case (CALIB_FOCAL_PRINCIPAL_7P):
+                sample_sz = 7; break;
+            default:
+                throw std::runtime_error("NYI");
+        }
+
+        sampler = RandomSampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations);
+        x1s.resize(sample_sz);
+        x2s.resize(sample_sz);
+        sample.resize(sample_sz);
+        pose = CameraPose(R, t);
+        essential_from_motion(pose, &E);
+    }
+
+    void generate_models(ImagePairVector *models);
+    double score_model(const ImagePair &image_pair, size_t *inlier_count) const;
+    void refine_model(ImagePair *image_pair) const;
+
+    const size_t num_data;
+    size_t sample_sz;
+
+  private:
+    const RansacOptions &opt;
+    const CalibMethod &method;
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+    const bool optimize_relpose;
+    Eigen::Matrix3d E;
+    CameraPose pose;
+
+    RandomSampler sampler;
+    // pre-allocated vectors for sampling
+    std::vector<Eigen::Vector2d> x1s, x2s;
     std::vector<size_t> sample;
 };
 

@@ -382,6 +382,15 @@ Eigen::Matrix3d Camera::calib_matrix() const {
     return K;
 }
 
+Eigen::Matrix3d Camera::inverse_calib_matrix() const {
+    Eigen::Matrix3d K_inv;
+    K_inv.setIdentity();
+    K_inv.block<2, 1>(0, 2) = -principal_point();
+    K_inv.row(0) *= 1 / focal_x();
+    K_inv.row(1) *= 1 / focal_y();
+    return K_inv;
+}
+
 // Update the camera parameters such that the projections are rescaled
 void Camera::rescale(double scale) {
     if (params.empty()) {

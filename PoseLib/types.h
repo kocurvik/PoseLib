@@ -36,6 +36,9 @@
 
 namespace poselib {
 
+enum CalibMethod { CALIB_SHARED_FOCAL_1P, CALIB_SHARED_FOCAL_2P, CALIB_SHARED_FOCAL_PRINCIPAL_4P, CALIB_FOCAL_2P,
+                   CALIB_FOCAL_3P, CALIB_FOCAL_PRINCIPAL_7P};
+
 struct RansacOptions {
     size_t max_iterations = 100000;
     size_t min_iterations = 1000;
@@ -58,6 +61,7 @@ struct RansacOptions {
 
     bool estimate_focal_length = false;
     bool estimate_extra_params = false;
+    int lo_iterations = 25;
 };
 
 struct RansacStats {

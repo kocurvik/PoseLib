@@ -33,6 +33,7 @@ set(SOURCES
     solvers/gen_relpose_5p1pt.cc
     solvers/gen_relpose_6pt.cc
     solvers/homography_4pt.cc
+    solvers/calib_known_motion.cc
     misc/qep.cc
     misc/univariate.cc
     misc/essential.cc
@@ -87,6 +88,7 @@ set(HEADERS_PUBLIC
     solvers/gen_relpose_5p1pt.h
     solvers/gen_relpose_6pt.h
     solvers/homography_4pt.h
+    solvers/calib_known_motion.h
     misc/quaternion.h
     misc/camera_models.h
     misc/qep.h

@@ -851,6 +851,39 @@ std::tuple<Camera, Camera, int> focals_from_fundamental_iterative_wrapper(const 
     return focals_from_fundamental_iterative(F, camera1, camera2, max_iters, weights);
 }
 
+std::pair<ImagePair, py::dict> calib_with_known_pose_wrapper(const std::vector<Point2D> &points2D_1,
+                                                             const std::vector<Point2D> &points2D_2,
+                                                             const Eigen::Matrix3d &R, const Point3D &t,
+                                                             const CalibMethod &method, bool optimize_relpose,
+                                                             const py::dict &ransac_opt_dict,
+                                                             const py::dict &bundle_opt_dict) {
+    RansacOptions ransac_opt;
+    update_ransac_options(ransac_opt_dict, ransac_opt);
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_scale = 0.5 * ransac_opt.max_epipolar_error;
+    update_bundle_options(bundle_opt_dict, bundle_opt);
+
+    ImagePair image_pair;
+    std::vector<char> inlier_mask;
+
+    std::vector<Image> output;
+    RansacStats stats = estimate_calib_known_pose(points2D_1, points2D_2, R, t, method, optimize_relpose, ransac_opt,
+                                                  bundle_opt, &image_pair, &inlier_mask);
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(image_pair, output_dict);
+}
+
+std::pair<std::vector<CameraPose>, std::vector<Point3D>> motion_from_homography_wrapper(Eigen::Matrix3d &H){
+    std::vector<CameraPose> poses;
+    std::vector<Point3D> normals;
+    motion_from_homography_svd(H, poses, normals);
+    return std::make_pair(poses, normals);
+}
+
 } // namespace poselib
 
 PYBIND11_MODULE(poselib, m) {
@@ -886,7 +919,7 @@ PYBIND11_MODULE(poselib, m) {
         .def("focal_x", &poselib::Camera::focal_x, "Returns the camera focal_x.")
         .def("focal_y", &poselib::Camera::focal_y, "Returns the camera focal_y.")
         .def("model_name", &poselib::Camera::model_name, "Returns the camera model name.")
-        .def("prinicipal_point", &poselib::Camera::principal_point, "Returns the camera principal point.")
+        .def("principal_point", &poselib::Camera::principal_point, "Returns the camera principal point.")
         .def("camera_matrix", &poselib::Camera::calib_matrix, "Returns the camera calibration matrix.")
         .def("initialize_from_txt", &poselib::Camera::initialize_from_txt, "Initialize camera from a cameras.txt line")
         .def("project",
@@ -1099,6 +1132,21 @@ PYBIND11_MODULE(poselib, m) {
           py::arg("points3D"), py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
           "Absolute pose estimation for the 1D radial camera model with non-linear refinement.");
 
+    py::enum_<poselib::CalibMethod>(m, "CalibMethod")
+        .value("CALIB_FOCAL_2P", poselib::CalibMethod::CALIB_FOCAL_2P)
+        .value("CALIB_FOCAL_3P", poselib::CalibMethod::CALIB_FOCAL_3P)
+        .value("CALIB_FOCAL_PRINCIPAL_7P", poselib::CalibMethod::CALIB_FOCAL_PRINCIPAL_7P)
+        .value("CALIB_SHARED_FOCAL_1P", poselib::CalibMethod::CALIB_SHARED_FOCAL_1P)
+        .value("CALIB_SHARED_FOCAL_2P", poselib::CalibMethod::CALIB_SHARED_FOCAL_2P)
+        .value("CALIB_SHARED_FOCAL_PRINCIPAL_4P", poselib::CalibMethod::CALIB_SHARED_FOCAL_PRINCIPAL_4P)
+        .export_values();
+
+    m.def("calib_with_known_pose", &poselib::calib_with_known_pose_wrapper, py::arg("points2D_1"),
+          py::arg("points2D_2"), py::arg("R"), py::arg("t"), py::arg("CalibMethod"), py::arg("optimize_relpose"),
+          py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
+          "Camera calibration under known realtive pose");
+
+    m.def("motion_from_homography", &poselib::motion_from_homography_wrapper, py::arg("H"));
     m.def("focals_from_fundamental", &poselib::focals_from_fundamental, py::arg("F"), py::arg("pp1"), py::arg("pp2"));
     m.def("focals_from_fundamental_iterative", &poselib::focals_from_fundamental_iterative_wrapper, py::arg("F"),
           py::arg("camera1_dict"), py::arg("camera2_dict"), py::arg("max_iters") = 50,

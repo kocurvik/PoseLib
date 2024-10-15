@@ -97,6 +97,8 @@ double normalize_points(std::vector<Eigen::Vector2d> &x1, std::vector<Eigen::Vec
 // Calculate whether F would yield real focals, assumes both pp at [0, 0]
 bool calculate_RFC(const Eigen::Matrix3d &F);
 
+Eigen::Matrix3d skew(const Point3D &x);
+
 } // namespace poselib
 
 #endif

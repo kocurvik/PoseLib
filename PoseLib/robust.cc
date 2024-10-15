@@ -30,6 +30,8 @@
 
 #include "PoseLib/robust/utils.h"
 
+#include <iostream>
+
 namespace poselib {
 
 RansacStats estimate_absolute_pose(const std::vector<Point2D> &points2D, const std::vector<Point3D> &points3D,
@@ -292,6 +294,56 @@ RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &poin
     image_pair->camera1.params[2] = pp(1);
 
     image_pair->camera2 = image_pair->camera1;
+
+    return stats;
+}
+
+RansacStats estimate_calib_known_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                      const Eigen::Matrix3d &R, const Point3D &t, const CalibMethod &method,
+                                      bool optimize_relpose, const RansacOptions &ransac_opt,
+                                      const BundleOptions &bundle_opt, ImagePair *image_pair,
+                                      std::vector<char> *inliers) {
+
+    Eigen::Matrix3d T1, T2;
+    std::vector<Point2D> x1_norm = x1;
+    std::vector<Point2D> x2_norm = x2;
+
+    double scale = normalize_points(x1_norm, x2_norm, T1, T2, true, false, true);
+    RansacOptions ransac_opt_scaled = ransac_opt;
+    ransac_opt_scaled.max_epipolar_error /= scale;
+    BundleOptions bundle_opt_scaled = bundle_opt;
+    bundle_opt_scaled.loss_scale /= scale;
+
+    RansacStats stats = ransac_calib_known_pose(x1_norm, x2_norm, R, t, method, optimize_relpose, ransac_opt_scaled,
+                                                image_pair, inliers);
+
+//    if (stats.num_inliers > 2) {
+//        // Collect inlier for additional bundle adjustment
+//        // TODO: use camera models for this refinement!
+//        std::vector<Point2D> x1_inliers;
+//        std::vector<Point2D> x2_inliers;
+//        x1_inliers.reserve(stats.num_inliers);
+//        x2_inliers.reserve(stats.num_inliers);
+//
+//        for (size_t k = 0; k < num_pts; ++k) {
+//            if (!(*inliers)[k])
+//                continue;
+//            x1_inliers.push_back(x1_calib[k]);
+//            x2_inliers.push_back(x2_calib[k]);
+//        }
+//
+//        BundleOptions scaled_bundle_opt = bundle_opt;
+//        scaled_bundle_opt.loss_scale = bundle_opt.loss_scale * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
+//
+//        refine_relpose(x1_inliers, x2_inliers, pose, scaled_bundle_opt);
+//    }
+    image_pair->camera1.params[0] *= scale;
+    image_pair->camera2.params[0] *= scale;
+
+    image_pair->camera1.params[1] *= scale;
+    image_pair->camera2.params[1] *= scale;
+    image_pair->camera1.params[2] *= scale;
+    image_pair->camera2.params[2] *= scale;
 
     return stats;
 }

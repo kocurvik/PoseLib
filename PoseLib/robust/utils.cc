@@ -564,5 +564,10 @@ bool calculate_RFC(const Eigen::Matrix3d &F) {
         return false;
     return true;
 }
+Eigen::Matrix3d skew(const Point3D &x) {
+    Eigen::Matrix3d x_x;
+    x_x << 0, -x(2), x(1), x(2), 0, -x(0), -x(1), x(0), 0;
+    return x_x;
+}
 
 } // namespace poselib

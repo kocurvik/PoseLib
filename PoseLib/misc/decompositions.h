@@ -1,12 +1,15 @@
 #ifndef POSELIB_DECOMPOSITIONS_H
 #define POSELIB_DECOMPOSITIONS_H
 
+#include "PoseLib/camera_pose.h"
 #include "PoseLib/misc/camera_models.h"
 #include "PoseLib/types.h"
 
 #include <Eigen/Core>
 
 namespace poselib {
+
+void motion_from_homography_svd(Eigen::Matrix3d &HH, std::vector<CameraPose> &poses, std::vector<Eigen::Vector3d> &normals);
 
 // Estimate two different focal lengths from F using the formula from:
 // Bougnoux,"From Projective to Euclidean space under any practical situation, a criticism of self-calibration"(ICCV 98)

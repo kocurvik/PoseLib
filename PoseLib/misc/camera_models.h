@@ -122,6 +122,7 @@ struct Camera {
     void set_principal_point(double cx, double cy);
 
     Eigen::Matrix3d calib_matrix() const;
+    Eigen::Matrix3d inverse_calib_matrix() const;
 
     double max_dim() const {
         int m_dim = std::max(width, height);

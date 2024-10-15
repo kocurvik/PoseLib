@@ -30,6 +30,7 @@
 
 #include "PoseLib/misc/essential.h"
 #include "PoseLib/robust/bundle.h"
+#include "PoseLib/solvers/calib_known_motion.h"
 #include "PoseLib/solvers/gen_relpose_5p1pt.h"
 #include "PoseLib/solvers/relpose_5pt.h"
 #include "PoseLib/solvers/relpose_6pt_focal.h"
@@ -128,6 +129,109 @@ void SharedFocalRelativePoseEstimator::refine_model(ImagePair *image_pair) const
     }
 
     refine_shared_focal_relpose(x1_inlier, x2_inlier, image_pair, bundle_opt);
+}
+
+void CalibWithKnownPoseEstimator::generate_models(ImagePairVector *models) {
+    sampler.generate_sample(&sample);
+    for (size_t k = 0; k < sample_sz; ++k){
+        x1s[k] = x1[sample[k]];
+        x2s[k] = x2[sample[k]];
+    }
+
+    switch(method){
+        case CALIB_FOCAL_2P:
+            calib_known_motion_f_2p(x1s, x2s, E, pose, models);
+            break;
+        case CALIB_FOCAL_3P:
+            calib_known_motion_f_3p(x1s, x2s, E, pose, models);
+            break;
+        case CALIB_FOCAL_PRINCIPAL_7P:
+            calib_known_motion_fpp_7p(x1s, x2s, E, pose, models);
+            break;
+        case CALIB_SHARED_FOCAL_PRINCIPAL_4P:
+            calib_known_motion_shared_fpp_4p(x1s, x2s, E, pose, models);
+            break;
+        case CALIB_SHARED_FOCAL_1P:
+            calib_known_motion_shared_f_1p(x1s[0], x2s[0], E, pose, models);
+            break;
+        case CALIB_SHARED_FOCAL_2P:
+            calib_known_motion_shared_f_2p(x1s, x2s, E, pose, models);
+            break;
+    }
+}
+
+double CalibWithKnownPoseEstimator::score_model(const ImagePair &image_pair, size_t *inlier_count) const {
+//    Eigen::DiagonalMatrix<double, 3> K1_inv(1.0, 1.0, image_pair.camera1.focal());
+//    Eigen::DiagonalMatrix<double, 3> K2_inv(1.0, 1.0, image_pair.camera2.focal());
+    Eigen::Matrix3d F = image_pair.camera2.inverse_calib_matrix().transpose() * (E * image_pair.camera1.inverse_calib_matrix());
+
+    return compute_sampson_msac_score(F, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
+}
+
+void CalibWithKnownPoseEstimator::refine_model(ImagePair *image_pair) const {
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_epipolar_error;
+    bundle_opt.max_iterations = opt.lo_iterations;
+
+//    Eigen::DiagonalMatrix<double, 3> K_inv(1.0, 1.0, image_pair->camera1.focal());
+//    Eigen::Matrix3d F = K_inv * (E * K_inv);
+//
+//    // Find approximate inliers and bundle over these with a truncated loss
+//    std::vector<char> inliers;
+//    int num_inl = get_inliers(F, x1, x2, 5 * (opt.max_epipolar_error * opt.max_epipolar_error), &inliers);
+//    std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
+//    x1_inlier.reserve(num_inl);
+//    x2_inlier.reserve(num_inl);
+//
+//    if (num_inl <= sample_sz) {
+//        return;
+//    }
+//
+//    for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+//        if (inliers[pt_k]) {
+//            x1_inlier.push_back(x1[pt_k]);
+//            x2_inlier.push_back(x2[pt_k]);
+//        }
+//    }
+
+    if (optimize_relpose) {
+        switch (method) {
+            case CALIB_FOCAL_2P:
+            case CALIB_FOCAL_3P:
+                refine_focal_relpose(x1, x2, image_pair, bundle_opt);
+                break;
+            case CALIB_FOCAL_PRINCIPAL_7P:
+                throw std::runtime_error("NYI CALIB_SHARED_FOCAL_PRINCIPAL_4P relpose opt");
+                break;
+            case CALIB_SHARED_FOCAL_1P:
+            case CALIB_SHARED_FOCAL_2P:
+                refine_shared_focal_relpose(x1, x2, image_pair, bundle_opt);
+                break;
+            case CALIB_SHARED_FOCAL_PRINCIPAL_4P:
+                throw std::runtime_error("NYI CALIB_SHARED_FOCAL_PRINCIPAL_4P relpose opt");
+                break;
+        }
+    }
+
+    switch (method) {
+        case CALIB_FOCAL_2P:
+        case CALIB_FOCAL_3P:
+            refine_calib_focal(x1, x2, image_pair, bundle_opt);
+            break;
+        case CALIB_FOCAL_PRINCIPAL_7P:
+            refine_calib_focal_principal(x1, x2, image_pair, bundle_opt);
+            break;
+        case CALIB_SHARED_FOCAL_1P:
+        case CALIB_SHARED_FOCAL_2P:
+            refine_calib_shared_focal(x1, x2, image_pair, bundle_opt);
+            break;
+        case CALIB_SHARED_FOCAL_PRINCIPAL_4P:
+            refine_calib_shared_focal_principal(x1, x2, image_pair, bundle_opt);
+            break;
+
+    }
+
 }
 
 void GeneralizedRelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {
