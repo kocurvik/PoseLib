@@ -592,7 +592,7 @@ void ThreeViewRelativePoseEstimator::refine_model(ThreeViewCameraPose *pose) con
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
     bundle_opt.max_iterations = opt.lo_iterations;
-    bundle_opt.verbose = true;
+//    bundle_opt.verbose = true;
 
     // Find approximate inliers and bundle over these with a truncated loss
     std::vector<char> inliers;
