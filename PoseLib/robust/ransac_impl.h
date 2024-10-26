@@ -40,7 +40,7 @@ template <typename Solver, typename Model = CameraPose>
 RansacStats ransac(Solver &estimator, const RansacOptions &opt, Model *best_model) {
     RansacStats stats;
 
-    if (estimator.num_data < estimator.sample_sz) {
+    if (estimator.num_data < estimator.sample_sz || estimator.num_data < 3) {
         return stats;
     }
 
