@@ -70,7 +70,7 @@ int get_inliers(const ImageTriplet &image_triplet, const std::vector<Point2D> &x
                 const std::vector<Point2D> &x3, double sq_threshold, std::vector<char> *inliers);
 
 // inliers for homography
-void get_homography_inliers(const Eigen::Matrix3d &H, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+int get_homography_inliers(const Eigen::Matrix3d &H, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                             double sq_threshold, std::vector<char> *inliers);
 
 // Helpers for the 1D radial camera model

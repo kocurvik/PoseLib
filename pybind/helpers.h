@@ -42,6 +42,7 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "sample_sz", ransac_opt.sample_sz);
     update(input, "use_hc", ransac_opt.use_hc);
     update(input, "use_net", ransac_opt.use_net);
+    update(input, "use_affine", ransac_opt.use_affine);
     update(input, "init_net", ransac_opt.init_net);
     update(input, "oracle", ransac_opt.oracle);
     update(input, "gt_E", ransac_opt.gt_E);
@@ -90,6 +91,7 @@ void write_to_dict(const RansacOptions &ransac_opt, py::dict &dict) {
     dict["real_focal_check"] = ransac_opt.real_focal_check;
     dict["use_hc"] = ransac_opt.use_hc;
     dict["use_net"] = ransac_opt.use_net;
+    dict["use_affine"] = ransac_opt.use_affine;
     dict["init_net"] = ransac_opt.init_net;
     dict["oracle"] = ransac_opt.oracle;
     dict["gt_E"] = ransac_opt.gt_E;

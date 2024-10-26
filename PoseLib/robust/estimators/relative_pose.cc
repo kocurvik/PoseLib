@@ -35,9 +35,10 @@
 #include "PoseLib/solvers/relpose_5pt.h"
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
+#include "PoseLib/solvers/relpose_affine_4p.h"
 
-#include <torch/script.h>
 #include <iostream>
+#include <torch/script.h>
 
 namespace poselib {
 
@@ -192,6 +193,11 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
     }
 
 //    std::cout << "GT E: " << std::endl << opt.gt_E << std::endl;
+
+    if (opt.use_affine){
+        estimate_models(models);
+        return;
+    }
 
     if (sample_sz == 4){
         x1n[4] = ((x1[sample[0]] + x1[sample[1]] + x1[sample[2]]) / 3.0).homogeneous().normalized();
@@ -483,11 +489,33 @@ void ThreeViewRelativePoseEstimator::triangle_calc(double mx2, double my2, int &
 
 void ThreeViewRelativePoseEstimator::estimate_models(std::vector<ThreeViewCameraPose> *models) {
     std::vector<CameraPose> models12;
-    relpose_5pt(x1n, x2n, &models12);
+
+    if (opt.use_affine) {
+        switch (sample_sz) {
+        case 4:
+            relpose_affine_4p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, &models12);
+            break;
+        case 3:
+            affine_homography_3p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, &models12);
+            break;
+        case 2:
+            affine_essential_2p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, &models12);
+            break;
+        }
+    } else {
+        relpose_5pt(x1n, x2n, &models12);
+    }
 
     std::vector<Point3D> triangulated_12(3);
 
     for (CameraPose pose12 : models12){
+//        std::vector<char> inliers;
+//        int num_inliers = get_inliers(pose12, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, &inliers);
+//        if (opt.use_affine)
+//            std::cout << "Num inliers affine: " << num_inliers << std::endl;
+//        else
+//            std::cout << "Num inliers standard: " << num_inliers << std::endl;
+
         for (size_t i = 0; i < sample_sz_13; i++){
             triangulated_12[i] = triangulate(pose12, x1s[i], x2s[i]);
         }
@@ -497,6 +525,12 @@ void ThreeViewRelativePoseEstimator::estimate_models(std::vector<ThreeViewCamera
 
         for (CameraPose pose13 : models13){
             ThreeViewCameraPose three_view_pose = ThreeViewCameraPose(pose12, pose13);
+
+            size_t inlier_13 = 0;
+            size_t inlier_23 = 0;
+            compute_sampson_msac_score(three_view_pose.pose13, x1, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_13);
+            compute_sampson_msac_score(three_view_pose.pose23(), x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_23);
+
             if (opt.threeview_check){
                 size_t inlier_4p_13 = 0;
                 size_t inlier_4p_23 = 0;
@@ -513,6 +547,7 @@ void ThreeViewRelativePoseEstimator::estimate_models(std::vector<ThreeViewCamera
             if (opt.inner_refine > 0) {
                 inner_refine(&three_view_pose);
             }
+
             models->emplace_back(three_view_pose);
         }
     }
@@ -557,7 +592,7 @@ void ThreeViewRelativePoseEstimator::refine_model(ThreeViewCameraPose *pose) con
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
     bundle_opt.max_iterations = opt.lo_iterations;
-//    bundle_opt.verbose = true;
+    bundle_opt.verbose = true;
 
     // Find approximate inliers and bundle over these with a truncated loss
     std::vector<char> inliers;

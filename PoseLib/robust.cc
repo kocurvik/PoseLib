@@ -304,6 +304,18 @@ RansacStats estimate_3v_relative_pose(const std::vector<Point2D> &x1, const std:
     ransac_opt_scaled.max_epipolar_error =
         ransac_opt.max_epipolar_error * (3.0 / (camera1.focal() + camera2.focal() + camera3.focal()));
 
+//    Eigen::Matrix3d K1, K2;
+//    K1.setZero();
+//    K2.setZero();
+//    K1(0, 0) = camera1.focal_x();
+//    K1(1, 1) = camera1.focal_y();
+//    K1(0, 2) = camera1.principal_point()[0];
+//    K1(1, 2) = camera1.principal_point()[1];
+//    K2(0, 0) = camera2.focal_x();
+//    K2(1, 1) = camera2.focal_y();
+//    K2(0, 2) = camera2.principal_point()[0];
+//    K2(1, 2) = camera2.principal_point()[1];
+
     RansacStats stats = ransac_3v_relpose(x1_calib, x2_calib, x3_calib, ransac_opt_scaled, three_view_pose, inliers);
 
     if (stats.num_inliers > 4) {

@@ -35,6 +35,7 @@
 #include "PoseLib/robust/sampling.h"
 #include "PoseLib/robust/utils.h"
 #include "PoseLib/types.h"
+#include <iostream>
 
 namespace poselib {
 
@@ -70,11 +71,12 @@ class RelativePoseEstimator {
 class ThreeViewRelativePoseEstimator {
   public:
     ThreeViewRelativePoseEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &points2D_1,
-                                   const std::vector<Point2D> &points2D_2, const std::vector<Point2D> &points2D_3                                   )
+                                   const std::vector<Point2D> &points2D_2, const std::vector<Point2D> &points2D_3)
         : sample_sz((ransac_opt.sample_sz == 0) ? 5 : ransac_opt.sample_sz), num_data(points2D_1.size()), opt(ransac_opt), x1(points2D_1), x2(points2D_2), x3(points2D_3),
-        sampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
-        x1n.resize(5);
-        x2n.resize(5);
+        sampler(num_data, (ransac_opt.sample_sz > 2) ? sample_sz : 3, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
+        // we do not use virtual points with affine
+        x1n.resize(opt.use_affine ? sample_sz : 5);
+        x2n.resize(opt.use_affine ? sample_sz : 5);
         x1s.resize(sample_sz_13);
         x2s.resize(sample_sz_13);
         x3s.resize(sample_sz_13);

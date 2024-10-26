@@ -202,8 +202,10 @@ double compute_homography_msac_score(const Eigen::Matrix3d &H, const std::vector
     return score;
 }
 
-void get_homography_inliers(const Eigen::Matrix3d &H, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                            double sq_threshold, std::vector<char> *inliers) {
+int get_homography_inliers(const Eigen::Matrix3d &H, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                           double sq_threshold, std::vector<char> *inliers) {
+    int num_inliers = 0;
+
     const double H0_0 = H(0, 0), H0_1 = H(0, 1), H0_2 = H(0, 2);
     const double H1_0 = H(1, 0), H1_1 = H(1, 1), H1_2 = H(1, 2);
     const double H2_0 = H(2, 0), H2_1 = H(2, 1), H2_2 = H(2, 2);
@@ -220,8 +222,14 @@ void get_homography_inliers(const Eigen::Matrix3d &H, const std::vector<Point2D>
         const double r0 = Hx1_0 * inv_Hx1_2 - x2_0;
         const double r1 = Hx1_1 * inv_Hx1_2 - x2_1;
         const double r2 = r0 * r0 + r1 * r1;
-        (*inliers)[k] = (r2 < sq_threshold);
+        bool inlier = (r2 < sq_threshold);
+        (*inliers)[k] = inlier;
+        if (inlier){
+            num_inliers += 1;
+        }
     }
+
+    return num_inliers;
 }
 
 // Returns MSAC score for the 1D radial camera model
@@ -271,7 +279,8 @@ void get_inliers(const CameraPose &pose, const std::vector<Line2D> &lines2D, con
         const double r =
             std::abs(proj_line.dot(lines2D[k].x1.homogeneous())) + std::abs(proj_line.dot(lines2D[k].x2.homogeneous()));
         const double r2 = r * r;
-        (*inliers)[k] = (r2 < sq_threshold);
+        bool inlier = (r2 < sq_threshold);
+        (*inliers)[k] = inlier;
     }
 }
 
