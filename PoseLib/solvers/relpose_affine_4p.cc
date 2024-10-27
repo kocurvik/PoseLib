@@ -3,12 +3,13 @@
 //
 
 #include "PoseLib/camera_pose.h"
+#include "PoseLib/misc/decompositions.h"
 #include "PoseLib/misc/essential.h"
+#include "PoseLib/misc/univariate.h"
 #include "PoseLib/robust/bundle.h"
 #include "PoseLib/robust/utils.h"
 #include "relpose_5pt.h"
 #include "relpose_8pt.h"
-#include "PoseLib/misc/univariate.h"
 
 #include <Eigen/Dense>
 #include <iostream>
@@ -107,22 +108,55 @@ void affine_homography_3p(const std::vector<Eigen::Vector2d> &x1, const std::vec
 
     Eigen::Matrix3d H = affine_homography_3pt(xx1, xx2);
 
-    std::vector<char> inliers;
-    int num_inliers = get_homography_inliers(H, x1, x2, sq_epipolar_error, &inliers);
+//    //Direct H inliers
+//    std::vector<char> inliers_H;
+//    int num_inliers_H = get_homography_inliers(H, x1, x2, sq_epipolar_error, &inliers_H);
+//
+//    if (num_inliers > 5){
+//        std::vector<Eigen::Vector3d> x1_inlier, x2_inlier;
+//        x1_inlier.reserve(num_inliers);
+//        x2_inlier.reserve(num_inliers);
+//        for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+//            if (inliers[pt_k]) {
+//                x1_inlier.emplace_back(x1[pt_k].homogeneous().normalized());
+//                x2_inlier.emplace_back(x2[pt_k].homogeneous().normalized());
+//            }
+//        }
+//
+//        relpose_5pt(x1_inlier, x2_inlier, models);
+//    }
 
-    if (num_inliers > 5){
-        std::vector<Eigen::Vector3d> x1_inlier, x2_inlier;
-        x1_inlier.reserve(num_inliers);
-        x2_inlier.reserve(num_inliers);
-        for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
-            if (inliers[pt_k]) {
-                x1_inlier.emplace_back(x1[pt_k].homogeneous().normalized());
-                x2_inlier.emplace_back(x2[pt_k].homogeneous().normalized());
+    std::vector<Eigen::Vector3d> normals;
+    std::vector<CameraPose> poses;
+    motion_from_homography_svd(H, poses, normals);
+
+    for (const CameraPose& pose: poses){
+        Eigen::Matrix3d E;
+        essential_from_motion(pose, &E);
+        std::vector<char> inliers;
+        int num_inliers = get_inliers(E, x1, x2, sq_epipolar_error, &inliers);
+
+        if (num_inliers > 5){
+            std::vector<Eigen::Vector3d> x1_inlier, x2_inlier;
+            x1_inlier.reserve(num_inliers);
+            x2_inlier.reserve(num_inliers);
+            for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+                if (inliers[pt_k]) {
+                    x1_inlier.emplace_back(x1[pt_k].homogeneous().normalized());
+                    x2_inlier.emplace_back(x2[pt_k].homogeneous().normalized());
+                }
+            }
+
+            CameraPoseVector local_models;
+
+            // relpose 5pt does clear
+            relpose_5pt(x1_inlier, x2_inlier, &local_models);
+            for (const CameraPose& local_pose : local_models){
+                models->emplace_back(local_pose);
             }
         }
-
-        relpose_5pt(x1_inlier, x2_inlier, models);
     }
+
 }
 
 void affine_essential_2p(const std::vector<Eigen::Vector2d> &x1, const std::vector<Eigen::Vector2d> &x2,
