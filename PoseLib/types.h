@@ -61,6 +61,8 @@ struct RansacOptions {
     bool oracle = false;
     Eigen::Matrix3d gt_E = Eigen::Matrix3d::Zero();
     bool use_affine = false;
+    bool early_nonminimal = false;
+    bool early_lm = false;
 };
 
 struct RansacStats {

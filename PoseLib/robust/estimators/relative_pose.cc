@@ -179,6 +179,57 @@ void ThreeViewRelativePoseEstimator::generate_nn_init_delta_models(std::vector<T
     }
 }
 
+void ThreeViewRelativePoseEstimator::non_minimal_refinement(std::vector<CameraPose> *models) const{
+    CameraPoseVector new_models;
+    new_models.reserve(models->size());
+    for (CameraPose model : *models) {
+        std::vector<char> inliers;
+        int num_inliers = get_inliers(model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, &inliers);
+
+        if (num_inliers > 5) {
+            std::vector<Eigen::Vector3d> x1_inlier, x2_inlier;
+            x1_inlier.reserve(num_inliers);
+            x2_inlier.reserve(num_inliers);
+            for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+                if (inliers[pt_k]) {
+                    x1_inlier.emplace_back(x1[pt_k].homogeneous().normalized());
+                    x2_inlier.emplace_back(x2[pt_k].homogeneous().normalized());
+                }
+            }
+            relpose_5pt(x1_inlier, x2_inlier, &new_models);
+        }
+    }
+    *models = new_models;
+}
+
+void ThreeViewRelativePoseEstimator::lm_refinement(std::vector<CameraPose> *models) const{
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_epipolar_error;
+    bundle_opt.max_iterations = 25;
+
+    // Find approximate inliers and bundle over these with a truncated loss
+    for (CameraPose &pose: *models) {
+        std::vector<char> inliers;
+        int num_inl = get_inliers(pose, x1, x2, 5 * (opt.max_epipolar_error * opt.max_epipolar_error), &inliers);
+        std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
+        x1_inlier.reserve(num_inl);
+        x2_inlier.reserve(num_inl);
+
+        if (num_inl <= 5) {
+            return;
+        }
+
+        for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+            if (inliers[pt_k]) {
+                x1_inlier.push_back(x1[pt_k]);
+                x2_inlier.push_back(x2[pt_k]);
+            }
+        }
+        refine_relpose(x1_inlier, x2_inlier, &pose, bundle_opt);
+    }
+}
+
 void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCameraPose> *models) {
     sampler.generate_sample(&sample);
     for (size_t k = 0; k < sample_sz; ++k) {
@@ -213,6 +264,7 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
             double y = - (epipolar_line(2) + epipolar_line(0) * x_0) / epipolar_line(1);
             x2n[4] = Eigen::Vector2d(x_0, y).homogeneous().normalized();
             estimate_models(models);
+
             return;
         }
 
@@ -504,6 +556,14 @@ void ThreeViewRelativePoseEstimator::estimate_models(std::vector<ThreeViewCamera
         }
     } else {
         relpose_5pt(x1n, x2n, &models12);
+
+        if (opt.early_nonminimal){
+            non_minimal_refinement(&models12);
+        }
+
+        if (opt.early_lm){
+            lm_refinement(&models12);
+        }
     }
 
     std::vector<Point3D> triangulated_12(3);

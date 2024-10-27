@@ -119,6 +119,8 @@ class ThreeViewRelativePoseEstimator {
 
     Eigen::Vector3d get_network_point();
     void generate_nn_init_delta_models(std::vector<ThreeViewCameraPose> *models);
+    void non_minimal_refinement(std::vector<CameraPose> *models) const;
+    void lm_refinement(std::vector<CameraPose> *models) const;
 };
 
 class ThreeViewSharedFocalRelativePoseEstimator {

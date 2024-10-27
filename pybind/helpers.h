@@ -49,6 +49,8 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "inner_refine", ransac_opt.inner_refine);
     update(input, "threeview_check", ransac_opt.threeview_check);
     update(input, "delta", ransac_opt.delta);
+    update(input, "early_nonminimal", ransac_opt.early_nonminimal);
+    update(input, "early_lm", ransac_opt.early_lm);
 }
 
 void update_bundle_options(const py::dict &input, BundleOptions &bundle_opt) {
@@ -92,6 +94,8 @@ void write_to_dict(const RansacOptions &ransac_opt, py::dict &dict) {
     dict["use_hc"] = ransac_opt.use_hc;
     dict["use_net"] = ransac_opt.use_net;
     dict["use_affine"] = ransac_opt.use_affine;
+    dict["early_nonminimal"] = ransac_opt.early_nonminimal;
+    dict["early_lm"] = ransac_opt.early_lm;
     dict["init_net"] = ransac_opt.init_net;
     dict["oracle"] = ransac_opt.oracle;
     dict["gt_E"] = ransac_opt.gt_E;
