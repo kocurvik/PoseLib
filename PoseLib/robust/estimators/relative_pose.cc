@@ -28,9 +28,11 @@
 
 #include "relative_pose.h"
 
+#include "PoseLib/misc/decompositions.h"
 #include "PoseLib/misc/essential.h"
 #include "PoseLib/robust/bundle.h"
 #include "PoseLib/solvers/gen_relpose_5p1pt.h"
+#include "PoseLib/solvers/homography_4pt.h"
 #include "PoseLib/solvers/p3p.h"
 #include "PoseLib/solvers/relpose_5pt.h"
 #include "PoseLib/solvers/relpose_6pt_focal.h"
@@ -42,13 +44,231 @@
 
 namespace poselib {
 
-void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {
+Point2D RelativePoseEstimator::triangle_calc() {
+    double mx2 = m2(0);
+    double my2 = m2(1);
+    double tr_xA = x2[sample[0]](0), tr_yA = x2[sample[0]](1);
+    double tr_xB = x2[sample[1]](0), tr_yB = x2[sample[1]](1);
+    double tr_xC = x2[sample[2]](0), tr_yC = x2[sample[2]](1);
+
+    double slopeAB = (tr_yB - tr_yA) / (tr_xB - tr_xA);
+    double slopeAC = (tr_yC - tr_yA) / (tr_xC - tr_xA);
+    double slopeBC = (tr_yC - tr_yB) / (tr_xC - tr_xB);
+
+    double interceptAB = tr_yA - slopeAB * tr_xA;
+    double interceptAC = tr_yA - slopeAC * tr_xA;
+    double interceptBC = tr_yB - slopeBC * tr_xB;
+
+    // find y coord in lines AB, AC, and BC, in the 2nd view for x=mean
+    double yAB = slopeAB * mx2 + interceptAB;
+    double yAC = slopeAC * mx2 + interceptAC;
+    double yBC = slopeBC * mx2 + interceptBC;
+
+    // find x coord in lines AB, AC, and BC, in the 2nd view for y=mean
+    double xAB = (my2 - interceptAB) / slopeAB;
+    double xAC = (my2 - interceptAC) / slopeAC;
+    double xBC = (my2 - interceptBC) / slopeBC;
+
+    // find min and max y and min and max x of thriangle vertices
+    double min_y = std::min(std::min(tr_yA, tr_yB), tr_yC);
+    double max_y = std::max(std::max(tr_yA, tr_yB), tr_yC);
+    double min_x = std::min(std::min(tr_xA, tr_xB), tr_xC);
+    double max_x = std::max(std::max(tr_xA, tr_xB), tr_xC);
+
+    double max_distY;
+    if (yAB>max_y || yAB<min_y) {
+        max_distY = std::abs(yAC-yBC);
+    } else if (yAC>max_y || yAC<min_y) {
+        max_distY = std::abs(yAB-yBC);
+    } else {
+        max_distY = std::abs(yAB-yAC);
+    }
+
+    double max_distX;
+    if (xAB>max_x || xAB<min_x) {
+        max_distX = std::abs(xAC-xBC);
+    } else if (xAC>max_x || xAC<min_x) {
+        max_distX = std::abs(xAB-xBC);
+    } else {
+        max_distX = std::abs(xAB-xAC);
+    }
+    if (max_distX > max_distY){
+        return Point2D(max_distX, 0);
+    } else {
+        return Point2D(0, max_distY);
+    }
+}
+
+void RelativePoseEstimator::non_minimal_refinement(std::vector<CameraPose> *models) const{
+    CameraPoseVector new_models;
+    new_models.reserve(models->size());
+    for (CameraPose model : *models) {
+        std::vector<char> inliers;
+        int num_inliers = get_inliers(model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, &inliers);
+
+        if (num_inliers > 5) {
+            std::vector<Eigen::Vector3d> x1_inlier, x2_inlier;
+            x1_inlier.reserve(num_inliers);
+            x2_inlier.reserve(num_inliers);
+            for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+                if (inliers[pt_k]) {
+                    x1_inlier.emplace_back(x1[pt_k].homogeneous().normalized());
+                    x2_inlier.emplace_back(x2[pt_k].homogeneous().normalized());
+                }
+            }
+            relpose_5pt(x1_inlier, x2_inlier, &new_models);
+        }
+    }
+    *models = new_models;
+}
+
+void RelativePoseEstimator::lm_refinement(std::vector<CameraPose> *models) const{
+    CameraPoseVector new_models;
+    new_models.reserve(models->size());
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_epipolar_error;
+    bundle_opt.max_iterations = 25;
+
+    // Find approximate inliers and bundle over these with a truncated loss
+    for (CameraPose &pose: *models) {
+        std::vector<char> inliers;
+        int num_inl = get_inliers(pose, x1, x2, 5 * (opt.max_epipolar_error * opt.max_epipolar_error), &inliers);
+        std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
+        x1_inlier.reserve(num_inl);
+        x2_inlier.reserve(num_inl);
+
+        if (num_inl > 5) {
+            for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+                if (inliers[pt_k]) {
+                    x1_inlier.push_back(x1[pt_k]);
+                    x2_inlier.push_back(x2[pt_k]);
+                }
+            }
+            refine_relpose(x1_inlier, x2_inlier, &pose, bundle_opt);
+            new_models.emplace_back(pose);
+        }
+    }
+    *models = new_models;
+}
+
+void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models){
     sampler.generate_sample(&sample);
+
+    if (opt.use_affine) {
+        switch(sample_sz){
+        case 3:
+            affine_homography_3p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, models);
+            break;
+        case 4:
+            relpose_affine_4p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, models);
+            break;
+        default:
+            throw std::runtime_error("Twoview affine invoked with wrong sample sz");
+        }
+        return;
+    }
+
     for (size_t k = 0; k < sample_sz; ++k) {
         x1s[k] = x1[sample[k]].homogeneous().normalized();
         x2s[k] = x2[sample[k]].homogeneous().normalized();
     }
+
+    // create the virtual point
+    if (sample_sz < 5){
+        m1 = (x1[sample[0]] + x1[sample[1]] + x1[sample[2]])/3;
+        m2 = (x2[sample[0]] + x2[sample[1]] + x2[sample[2]])/3;
+    }
+
+    //
+    if (opt.use_homography){
+        // use virtual correspondence
+        if (sample_sz == 3) {
+            x1s[3] = m1.homogeneous().normalized();
+            x2s[3] = m2.homogeneous().normalized();
+        }
+
+        Eigen::Matrix3d H;
+        int sols = homography_4pt(x1s, x2s, &H, true);
+        if (sols > 0)
+            pose_from_H(H, models);
+
+        if (sample_sz == 3 and opt.delta > 0.0) {
+            Point2D dir = triangle_calc();
+            x2s[3] = (m2 + opt.delta * dir).homogeneous().normalized();
+            sols = homography_4pt(x1s, x2s, &H, true);
+            if (sols > 0)
+                pose_from_H(H, models);
+
+            x2s[3] = (m2 - opt.delta * dir).homogeneous().normalized();
+            sols = homography_4pt(x1s, x2s, &H, true);
+            if (sols > 0)
+                pose_from_H(H, models);
+        }
+
+        if (opt.early_nonminimal){
+            non_minimal_refinement(models);
+        }
+        if (opt.early_lm){
+            lm_refinement(models);
+        }
+
+        return;
+    }
+
+    // use virtual correspondence as 5th point
+    if (sample_sz == 4) {
+        x1s[4] = m1.homogeneous().normalized();
+        x2s[4] = m2.homogeneous().normalized();
+    }
+
     relpose_5pt(x1s, x2s, models);
+
+//    if (opt.all_triangles){
+//        Point2D all1 = x1[sample[0]] + x1[sample[1]] + x1[sample[3]] + x1[sample[4]];
+//        Point2D all2 = x2[sample[0]] + x2[sample[1]] + x2[sample[3]] + x2[sample[4]];
+//
+//        std::vector<CameraPose> all_models;
+//
+//        for (int i = 0; i < 4; ++i) {
+//            x1s[4] = ((all1 - x1[sample[i]]) / 3).homogeneous().normalized();
+//            x2s[4] = ((all2 - x2[sample[i]]) / 3).homogeneous().normalized();
+//            relpose_5pt(x1s, x2s, &all_models);
+//            models->reserve(models->size() + all_models.size());
+//            models->insert(models->end(), all_models.begin(), all_models.end());
+//        }
+//    }
+
+    if (opt.delta > 0.0){
+        Point2D dir = triangle_calc();
+
+        std::vector<CameraPose> delta_models;
+
+        x2s[4] = (m2 + opt.delta * dir).homogeneous().normalized();
+        relpose_5pt(x1s, x2s, &delta_models);
+        models->reserve(models->size() + delta_models.size());
+        models->insert(models->end(), delta_models.begin(), delta_models.end());
+
+        x2s[4] = (m2 - opt.delta * dir).homogeneous().normalized();
+        relpose_5pt(x1s, x2s, &delta_models);
+        models->reserve(models->size() + delta_models.size());
+        models->insert(models->end(), delta_models.begin(), delta_models.end());
+    }
+
+    if (opt.early_nonminimal){
+        non_minimal_refinement(models);
+    }
+
+    if (opt.early_lm){
+        lm_refinement(models);
+    }
+}
+void RelativePoseEstimator::pose_from_H(Eigen::Matrix3d &H, std::vector<CameraPose> *models) const {
+    std::vector<CameraPose> poses;
+    std::vector<Eigen::Vector3d> ns;
+    motion_from_homography_svd(H, poses, ns);
+    models->reserve(models->size() + poses.size());
+    models->insert(models->end(), poses.begin(), poses.end());
 }
 
 double RelativePoseEstimator::score_model(const CameraPose &pose, size_t *inlier_count) const {
@@ -59,7 +279,7 @@ void RelativePoseEstimator::refine_model(CameraPose *pose) const {
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
-    bundle_opt.max_iterations = 25;
+    bundle_opt.max_iterations = opt.lo_iterations;
 
     // Find approximate inliers and bundle over these with a truncated loss
     std::vector<char> inliers;
@@ -78,6 +298,7 @@ void RelativePoseEstimator::refine_model(CameraPose *pose) const {
             x2_inlier.push_back(x2[pt_k]);
         }
     }
+
     refine_relpose(x1_inlier, x2_inlier, pose, bundle_opt);
 }
 
@@ -203,6 +424,8 @@ void ThreeViewRelativePoseEstimator::non_minimal_refinement(std::vector<CameraPo
 }
 
 void ThreeViewRelativePoseEstimator::lm_refinement(std::vector<CameraPose> *models) const{
+    CameraPoseVector new_models;
+    new_models.reserve(models->size());
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_epipolar_error;
@@ -216,18 +439,18 @@ void ThreeViewRelativePoseEstimator::lm_refinement(std::vector<CameraPose> *mode
         x1_inlier.reserve(num_inl);
         x2_inlier.reserve(num_inl);
 
-        if (num_inl <= 5) {
-            return;
-        }
-
-        for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
-            if (inliers[pt_k]) {
-                x1_inlier.push_back(x1[pt_k]);
-                x2_inlier.push_back(x2[pt_k]);
+        if (num_inl > 5) {
+            for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+                if (inliers[pt_k]) {
+                    x1_inlier.push_back(x1[pt_k]);
+                    x2_inlier.push_back(x2[pt_k]);
+                }
             }
+            refine_relpose(x1_inlier, x2_inlier, &pose, bundle_opt);
+            new_models.emplace_back(pose);
         }
-        refine_relpose(x1_inlier, x2_inlier, &pose, bundle_opt);
     }
+    *models = new_models;
 }
 
 void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCameraPose> *models) {

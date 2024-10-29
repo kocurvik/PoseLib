@@ -63,6 +63,7 @@ struct RansacOptions {
     bool use_affine = false;
     bool early_nonminimal = false;
     bool early_lm = false;
+    bool use_homography = false;
 };
 
 struct RansacStats {
