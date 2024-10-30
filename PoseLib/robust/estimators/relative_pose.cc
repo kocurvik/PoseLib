@@ -870,6 +870,7 @@ double ThreeViewRelativePoseEstimator::score_model(const ThreeViewCameraPose &th
     double score13 = compute_sampson_msac_score(three_view_pose.pose13, x1, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count13);
     double score23 = compute_sampson_msac_score(three_view_pose.pose23(), x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count23);
 
+    std::vector<char> inliers;
     *inlier_count = get_inliers(three_view_pose, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inliers);
     return score12 + score13 + score23;
 }
