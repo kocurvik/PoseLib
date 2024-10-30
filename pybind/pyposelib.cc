@@ -809,6 +809,17 @@ std::pair<CameraPose, py::dict> estimate_1D_radial_absolute_pose_wrapper(const s
     output_dict["inliers"] = convert_inlier_vector(inlier_mask);
     return std::make_pair(pose, output_dict);
 }
+
+std::vector<ThreeViewCameraPose> solver_4p3v_para_wrapper(const std::vector<Eigen::Vector2d> &x1,
+                                                          const std::vector<Eigen::Vector2d> &x2,
+                                                          const std::vector<Eigen::Vector2d> &x3,
+                                                          int iters){
+    std::vector<size_t> sample = {0, 1, 2, 3};
+    std::vector<ThreeViewCameraPose> models;
+    solver_4p3v_para(x1, x2, x3, sample, &models, iters, 1.0);
+    return models;
+}
+
 } // namespace poselib
 
 PYBIND11_MODULE(poselib, m) {
@@ -991,6 +1002,8 @@ PYBIND11_MODULE(poselib, m) {
           py::arg("initial_pose"), py::arg("camera1_ext"), py::arg("camera1_dict"), py::arg("camera2_ext"),
           py::arg("camera2_dict"), py::arg("bundle_opt") = py::dict(),
           "Generalized relative pose non-linear refinement.");
+
+    m.def("para_4pt_solver", &poselib::solver_4p3v_para_wrapper, py::arg("x1"), py::arg("x2"), py::arg("x3"), py::arg("iters"));
 
     m.def("RansacOptions", &poselib::RansacOptions_wrapper, py::arg("opt") = py::dict(), "Options for RANSAC.");
     m.def("BundleOptions", &poselib::BundleOptions_wrapper, py::arg("opt") = py::dict(),

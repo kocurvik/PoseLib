@@ -52,6 +52,7 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "early_nonminimal", ransac_opt.early_nonminimal);
     update(input, "early_lm", ransac_opt.early_lm);
     update(input, "use_homography", ransac_opt.use_homography);
+    update(input, "use_para", ransac_opt.use_para);
 }
 
 void update_bundle_options(const py::dict &input, BundleOptions &bundle_opt) {
@@ -101,6 +102,7 @@ void write_to_dict(const RansacOptions &ransac_opt, py::dict &dict) {
     dict["oracle"] = ransac_opt.oracle;
     dict["gt_E"] = ransac_opt.gt_E;
     dict["use_homography"] = ransac_opt.use_homography;
+    dict["use_para"] = ransac_opt.use_para;
 }
 
 void write_to_dict(const BundleOptions &bundle_opt, py::dict &dict) {

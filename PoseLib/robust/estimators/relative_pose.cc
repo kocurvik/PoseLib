@@ -38,6 +38,7 @@
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
 #include "PoseLib/solvers/relpose_affine_4p.h"
+#include "PoseLib/solvers/threeview_para.h"
 
 #include <iostream>
 #include <torch/script.h>
@@ -157,6 +158,9 @@ void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models){
 
     if (opt.use_affine) {
         switch(sample_sz){
+        case 2:
+            affine_essential_2p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, models);
+            break;
         case 3:
             affine_homography_3p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, models);
             break;
@@ -174,16 +178,12 @@ void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models){
         x2s[k] = x2[sample[k]].homogeneous().normalized();
     }
 
-    // create the virtual point
-    if (sample_sz < 5){
-        m1 = (x1[sample[0]] + x1[sample[1]] + x1[sample[2]])/3;
-        m2 = (x2[sample[0]] + x2[sample[1]] + x2[sample[2]])/3;
-    }
-
     //
     if (opt.use_homography){
         // use virtual correspondence
         if (sample_sz == 3) {
+            m1 = (x1[sample[0]] + x1[sample[1]] + x1[sample[2]])/3;
+            m2 = (x2[sample[0]] + x2[sample[1]] + x2[sample[2]])/3;
             x1s[3] = m1.homogeneous().normalized();
             x2s[3] = m2.homogeneous().normalized();
         }
@@ -212,12 +212,12 @@ void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models){
         if (opt.early_lm){
             lm_refinement(models);
         }
-
         return;
     }
 
-    // use virtual correspondence as 5th point
-    if (sample_sz == 4) {
+    if (sample_sz == 4){
+        m1 = (x1[sample[0]] + x1[sample[1]] + x1[sample[2]])/3;
+        m2 = (x2[sample[0]] + x2[sample[1]] + x2[sample[2]])/3;
         x1s[4] = m1.homogeneous().normalized();
         x2s[4] = m2.homogeneous().normalized();
     }
@@ -287,6 +287,8 @@ void RelativePoseEstimator::refine_model(CameraPose *pose) const {
     std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
     x1_inlier.reserve(num_inl);
     x2_inlier.reserve(num_inl);
+
+    std::cout << "Check R1" << std::endl;
 
     if (num_inl <= 5) {
         return;
@@ -455,9 +457,10 @@ void ThreeViewRelativePoseEstimator::lm_refinement(std::vector<CameraPose> *mode
 
 void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCameraPose> *models) {
     sampler.generate_sample(&sample);
-    for (size_t k = 0; k < sample_sz; ++k) {
-        x1n[k] = x1[sample[k]].homogeneous().normalized();
-        x2n[k] = x2[sample[k]].homogeneous().normalized();
+
+    if (opt.use_para) {
+        solver_4p3v_para(x1, x2, x3, sample, models, 0, opt.max_epipolar_error * opt.max_epipolar_error);
+        return;
     }
 
     for (size_t k = 0; k < sample_sz_13; ++k) {
@@ -471,6 +474,11 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
     if (opt.use_affine){
         estimate_models(models);
         return;
+    }
+
+    for (size_t k = 0; k < sample_sz; ++k) {
+        x1n[k] = x1[sample[k]].homogeneous().normalized();
+        x2n[k] = x2[sample[k]].homogeneous().normalized();
     }
 
     if (sample_sz == 4){
@@ -862,7 +870,6 @@ double ThreeViewRelativePoseEstimator::score_model(const ThreeViewCameraPose &th
     double score13 = compute_sampson_msac_score(three_view_pose.pose13, x1, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count13);
     double score23 = compute_sampson_msac_score(three_view_pose.pose23(), x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inlier_count23);
 
-    std::vector<char> inliers;
     *inlier_count = get_inliers(three_view_pose, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, &inliers);
     return score12 + score13 + score23;
 }
