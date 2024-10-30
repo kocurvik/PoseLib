@@ -288,8 +288,6 @@ void RelativePoseEstimator::refine_model(CameraPose *pose) const {
     x1_inlier.reserve(num_inl);
     x2_inlier.reserve(num_inl);
 
-    std::cout << "Check R1" << std::endl;
-
     if (num_inl <= 5) {
         return;
     }
