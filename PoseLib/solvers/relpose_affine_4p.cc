@@ -39,7 +39,8 @@ Eigen::Matrix3d relpose_affine_4p(const std::vector<Eigen::Vector2d> &x1, const 
 }
 
 void relpose_affine_4p(const std::vector<Eigen::Vector2d> &x1, const std::vector<Eigen::Vector2d> &x2,
-                       const std::vector<size_t> &sample, double sq_epipolar_error, std::vector<CameraPose> *models){
+                       const std::vector<size_t> &sample, double sq_epipolar_error, bool use_enm,
+                       std::vector<CameraPose> *models) {
     std::vector<Eigen::Vector2d> xx1(4), xx2(4);
     for (int i = 0; i < 4; ++i){
         xx1[i] = x1[sample[i]];
@@ -47,6 +48,18 @@ void relpose_affine_4p(const std::vector<Eigen::Vector2d> &x1, const std::vector
     }
 
     Eigen::Matrix3d FA = relpose_affine_4p(xx1, xx2);
+
+    if (not use_enm){
+        std::vector<Point3D> x1n(4), x2n(4);
+        for (int k = 0; k < 4; ++k){
+            x1n[k] = xx1[k].homogeneous().normalized();
+            x2n[k] = xx2[k].homogeneous().normalized();
+        }
+
+        CameraPoseVector poses;
+        motion_from_essential(FA, x1n, x2n, models);
+        return;
+    }
 
     std::vector<char> inliers;
     int num_inliers = get_inliers(FA, x1, x2, sq_epipolar_error, &inliers);
@@ -99,7 +112,8 @@ Eigen::Matrix3d affine_homography_3pt(const std::vector<Eigen::Vector2d>& points
 }
 
 void affine_homography_3p(const std::vector<Eigen::Vector2d> &x1, const std::vector<Eigen::Vector2d> &x2,
-                          const std::vector<size_t> &sample, double sq_epipolar_error, std::vector<CameraPose> *models){
+                          const std::vector<size_t> &sample, double sq_epipolar_error, bool use_enm,
+                          std::vector<CameraPose> *models) {
     std::vector<Eigen::Vector2d> xx1(3), xx2(3);
     for (int i = 0; i < 3; ++i){
         xx1[i] = x1[sample[i]];
@@ -129,6 +143,13 @@ void affine_homography_3p(const std::vector<Eigen::Vector2d> &x1, const std::vec
     std::vector<Eigen::Vector3d> normals;
     std::vector<CameraPose> poses;
     motion_from_homography_svd(H, poses, normals);
+
+    if (not use_enm) {
+        for (const CameraPose& pose: poses){
+            models->emplace_back(pose);
+        }
+        return;
+    }
 
     for (const CameraPose& pose: poses){
         Eigen::Matrix3d E;
@@ -160,7 +181,8 @@ void affine_homography_3p(const std::vector<Eigen::Vector2d> &x1, const std::vec
 }
 
 void affine_essential_2p(const std::vector<Eigen::Vector2d> &x1, const std::vector<Eigen::Vector2d> &x2,
-                         const std::vector<size_t> &sample, double sq_epipolar_error, std::vector<CameraPose> *models){
+                         const std::vector<size_t> &sample, double sq_epipolar_error, bool use_enm,
+                         std::vector<CameraPose> *models) {
     std::vector<Eigen::Vector2d> xx1(2), xx2(2);
     for (int i = 0; i < 2; ++i){
         xx1[i] = x1[sample[i]];
@@ -195,6 +217,18 @@ void affine_essential_2p(const std::vector<Eigen::Vector2d> &x1, const std::vect
         Eigen::Matrix<double, 4, 1> Ev = s[i]*V3 + V4;
         Eigen::Matrix3d E;
         E << 0, 0, Ev(0), 0, 0, Ev(1), Ev(2), Ev(3), 0;
+
+        if (not use_enm){
+            std::vector<Point3D> x1n(2), x2n(2);
+            x1n[0] = xx1[0].homogeneous().normalized();
+            x1n[1] = xx1[1].homogeneous().normalized();
+            x2n[0] = xx2[0].homogeneous().normalized();
+            x2n[1] = xx2[1].homogeneous().normalized();
+
+            CameraPoseVector poses;
+            motion_from_essential(E, x1n, x2n, models);
+            return;
+        }
 
         std::vector<char> inliers;
         int num_inliers = get_inliers(E, x1, x2, sq_epipolar_error, &inliers);

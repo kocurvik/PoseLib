@@ -159,13 +159,13 @@ void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models){
     if (opt.use_affine) {
         switch(sample_sz){
         case 2:
-            affine_essential_2p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, models);
+            affine_essential_2p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, opt.early_nonminimal, models);
             break;
         case 3:
-            affine_homography_3p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, models);
+            affine_homography_3p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, opt.early_nonminimal, models);
             break;
         case 4:
-            relpose_affine_4p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, models);
+            relpose_affine_4p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, opt.early_nonminimal, models);
             break;
         default:
             throw std::runtime_error("Twoview affine invoked with wrong sample sz");
@@ -774,13 +774,13 @@ void ThreeViewRelativePoseEstimator::estimate_models(std::vector<ThreeViewCamera
     if (opt.use_affine) {
         switch (sample_sz) {
         case 4:
-            relpose_affine_4p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, &models12);
+            relpose_affine_4p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, opt.early_nonminimal, &models12);
             break;
         case 3:
-            affine_homography_3p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, &models12);
+            affine_homography_3p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, opt.early_nonminimal, &models12);
             break;
         case 2:
-            affine_essential_2p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, &models12);
+            affine_essential_2p(x1, x2, sample, opt.max_epipolar_error * opt.max_epipolar_error, opt.early_nonminimal, &models12);
             break;
         }
     } else {
