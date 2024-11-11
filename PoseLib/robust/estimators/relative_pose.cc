@@ -469,8 +469,8 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
 
         double angle = std::rand() * 2 * 3.14159265358979323846;
         Eigen::Vector3d noisy_epipole = epipole;
-        noisy_epipole[0] += 60 * std::cos(angle) * opt.nister_scale;
-        noisy_epipole[1] += 60 * std::sin(angle) * opt.nister_scale;
+        noisy_epipole[0] += 200 * std::cos(angle) * opt.nister_scale;
+        noisy_epipole[1] += 200 * std::sin(angle) * opt.nister_scale;
 
         threeview_nister(x1, x2, x3, noisy_epipole, sample, opt.early_nonminimal,
                              opt.max_epipolar_error * opt.max_epipolar_error, models);
