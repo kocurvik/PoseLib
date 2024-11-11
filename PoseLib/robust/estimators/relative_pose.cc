@@ -471,7 +471,7 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
         noisy_epipole[0] += 60 * distribution(generator);
         noisy_epipole[1] += 60 * distribution(generator);
 
-        threeview_nister(x1, x2, x3, epipole, sample, opt.early_nonminimal,
+        threeview_nister(x1, x2, x3, noisy_epipole, sample, opt.early_nonminimal,
                              opt.max_epipolar_error * opt.max_epipolar_error, models);
         if (opt.use_nister == 1) {
             return;
@@ -481,14 +481,14 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
         noisy_epipole[0] += 40 * distribution(generator);
         noisy_epipole[1] += 40 * distribution(generator);
 
-        threeview_nister(x1, x2, x3, epipole, sample, opt.early_nonminimal,
+        threeview_nister(x1, x2, x3, noisy_epipole, sample, opt.early_nonminimal,
                          opt.max_epipolar_error * opt.max_epipolar_error, models);
 
         noisy_epipole = epipole;
         noisy_epipole[0] += 20 * distribution(generator);
         noisy_epipole[1] += 20 * distribution(generator);
 
-        threeview_nister(x1, x2, x3, epipole, sample, opt.early_nonminimal,
+        threeview_nister(x1, x2, x3, noisy_epipole, sample, opt.early_nonminimal,
                          opt.max_epipolar_error * opt.max_epipolar_error, models);
         return;
     }
