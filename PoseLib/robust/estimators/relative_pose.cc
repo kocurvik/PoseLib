@@ -467,9 +467,10 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
         std::default_random_engine generator;
         std::normal_distribution<double> distribution(0.0, opt.nister_scale);
 
+        double angle = std::rand() * 2 * 3.14159265358979323846;
         Eigen::Vector3d noisy_epipole = epipole;
-        noisy_epipole[0] += 60 * distribution(generator);
-        noisy_epipole[1] += 60 * distribution(generator);
+        noisy_epipole[0] += 60 * std::cos(angle) * opt.nister_scale;
+        noisy_epipole[1] += 60 * std::sin(angle) * opt.nister_scale;
 
         threeview_nister(x1, x2, x3, noisy_epipole, sample, opt.early_nonminimal,
                              opt.max_epipolar_error * opt.max_epipolar_error, models);
@@ -477,16 +478,18 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
             return;
         }
 
+        angle = std::rand() * 2 * 3.14159265358979323846;
         noisy_epipole = epipole;
-        noisy_epipole[0] += 40 * distribution(generator);
-        noisy_epipole[1] += 40 * distribution(generator);
+        noisy_epipole[0] += 40 * std::cos(angle) * opt.nister_scale;
+        noisy_epipole[1] += 40 * std::sin(angle) * opt.nister_scale;
 
         threeview_nister(x1, x2, x3, noisy_epipole, sample, opt.early_nonminimal,
                          opt.max_epipolar_error * opt.max_epipolar_error, models);
 
+        angle = std::rand() * 2 * 3.14159265358979323846;
         noisy_epipole = epipole;
-        noisy_epipole[0] += 20 * distribution(generator);
-        noisy_epipole[1] += 20 * distribution(generator);
+        noisy_epipole[0] += 20 * std::cos(angle) * opt.nister_scale;
+        noisy_epipole[1] += 20 * std::sin(angle) * opt.nister_scale;
 
         threeview_nister(x1, x2, x3, noisy_epipole, sample, opt.early_nonminimal,
                          opt.max_epipolar_error * opt.max_epipolar_error, models);
