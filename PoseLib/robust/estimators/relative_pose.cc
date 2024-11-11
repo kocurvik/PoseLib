@@ -38,9 +38,11 @@
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
 #include "PoseLib/solvers/relpose_affine_4p.h"
+#include "PoseLib/solvers/threeview_nister.h"
 #include "PoseLib/solvers/threeview_para.h"
 
 #include <iostream>
+#include <random>
 #include <torch/script.h>
 
 namespace poselib {
@@ -458,6 +460,36 @@ void ThreeViewRelativePoseEstimator::generate_models(std::vector<ThreeViewCamera
 
     if (opt.use_para) {
         solver_4p3v_para(x1, x2, x3, sample, models, 0, opt.max_epipolar_error * opt.max_epipolar_error);
+        return;
+    }
+
+    if (opt.use_nister > 0) {
+        std::default_random_engine generator;
+        std::normal_distribution<double> distribution(0.0, opt.nister_scale);
+
+        Eigen::Vector3d noisy_epipole = epipole;
+        noisy_epipole[0] += 60 * distribution(generator);
+        noisy_epipole[1] += 60 * distribution(generator);
+
+        threeview_nister(x1, x2, x3, epipole, sample, opt.early_nonminimal,
+                             opt.max_epipolar_error * opt.max_epipolar_error, models);
+        if (opt.use_nister == 1) {
+            return;
+        }
+
+        noisy_epipole = epipole;
+        noisy_epipole[0] += 40 * distribution(generator);
+        noisy_epipole[1] += 40 * distribution(generator);
+
+        threeview_nister(x1, x2, x3, epipole, sample, opt.early_nonminimal,
+                         opt.max_epipolar_error * opt.max_epipolar_error, models);
+
+        noisy_epipole = epipole;
+        noisy_epipole[0] += 20 * distribution(generator);
+        noisy_epipole[1] += 20 * distribution(generator);
+
+        threeview_nister(x1, x2, x3, epipole, sample, opt.early_nonminimal,
+                         opt.max_epipolar_error * opt.max_epipolar_error, models);
         return;
     }
 

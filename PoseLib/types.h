@@ -65,6 +65,8 @@ struct RansacOptions {
     bool early_lm = false;
     bool use_homography = false;
     bool use_para = false;
+    int use_nister = 0;
+    double nister_scale = 1.0;
 };
 
 struct RansacStats {

@@ -32,6 +32,7 @@ set(SOURCES
     solvers/homography_4pt.cc
     solvers/threeview_hc.cc
     solvers/threeview_para.cc
+    solvers/threeview_nister.cc
     misc/qep.cc
     misc/univariate.cc
     misc/essential.cc
@@ -84,6 +85,7 @@ set(HEADERS_PUBLIC
     solvers/homography_4pt.h
     solvers/threeview_hc.h
     solvers/threeview_para.h
+    solvers/threeview_nister.h
     misc/quaternion.h
     misc/colmap_models.h
     misc/qep.h

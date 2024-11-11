@@ -303,6 +303,7 @@ RansacStats estimate_3v_relative_pose(const std::vector<Point2D> &x1, const std:
     RansacOptions ransac_opt_scaled = ransac_opt;
     ransac_opt_scaled.max_epipolar_error =
         ransac_opt.max_epipolar_error * (3.0 / (camera1.focal() + camera2.focal() + camera3.focal()));
+    ransac_opt_scaled.nister_scale = 1 / camera1.focal();
 
 //    Eigen::Matrix3d K1, K2;
 //    K1.setZero();

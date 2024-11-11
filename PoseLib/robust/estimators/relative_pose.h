@@ -91,6 +91,10 @@ class ThreeViewRelativePoseEstimator {
         if (opt.use_net || opt.init_net){
             module = torch::jit::load("res/epoch28_sampson.pt");
         }
+
+        if (opt.use_nister > 0){
+            epipole = opt.gt_E.fullPivLu().kernel().col(0).hnormalized().homogeneous();
+        }
     }
 
     void generate_models(std::vector<ThreeViewCameraPose> *models);
@@ -113,6 +117,7 @@ class ThreeViewRelativePoseEstimator {
     // pre-allocated vectors for sampling
     std::vector<Eigen::Vector3d> x1n, x2n, x1s, x2s, x3s;
     std::vector<size_t> sample;
+    Eigen::Vector3d epipole;
 
     void estimate_models(std::vector<ThreeViewCameraPose> *models);
     void triangle_calc(double mx, double my, int &idx, double &scale);
