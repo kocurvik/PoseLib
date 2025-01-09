@@ -1,4 +1,4 @@
-// Copyright (c) 2021, Viktor Larsson
+// Copyright (c) 2024, Viktor Larsson
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -18,45 +18,31 @@
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+// ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
 // (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
 // LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 // ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "homography.h"
+#ifndef POSELIB_P5PFR_H_
+#define POSELIB_P5PFR_H_
 
-#include "PoseLib/robust/bundle.h"
-#include "PoseLib/solvers/homography_4pt.h"
+#include "PoseLib/camera_pose.h"
+
+#include <Eigen/Dense>
+#include <vector>
 
 namespace poselib {
 
-void HomographyEstimator::generate_models(std::vector<Eigen::Matrix3d> *models) {
-    sampler.generate_sample(&sample);
-    for (size_t k = 0; k < sample_sz; ++k) {
-        x1s[k] = x1[sample[k]].homogeneous().normalized();
-        x2s[k] = x2[sample[k]].homogeneous().normalized();
-    }
-    Eigen::Matrix3d H;
-    int sols = homography_4pt(x1s, x2s, &H, true);
-    if (sols > 0) {
-        models->push_back(H);
-    }
-}
-
-double HomographyEstimator::score_model(const Eigen::Matrix3d &H, size_t *inlier_count) const {
-    return compute_homography_msac_score(H, x1, x2, opt.max_error * opt.max_error, inlier_count);
-}
-
-void HomographyEstimator::refine_model(Eigen::Matrix3d *H) const {
-    BundleOptions bundle_opt;
-    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
-    bundle_opt.loss_scale = opt.max_error;
-    bundle_opt.max_iterations = 25;
-
-    refine_homography(x1, x2, H, bundle_opt);
-}
+// Solves for camera pose and focal length f and dist param k such that: lambda*diag(1/f,1/f,1)*[x;1+k*f^2*|x|^2] = R*X+t
+// Re-implementation of the p5pfr solver from
+//    Kukelova et al., Real-time solution to the absolute pose problem with unknown radial distortion and focal length,
+//    ICCV 2013
+int p5pfr(const std::vector<Eigen::Vector2d> &points2d, const std::vector<Eigen::Vector3d> &points3d,
+         std::vector<CameraPose> *output_poses, std::vector<double> *output_focals, std::vector<double> *output_dist, bool normalize_input = true);
 
 } // namespace poselib
+
+#endif

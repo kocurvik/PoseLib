@@ -11,6 +11,7 @@ set(SOURCES
     solvers/p4pf.cc
     solvers/p35pf.cc
     solvers/p5pf.cc
+    solvers/p5pfr.cc
     solvers/p5lp_radial.cc
     solvers/p6lp.cc
     solvers/ugp2p.cc
@@ -46,10 +47,12 @@ set(SOURCES
     robust/bundle.cc
     robust/utils.cc
     robust/sampling.cc
+    robust/recalibrator.cc
     robust/estimators/absolute_pose.cc
     robust/estimators/relative_pose.cc
     robust/estimators/hybrid_pose.cc
     robust/estimators/homography.cc
+    robust/optim/lm_impl.cc
 )
 
 # Set HEADERS_PUBLIC variable

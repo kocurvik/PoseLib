@@ -92,8 +92,8 @@ struct BundleOptions {
     double max_lambda = 1e10;
     bool verbose = false;
     bool refine_focal_length = false;
-    bool refine_principal_point = false;
     bool refine_extra_params = false;
+    bool refine_principal_point = false;
 };
 
 struct BundleStats {
@@ -104,6 +104,51 @@ struct BundleStats {
     size_t invalid_steps;
     double step_norm;
     double grad_norm;
+};
+
+// Options for robust estimators
+struct AbsolutePoseOptions {
+    RansacOptions ransac;
+    BundleOptions bundle;
+
+    double max_error = 12.0;
+    // For problems with multiple types of residuals, we can have different max errors for each type
+    // If not set, max_error is used for all residuals
+    std::vector<double> max_errors = {};
+
+    // Only applicable for pure PnP problems (central, 2D-3D points only)
+    bool estimate_focal_length = false;
+    bool estimate_extra_params = false;
+
+    // Minimum (effective) field-of-view to accept when estimating focal length
+    // in degrees. Effective means based on the image points supplied
+    // and not on the actual image size.
+    // Setting to 0 (or negative) disables checking.
+    double min_fov = 5.0; // circa 500mm lens 35mm-equivalent
+};
+
+struct RelativePoseOptions {
+    RansacOptions ransac;
+    BundleOptions bundle;
+
+    // Inlier threshold
+    double max_error = 1.0;
+
+    bool estimate_focal_length = false;
+    bool estimate_extra_params = false;
+    bool shared_intrinsics = false;
+    bool tangent_sampson = false;
+
+    // Whether we should use real focal length checking: https://arxiv.org/abs/2311.16304
+    // Assumes that principal points of both cameras are at origin.
+    bool real_focal_check = false;
+};
+
+struct HomographyOptions {
+    RansacOptions ransac;
+    BundleOptions bundle;
+
+    double max_error = 1.0;
 };
 
 typedef Eigen::Vector2d Point2D;

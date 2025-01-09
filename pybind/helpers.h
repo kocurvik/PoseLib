@@ -27,6 +27,7 @@ template <> void update(const py::dict &input, const std::string &name, bool &va
     }
 }
 
+
 void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "max_iterations", ransac_opt.max_iterations);
     update(input, "min_iterations", ransac_opt.min_iterations);
@@ -42,6 +43,7 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "estimate_focal_length", ransac_opt.estimate_focal_length);
     update(input, "estimate_extra_params", ransac_opt.estimate_extra_params);
     update(input, "lo_iterations", ransac_opt.lo_iterations);
+    update(input, "max_prosac_iterations", ransac_opt.max_prosac_iterations);
 }
 
 void update_bundle_options(const py::dict &input, BundleOptions &bundle_opt) {
@@ -72,6 +74,49 @@ void update_bundle_options(const py::dict &input, BundleOptions &bundle_opt) {
         } else if (loss_type == "TRUNCATED_LE_ZACH") {
             bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED_LE_ZACH;
         }
+    }
+}
+
+
+void update_absolute_pose_options(const py::dict &input, AbsolutePoseOptions &opt) {
+    update(input, "max_error", opt.max_error);
+    update(input, "max_errors", opt.max_errors);
+    update(input, "estimate_focal_length", opt.estimate_focal_length);
+    update(input, "estimate_extra_params", opt.estimate_extra_params);
+    update(input, "min_fov", opt.min_fov);
+    if(input.contains("ransac")) {
+        update_ransac_options(input["ransac"].cast<py::dict>(), opt.ransac);
+    }
+    if(input.contains("bundle")) {
+        opt.bundle.loss_scale = 0.5 * opt.max_error;
+        update_bundle_options(input["bundle"].cast<py::dict>(), opt.bundle);
+    }
+}
+
+void update_relative_pose_options(const py::dict &input, RelativePoseOptions &opt) {
+    update(input, "max_error", opt.max_error);
+    update(input, "estimate_focal_length", opt.estimate_focal_length);
+    update(input, "estimate_extra_params", opt.estimate_extra_params);
+    update(input, "shared_intrinsics", opt.shared_intrinsics);
+    update(input, "tangent_sampson", opt.tangent_sampson);
+    update(input, "real_focal_check", opt.real_focal_check);
+    if(input.contains("ransac")) {
+        update_ransac_options(input["ransac"].cast<py::dict>(), opt.ransac);
+    }
+    if(input.contains("bundle")) {
+        opt.bundle.loss_scale = 0.5 * opt.max_error;
+        update_bundle_options(input["bundle"].cast<py::dict>(), opt.bundle);
+    }
+}
+
+void update_homography_options(const py::dict &input, HomographyOptions &opt) {
+    update(input, "max_error", opt.max_error);
+    if(input.contains("ransac")) {
+        update_ransac_options(input["ransac"].cast<py::dict>(), opt.ransac);
+    }
+    if(input.contains("bundle")) {
+        opt.bundle.loss_scale = 0.5 * opt.max_error;
+        update_bundle_options(input["bundle"].cast<py::dict>(), opt.bundle);
     }
 }
 
@@ -124,6 +169,50 @@ void write_to_dict(const BundleOptions &bundle_opt, py::dict &dict) {
     dict["refine_extra_params"] = bundle_opt.refine_extra_params;
 }
 
+void write_to_dict(const AbsolutePoseOptions &opt, py::dict &dict) {
+    py::dict ransac_dict;
+    write_to_dict(opt.ransac, ransac_dict);
+    dict["ransac"] = ransac_dict;
+
+    py::dict bundle_dict;
+    write_to_dict(opt.bundle, bundle_dict);
+    dict["bundle"] = bundle_dict;
+
+    dict["max_error"] = opt.max_error;
+    dict["max_errors"] = opt.max_errors;
+    dict["estimate_focal_length"] = opt.estimate_focal_length;
+    dict["min_fov"] = opt.min_fov;
+}
+
+void write_to_dict(const RelativePoseOptions &opt, py::dict &dict) {
+    py::dict ransac_dict;
+    write_to_dict(opt.ransac, ransac_dict);
+    dict["ransac"] = ransac_dict;
+
+    py::dict bundle_dict;
+    write_to_dict(opt.bundle, bundle_dict);
+    dict["bundle"] = bundle_dict;
+
+    dict["max_error"] = opt.max_error;
+    dict["estimate_focal_length"] = opt.estimate_focal_length;
+    dict["estimate_extra_params"] = opt.estimate_extra_params;
+    dict["shared_intrinsics"] = opt.shared_intrinsics;
+    dict["tangent_sampson"] = opt.tangent_sampson;
+    dict["real_focal_check"] = opt.real_focal_check;
+}
+
+void write_to_dict(const HomographyOptions &opt, py::dict &dict) {
+    py::dict ransac_dict;
+    write_to_dict(opt.ransac, ransac_dict);
+    dict["ransac"] = ransac_dict;
+
+    py::dict bundle_dict;
+    write_to_dict(opt.bundle, bundle_dict);
+    dict["bundle"] = bundle_dict;
+
+    dict["max_error"] = opt.max_error;
+}
+
 void write_to_dict(const BundleStats &stats, py::dict &dict) {
     dict["iterations"] = stats.iterations;
     dict["cost"] = stats.cost;
@@ -151,6 +240,15 @@ Camera camera_from_dict(const py::dict &camera_dict) {
 
     camera.params = camera_dict["params"].cast<std::vector<double>>();
     return camera;
+}
+
+py::dict camera_to_dict(const Camera &camera){
+    py::dict camera_dict;
+    camera_dict["model"] = camera.model_name();
+    camera_dict["width"] = camera.width;
+    camera_dict["height"] = camera.height;
+    camera_dict["params"] = camera.params;
+    return camera_dict;
 }
 
 std::vector<bool> convert_inlier_vector(const std::vector<char> &inliers) {
