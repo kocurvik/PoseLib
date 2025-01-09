@@ -775,6 +775,91 @@ class CalibFocalPrincipalRefiner : public RefinerBase<ImagePair, Accumulator> {
     const ResidualWeightVector &weights;
 };
 
+
+
+
+// Minimize Sampson error with pinhole camera model. Assumes image points are in the normalized image plane.
+template <typename ResidualWeightVector = UniformWeightVector, typename Accumulator = NormalAccumulator>
+class CalibSharedRDFocalRefiner : public RefinerBase<ImagePair, Accumulator> {
+  public:
+    CalibSharedRDFocalRefiner(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
+                              const ResidualWeightVector &w = ResidualWeightVector())
+        : x1(points2D_1), x2(points2D_2), weights(w) {
+        this->num_params = 2;
+    }
+
+    double compute_residual(Accumulator &acc, const ImagePair &image_pair) {
+        Eigen::Matrix3d E;
+        essential_from_motion(image_pair.pose, &E);
+        for (size_t i = 0; i < x1.size(); ++i) {
+            Eigen::Matrix<double, 3, 1> xu1, xu2;
+            Eigen::Matrix<double, 3, 2> J1, J2;
+            image_pair.camera1.unproject_with_jac(x1[i], &xu1, &J1);
+            image_pair.camera1.unproject_with_jac(x2[i], &xu2, &J2);
+
+            double num = xu2.transpose() * (E * xu1);
+
+            double den_sq =
+                (xu2.transpose() * E * J1).squaredNorm() + (xu1.transpose() * E.transpose() * J2).squaredNorm();
+            acc.add_residual(num / std::sqrt(den_sq), weights[i]);
+        }
+        return acc.get_residual();
+    }
+
+    void compute_jacobian(Accumulator &acc, const ImagePair &image_pair) {
+        Eigen::Matrix3d E, F;
+        essential_from_motion(image_pair.pose, &E);
+        double focal = image_pair.camera1.focal();
+        Eigen::DiagonalMatrix<double, 3> K_inv(1.0, 1.0, focal);
+        F = K_inv * E * K_inv;
+
+        Eigen::Matrix<double, 9, 1> df;
+        df << 0.0, 0.0, E(2, 0), 0.0, 0.0, E(2, 1), E(0, 2), E(1, 2), 2 * E(2, 2) * focal;
+
+        for (size_t k = 0; k < x1.size(); ++k) {
+            double C = x2[k].homogeneous().dot(F * x1[k].homogeneous());
+
+            // J_C is the Jacobian of the epipolar constraint w.r.t. the image points
+            Eigen::Vector4d J_C;
+            J_C << F.block<3, 2>(0, 0).transpose() * x2[k].homogeneous(), F.block<2, 3>(0, 0) * x1[k].homogeneous();
+            const double nJ_C = J_C.norm();
+            const double inv_nJ_C = 1.0 / nJ_C;
+            const double r = C * inv_nJ_C;
+
+            // Compute Jacobian of Sampson error w.r.t the fundamental/essential matrix (3x3)
+            Eigen::Matrix<double, 1, 9> dF;
+            dF << x1[k](0) * x2[k](0), x1[k](0) * x2[k](1), x1[k](0), x1[k](1) * x2[k](0), x1[k](1) * x2[k](1),
+                x1[k](1), x2[k](0), x2[k](1), 1.0;
+            const double s = C * inv_nJ_C * inv_nJ_C;
+            dF(0) -= s * (J_C(2) * x1[k](0) + J_C(0) * x2[k](0));
+            dF(1) -= s * (J_C(3) * x1[k](0) + J_C(0) * x2[k](1));
+            dF(2) -= s * (J_C(0));
+            dF(3) -= s * (J_C(2) * x1[k](1) + J_C(1) * x2[k](0));
+            dF(4) -= s * (J_C(3) * x1[k](1) + J_C(1) * x2[k](1));
+            dF(5) -= s * (J_C(1));
+            dF(6) -= s * (J_C(2));
+            dF(7) -= s * (J_C(3));
+            dF *= inv_nJ_C;
+
+            // and then w.r.t. the pose parameters (rotation + tangent basis for translation)
+            Eigen::Matrix<double, 1, 1> J;
+            J(0) = dF * df;
+
+            acc.add_jacobian(r, J, weights[k]);
+        }
+    }
+
+    ImagePair step(const Eigen::VectorXd &dp, const ImagePair &image_pair) const {
+        Camera new_camera = Camera("SIMPLE_PINHOLE", {image_pair.camera1.focal() + dp(0), 0, 0}, -1, -1);
+        return ImagePair(image_pair.pose, new_camera, new_camera);
+    }
+
+    typedef ImagePair param_t;
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+    const ResidualWeightVector &weights;
+};
+
 } // namespace poselib
 
 #endif

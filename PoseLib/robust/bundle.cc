@@ -352,6 +352,24 @@ BundleStats refine_calib_focal_principal(const std::vector<Point2D> &x1, const s
     }
 }
 
+template <typename WeightType>
+BundleStats refine_calib_shared_rd_focal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                         ImagePair *image_pair, const BundleOptions &opt, const WeightType &weights) {
+    IterationCallback callback = setup_callback(opt);
+    CalibSharedRDFocalRefiner<decltype(weights)> refiner(x1, x2, weights);
+    return lm_impl<decltype(refiner)>(refiner, image_pair, opt, callback);
+}
+
+BundleStats refine_calib_shared_rd_focal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                      ImagePair *image_pair, const BundleOptions &opt,
+                                      const std::vector<double> &weights) {
+    if (weights.size() == x1.size()) {
+        return refine_calib_shared_rd_focal<std::vector<double>>(x1, x2, image_pair, opt, weights);
+    } else {
+        return refine_calib_shared_rd_focal<UniformWeightVector>(x1, x2, image_pair, opt, UniformWeightVector());
+    }
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 // Uncalibrated relative pose (fundamental matrix) refinement

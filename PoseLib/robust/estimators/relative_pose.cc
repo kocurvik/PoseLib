@@ -212,6 +212,7 @@ void CalibWithKnownPoseEstimator::refine_model(ImagePair *image_pair) const {
                 throw std::runtime_error("NYI CALIB_SHARED_FOCAL_PRINCIPAL_4P relpose opt");
                 break;
         }
+        return;
     }
 
     switch (method) {
@@ -230,6 +231,60 @@ void CalibWithKnownPoseEstimator::refine_model(ImagePair *image_pair) const {
             refine_calib_shared_focal_principal(x1, x2, image_pair, bundle_opt);
             break;
 
+    }
+
+}
+
+void CalibRDWithKnownPoseEstimator::generate_models(ImagePairVector *models) {
+    sampler.generate_sample(&sample);
+    for (size_t k = 0; k < sample_sz; ++k){
+        x1s[k] = x1[sample[k]];
+        x2s[k] = x2[sample[k]];
+    }
+
+    switch(method){
+        case CALIB_SHARED_RD_FOCAL_2P:
+            calib_known_motion_rd_f_2p(x1s, x2s, E, pose, models);
+            break;
+        case CALIB_SHARED_RD_FOCAL_3P:
+            calib_known_motion_rd_f_3p(x1s, x2s, E, pose, models);
+            break;
+    }
+}
+
+double CalibRDWithKnownPoseEstimator::score_model(const ImagePair &image_pair, size_t *inlier_count) const {
+    if (optimize_relpose){
+        Eigen::Matrix3d EE;
+        essential_from_motion(image_pair.pose, &EE);
+
+        return compute_tangent_sampson_msac_score(EE, x1, x2, image_pair.camera1, image_pair.camera2,
+                                                  opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
+    }
+    return compute_tangent_sampson_msac_score(E, x1, x2, image_pair.camera1, image_pair.camera2,
+                                              opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
+}
+
+void CalibRDWithKnownPoseEstimator::refine_model(ImagePair *image_pair) const {
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_epipolar_error;
+    bundle_opt.max_iterations = opt.lo_iterations;
+
+    if (optimize_relpose) {
+        switch (method) {
+            case CALIB_SHARED_RD_FOCAL_2P:
+            case CALIB_SHARED_RD_FOCAL_3P:
+                refine_shared_rd_focal_relpose(x1, x2, image_pair, bundle_opt);
+                break;
+        }
+        return;
+    }
+
+    switch (method) {
+        case CALIB_SHARED_RD_FOCAL_2P:
+        case CALIB_SHARED_RD_FOCAL_3P:
+            refine_calib_shared_rd_focal(x1, x2, image_pair, bundle_opt);
+            break;
     }
 
 }
