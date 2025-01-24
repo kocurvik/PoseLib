@@ -53,7 +53,9 @@ struct RansacOptions {
     bool real_focal_check = false;
     size_t sample_sz = 0;
     size_t inner_refine = 0;
+    size_t inner_refine_extra = 1;
     bool threeview_check = false;
+    bool threeview_check_extra = false;
     double delta = 0.0;
     bool use_hc = false;
     bool use_net = false;

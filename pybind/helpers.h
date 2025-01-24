@@ -47,7 +47,9 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "oracle", ransac_opt.oracle);
     update(input, "gt_E", ransac_opt.gt_E);
     update(input, "inner_refine", ransac_opt.inner_refine);
+    update(input, "inner_refine_extra", ransac_opt.inner_refine_extra);
     update(input, "threeview_check", ransac_opt.threeview_check);
+    update(input, "threeview_check_extra", ransac_opt.threeview_check_extra);
     update(input, "delta", ransac_opt.delta);
     update(input, "early_nonminimal", ransac_opt.early_nonminimal);
     update(input, "early_lm", ransac_opt.early_lm);
