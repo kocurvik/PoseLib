@@ -182,8 +182,8 @@ bool test_fundamental_pose_refinement() {
 
 bool test_rd_fundamental_pose_normal_acc() {
     const size_t N = 15;
-    std::string camera_str1 = "0 DIVISION 1 1 1.0 1.0 0.0 0.0 -0.25";
-    std::string camera_str2 = "0 DIVISION 1 1 1.0 1.0 0.0 0.0 -0.15";
+    std::string camera_str1 = "0 SIMPLE_DIVISION 1 1 1.0 0.0 0.0 -0.25";
+    std::string camera_str2 = "0 SIMPLE_DIVISION 1 1 1.0 0.0 0.0 -0.15";
     Camera camera1, camera2;
     camera1.initialize_from_txt(camera_str1);
     camera2.initialize_from_txt(camera_str2);
@@ -215,8 +215,8 @@ bool test_rd_fundamental_pose_normal_acc() {
 
 bool test_rd_fundamental_pose_jacobian() {
     const size_t N = 15;
-    std::string camera_str1 = "0 DIVISION 1 1 1.0 1.0 0.0 0.0 -0.25";
-    std::string camera_str2 = "0 DIVISION 1 1 1.0 1.0 0.0 0.0 -0.15";
+    std::string camera_str1 = "0 SIMPLE_DIVISION 1 1 1.0 0.0 0.0 -0.25";
+    std::string camera_str2 = "0 SIMPLE_DIVISION 1 1 1.0 0.0 0.0 -0.15";
     Camera camera1, camera2;
     camera1.initialize_from_txt(camera_str1);
     camera2.initialize_from_txt(camera_str2);
@@ -253,8 +253,8 @@ bool test_rd_fundamental_pose_jacobian() {
 
 bool test_rd_fundamental_pose_refinement() {
     const size_t N = 100;
-    std::string camera_str1 = "0 DIVISION 1 1 1.0 1.0 0.0 0.0 -0.25";
-    std::string camera_str2 = "0 DIVISION 1 1 1.0 1.0 0.0 0.0 -0.15";
+    std::string camera_str1 = "0 SIMPLE_DIVISION 1 1 1.0 0.0 0.0 -0.25";
+    std::string camera_str2 = "0 SIMPLE_DIVISION 1 1 1.0 0.0 0.0 -0.15";
     Camera camera1, camera2;
     camera1.initialize_from_txt(camera_str1);
     camera2.initialize_from_txt(camera_str2);
@@ -296,7 +296,7 @@ bool test_rd_fundamental_pose_refinement() {
 
 bool test_shared_rd_fundamental_pose_jacobian() {
     const size_t N = 15;
-    std::string camera_str1 = "0 DIVISION 1 1 1.0 1.0 0.0 0.0 -0.25";
+    std::string camera_str1 = "0 SIMPLE_DIVISION 1 1 1.0 0.0 0.0 -0.25";
     Camera camera1, camera2;
     camera1.initialize_from_txt(camera_str1);
     camera2.initialize_from_txt(camera_str1);
@@ -333,7 +333,7 @@ bool test_shared_rd_fundamental_pose_jacobian() {
 
 bool test_shared_rd_fundamental_pose_refinement() {
     const size_t N = 100;
-    std::string camera_str1 = "0 DIVISION 1 1 1.0 1.0 0.0 0.0 -0.25";
+    std::string camera_str1 = "0 SIMPLE_DIVISION 1 1 1.0 0.0 0.0 -0.25";
     Camera camera1, camera2;
     camera1.initialize_from_txt(camera_str1);
     camera2.initialize_from_txt(camera_str1);

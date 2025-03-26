@@ -481,8 +481,8 @@ void generate_relpose_problems(int n_problems, std::vector<RelativePoseProblemIn
             } else {
                 instance.rd2_gt = rd_gen(random_engine);
             }
-            rd1_camera = Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, instance.rd1_gt}, -1, -1);
-            rd2_camera = Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, instance.rd2_gt}, -1, -1);
+            rd1_camera = Camera("SIMPLE_DIVISION", {1.0, 0.0, 0.0, instance.rd1_gt}, -1, -1);
+            rd2_camera = Camera("SIMPLE_DIVISION", {1.0, 0.0, 0.0, instance.rd2_gt}, -1, -1);
         }
 
         if (!options.generalized_) {

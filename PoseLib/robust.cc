@@ -454,8 +454,8 @@ RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::v
 
     F_cam_pair->F = T2.transpose() * (F_cam_pair->F) * T1;
     F_cam_pair->F /= F_cam_pair->F.norm();
-    F_cam_pair->camera1.params[4] /= scale * scale;
-    F_cam_pair->camera2.params[4] /= scale * scale;
+    F_cam_pair->camera1.params[3] /= scale * scale;
+    F_cam_pair->camera2.params[3] /= scale * scale;
 
     return stats;
 }
@@ -512,8 +512,68 @@ RansacStats estimate_shared_rd_fundamental(const std::vector<Point2D> &x1, const
 
     F_cam_pair->F = T2.transpose() * (F_cam_pair->F) * T1;
     F_cam_pair->F /= F_cam_pair->F.norm();
-    F_cam_pair->camera1.params[4] /= scale * scale;
-    F_cam_pair->camera2.params[4] /= scale * scale;
+    F_cam_pair->camera1.params[3] /= scale * scale;
+    F_cam_pair->camera2.params[3] /= scale * scale;
+
+    return stats;
+}
+
+RansacStats estimate_focal_rd_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                      std::vector<double> &ks, const RelativePoseOptions &opt,
+                                      ImagePair *pair, std::vector<char> *inliers) {
+
+    const size_t num_pts = x1.size();
+    if (num_pts < 10) {
+        return RansacStats();
+    }
+
+    // We normalize points here to improve conditioning. Note that the normalization
+    // only ammounts to a uniform rescaling and shift of the image coordinate system
+    // and the cost we minimize is equivalent to the cost in the original image
+    // we do not perform the shift as the pp needs to remain at [0, 0]
+
+    Eigen::Matrix3d T1, T2;
+    std::vector<Point2D> x1_norm = x1;
+    std::vector<Point2D> x2_norm = x2;
+
+    double scale = normalize_points(x1_norm, x2_norm, T1, T2, true, false, true);
+    RelativePoseOptions opt_scaled = opt;
+    opt_scaled.max_error /= scale;
+    opt_scaled.bundle.loss_scale /= scale;
+
+    for (size_t k = 0; k < ks.size(); ++k) {
+        ks[k] *= scale * scale;
+    }
+
+    double min_limit = -2.0 * scale * scale;
+    double max_limit = 0.5 * scale * scale;
+
+    RansacStats stats =
+        ransac_focal_rd_relpose(x1_norm, x2_norm, ks, min_limit, max_limit, opt_scaled, pair, inliers);
+
+    if (stats.num_inliers > 9) {
+        // Collect inlier for additional non-linear refinement
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < num_pts; ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1_norm[k]);
+            x2_inliers.push_back(x2_norm[k]);
+        }
+
+        refine_relpose(x1_inliers, x2_inliers, pair, opt_scaled.bundle);
+    }
+
+    pair->camera1.params[3] /= pair->camera1.focal() * pair->camera1.focal();
+    pair->camera2.params[3] /= pair->camera2.focal() * pair->camera2.focal();
+    pair->camera1.params[3] /= scale * scale;
+    pair->camera2.params[3] /= scale * scale;
+    pair->camera1.params[0] *= scale;
+    pair->camera2.params[0] *= scale;
 
     return stats;
 }

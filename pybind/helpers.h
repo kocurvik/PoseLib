@@ -97,6 +97,7 @@ void update_relative_pose_options(const py::dict &input, RelativePoseOptions &op
     }
     if(input.contains("bundle")) {
         opt.bundle.loss_scale = 0.5 * opt.max_error;
+        opt.bundle.shared_intrinsics = opt.shared_intrinsics;
         update_bundle_options(input["bundle"].cast<py::dict>(), opt.bundle);
     }
 }

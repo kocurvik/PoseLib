@@ -390,8 +390,8 @@ int relpose_k2Fk1_10pt(const std::vector<Eigen::Vector3d> &x1, const std::vector
         double k1 = Ls(0, i);
         double k2 = Ls(1, i);
 
-        Camera cam1 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, k1}, -1, -1);
-        Camera cam2 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, k2}, -1, -1);
+        Camera cam1 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, k1}, -1, -1);
+        Camera cam2 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, k2}, -1, -1);
         F_cam_pair->push_back(ProjectiveImagePair(F.transpose(), cam1, cam2));
     }
 

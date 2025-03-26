@@ -76,6 +76,7 @@ struct BundleOptions {
     bool refine_focal_length = false;
     bool refine_extra_params = false;
     bool refine_principal_point = false;
+    bool shared_intrinsics = false;
 };
 
 struct BundleStats {

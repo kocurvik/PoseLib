@@ -616,6 +616,25 @@ estimate_shared_rd_fundamental_wrapper(const std::vector<Eigen::Vector2d> points
     return std::make_pair(F_cam_pair, output_dict);
 }
 
+std::pair<ImagePair, py::dict>
+estimate_focal_rd_relpose_wrapper(const std::vector<Eigen::Vector2d> points2D_1,
+                                  const std::vector<Eigen::Vector2d> points2D_2, std::vector<double> ks,
+                                  const py::dict &opt_dict) {
+
+    RelativePoseOptions opt;
+    update_relative_pose_options(opt_dict, opt);
+
+    ImagePair pair;
+    std::vector<char> inlier_mask;
+
+    RansacStats stats = estimate_focal_rd_relpose(points2D_1, points2D_2, ks, opt, &pair, &inlier_mask);
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(pair, output_dict);
+}
+
 std::pair<Eigen::Matrix3d, py::dict> refine_fundamental_wrapper(const std::vector<Eigen::Vector2d> points2D_1,
                                                                 const std::vector<Eigen::Vector2d> points2D_2,
                                                                 const Eigen::Matrix3d initial_F,
@@ -1059,6 +1078,9 @@ PYBIND11_MODULE(poselib, m) {
           "Fundamental matrix + division model radial distortion with parameters shared by both cameras estimation "
           "with non-linear refinement. If rd_param_samples is empty uses 9pt solver, otherwise uses a sampling "
           "strategy + 7pt sovler.");
+    m.def("estimate_focal_rd_relpose", &poselib::estimate_focal_rd_relpose_wrapper, py::arg("points2D_1"),
+          py::arg("points2D_2"), py::arg("rd_param_samples") = py::list(), py::arg("opt") = py::dict(),
+          "...");
     m.def("estimate_homography", &poselib::estimate_homography_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
           py::arg("opt") = py::dict(), "Homography matrix estimation with non-linear refinement.");
     m.def("estimate_generalized_relative_pose", &poselib::estimate_generalized_relative_pose_wrapper,

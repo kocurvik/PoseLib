@@ -40,6 +40,14 @@ namespace poselib {
 int relpose_7pt(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2,
                 std::vector<Eigen::Matrix3d> *fundamental_matrices);
 
+void varying_focal_relpose_from_F(const std::vector<Eigen::Matrix3d> &Fs,
+                                  std::vector<Point3D> &x1h, std::vector<Point3D> &x2h,
+                                  ImagePairVector *models);
+
+void varying_focal_relpose_from_projective_pair(const std::vector<ProjectiveImagePair> &proj_pairs,
+                                                std::vector<Point3D> &x1s, std::vector<Point3D> &x2s,
+                                                ImagePairVector *models);
+
 }; // namespace poselib
 
 #endif

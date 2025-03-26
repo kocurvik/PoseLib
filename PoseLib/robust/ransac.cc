@@ -200,8 +200,8 @@ RansacStats ransac_rd_fundamental(const std::vector<Point2D> &x1, const std::vec
                                   std::vector<char> *best_inliers) {
 
     best_model->F.setIdentity();
-    best_model->camera1 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
-    best_model->camera2 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
+    best_model->camera1 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+    best_model->camera2 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
     RansacStats stats;
 
     RDFundamentalEstimator estimator(opt, x1, x2, ks, min_k, max_k);
@@ -218,8 +218,8 @@ RansacStats ransac_shared_rd_fundamental(const std::vector<Point2D> &x1, const s
                                          std::vector<char> *best_inliers) {
 
     best_model->F.setIdentity();
-    best_model->camera1 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
-    best_model->camera2 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
+    best_model->camera1 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+    best_model->camera2 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
     RansacStats stats;
 
     SharedRDFundamentalEstimator estimator(opt, x1, x2, ks, min_k, max_k);
@@ -227,6 +227,29 @@ RansacStats ransac_shared_rd_fundamental(const std::vector<Point2D> &x1, const s
 
     get_tangent_sampson_inliers(best_model->F, best_model->camera1, best_model->camera2, x1, x2,
                                 opt.max_error * opt.max_error, best_inliers);
+    return stats;
+}
+
+RansacStats ransac_focal_rd_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                    std::vector<double> &ks, const double min_k, const double max_k,
+                                    const RelativePoseOptions &opt, ImagePair *best_model,
+                                    std::vector<char> *best_inliers) {
+
+    best_model->pose = CameraPose();
+    best_model->camera1 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+    best_model->camera2 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+    RansacStats stats;
+
+    if (opt.shared_intrinsics){
+        assert(opt.bundle.shared_inrinsics);
+        SharedRDFocalRelposeEstimator estimator(opt, x1, x2, ks, min_k, max_k);
+        stats = ransac<SharedRDFocalRelposeEstimator, ImagePair>(estimator, opt.ransac, best_model);
+    } else {
+        RDFocalRelposeEstimator estimator(opt, x1, x2, ks, min_k, max_k);
+        stats = ransac<RDFocalRelposeEstimator, ImagePair>(estimator, opt.ransac, best_model);
+    }
+
+    get_tangent_sampson_inliers(*best_model, x1, x2, opt.max_error * opt.max_error, best_inliers);
     return stats;
 }
 

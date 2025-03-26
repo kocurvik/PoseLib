@@ -78,7 +78,7 @@ int relpose_kFk_9pt(const std::vector<Eigen::Vector3d> &x1, const std::vector<Ei
         Eigen::Matrix3d F;
         F << f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8];
 
-        Camera cam = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, lambda}, -1, -1);
+        Camera cam = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, lambda}, -1, -1);
         models->emplace_back(ProjectiveImagePair(F, cam, cam));
     }
 

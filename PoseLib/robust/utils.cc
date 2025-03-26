@@ -231,6 +231,43 @@ double compute_tangent_sampson_msac_score(const Eigen::Matrix3d &F, const std::v
     return score;
 }
 
+
+// Returns MSAC score of the Tangent Sampson error (no cheirality check)
+double compute_tangent_sampson_msac_score(const ImagePair &pair, const std::vector<Point2D> &x1,
+                                          const std::vector<Point2D> &x2, double sq_threshold, size_t *inlier_count) {
+    *inlier_count = 0;
+    double score = 0;
+
+    Eigen::Matrix3d E;
+    essential_from_motion(pair.pose, &E);
+
+    const Camera &camera1 = pair.camera1;
+    const Camera &camera2 = pair.camera2;
+
+    for (size_t i = 0; i < x1.size(); ++i) {
+        Eigen::Matrix<double, 3, 1> d1, d2;
+        Eigen::Matrix<double, 3, 2> M1, M2;
+        camera1.unproject_with_jac(x1[i], &d1, &M1);
+        camera2.unproject_with_jac(x2[i], &d2, &M2);
+
+        double C = d2.dot(E * d1);
+        double denom2 = (M2.transpose() * E * d1).squaredNorm() +
+                        (M1.transpose() * E.transpose() * d2).squaredNorm();
+        double r2 = C * C / denom2;
+
+        if (r2 < sq_threshold) {
+            (*inlier_count)++;
+            score += r2;
+        } else {
+            score += sq_threshold;
+        }
+    }
+
+    return score;
+}
+
+
+
 double compute_tangent_sampson_msac_score(const CameraPose &pose, const std::vector<Point3D> &d1,
                                           const std::vector<Point3D> &d2,
                                           const std::vector<Eigen::Matrix<double, 3, 2>> &M1,
@@ -478,6 +515,34 @@ int get_tangent_sampson_inliers(const Eigen::Matrix3d &F, const Camera &cam1, co
 
         double C = d2.dot(F * d1);
         double denom2 = (M2.transpose() * F * d1).squaredNorm() + (M1.transpose() * F.transpose() * d2).squaredNorm();
+        double r2 = C * C / denom2;
+
+        bool inlier = (r2 < sq_threshold);
+        if (inlier) {
+            inlier_count++;
+        }
+        (*inliers)[i] = inlier;
+    }
+    return inlier_count;
+}
+
+// Compute inliers for relative pose estimation (using Sampson error)
+int get_tangent_sampson_inliers(const ImagePair &pair, const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                double sq_threshold, std::vector<char> *inliers) {
+    inliers->resize(x1.size());
+    size_t inlier_count = 0.0;
+
+    Eigen::Matrix3d E;
+    essential_from_motion(pair.pose, &E);
+
+    for (size_t i = 0; i < x1.size(); ++i) {
+        Eigen::Matrix<double, 3, 1> d1, d2;
+        Eigen::Matrix<double, 3, 2> M1, M2;
+        pair.camera1.unproject_with_jac(x1[i], &d1, &M1);
+        pair.camera2.unproject_with_jac(x2[i], &d2, &M2);
+
+        double C = d2.dot(E * d1);
+        double denom2 = (M2.transpose() * E * d1).squaredNorm() + (M1.transpose() * E.transpose() * d2).squaredNorm();
         double r2 = C * C / denom2;
 
         bool inlier = (r2 < sq_threshold);

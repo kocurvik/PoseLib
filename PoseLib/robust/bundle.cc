@@ -251,8 +251,8 @@ BundleStats refine_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
         IterationCallback callback = setup_callback(opt);
         std::vector<size_t> camera1_refine_idx = pair->camera1.get_param_refinement_idx(opt);
         std::vector<size_t> camera2_refine_idx = pair->camera2.get_param_refinement_idx(opt);
-        CameraRelativePoseRefiner<decltype(weights)> refiner(x1, x2, camera1_refine_idx, camera2_refine_idx, false,
-                                                             weights);
+        CameraRelativePoseRefiner<decltype(weights)> refiner(x1, x2, camera1_refine_idx, camera2_refine_idx,
+                                                             opt.shared_intrinsics, weights);
         return lm_impl<decltype(refiner)>(refiner, pair, opt, callback);
     }
 }

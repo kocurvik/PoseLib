@@ -166,8 +166,8 @@ class RDFundamentalRefiner : public RefinerBase<FactorizedProjectiveImagePair, A
             -F(2, 2), 0, F(0, 2), F(1, 1), -F(1, 0), 0, d_sigma(1, 2), F(1, 2), -F(0, 2), 0, F(2, 1), -F(2, 0), 0,
             d_sigma(2, 2);
 
-        double k1 = proj_image_pair.camera1.params[4];
-        double k2 = proj_image_pair.camera2.params[4];
+        double k1 = proj_image_pair.camera1.params[3];
+        double k2 = proj_image_pair.camera2.params[3];
 
         for (size_t i = 0; i < x1.size(); ++i) {
             double x1_sq = x1[i].squaredNorm();
@@ -314,9 +314,9 @@ class RDFundamentalRefiner : public RefinerBase<FactorizedProjectiveImagePair, A
         F_new.sigma = F.sigma + dp(6);
 
         Camera camera1_new = Camera(
-            "DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, proj_image_pair.camera1.params[4] + dp(7)}, -1, -1);
+            "SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, proj_image_pair.camera1.params[3] + dp(7)}, -1, -1);
         Camera camera2_new = Camera(
-            "DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, proj_image_pair.camera2.params[4] + dp(8)}, -1, -1);
+            "SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, proj_image_pair.camera2.params[3] + dp(8)}, -1, -1);
 
         return FactorizedProjectiveImagePair(F_new, camera1_new, camera2_new);
     }
@@ -374,7 +374,7 @@ class SharedRDFundamentalRefiner : public RefinerBase<FactorizedProjectiveImageP
             -F(2, 2), 0, F(0, 2), F(1, 1), -F(1, 0), 0, d_sigma(1, 2), F(1, 2), -F(0, 2), 0, F(2, 1), -F(2, 0), 0,
             d_sigma(2, 2);
 
-        double k = proj_image_pair.camera1.params[4];
+        double k = proj_image_pair.camera1.params[3];
 
         for (size_t i = 0; i < x1.size(); ++i) {
             double x1_sq = x1[i].squaredNorm();
@@ -517,9 +517,9 @@ class SharedRDFundamentalRefiner : public RefinerBase<FactorizedProjectiveImageP
         F_new.sigma = F.sigma + dp(6);
 
         Camera camera1_new = Camera(
-            "DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, proj_image_pair.camera1.params[4] + dp(7)}, -1, -1);
+            "SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, proj_image_pair.camera1.params[3] + dp(7)}, -1, -1);
         Camera camera2_new = Camera(
-            "DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, proj_image_pair.camera1.params[4] + dp(7)}, -1, -1);
+            "SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, proj_image_pair.camera1.params[3] + dp(7)}, -1, -1);
 
         return FactorizedProjectiveImagePair(F_new, camera1_new, camera2_new);
     }

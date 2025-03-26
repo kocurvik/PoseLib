@@ -97,6 +97,10 @@ RansacStats estimate_shared_rd_fundamental(const std::vector<Point2D> &x1, const
                                            std::vector<double> &ks, const RelativePoseOptions &opt,
                                            ProjectiveImagePair *F_cam_pair, std::vector<char> *inliers);
 
+RansacStats estimate_focal_rd_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                      std::vector<double> &ks, const RelativePoseOptions &opt,
+                                      ImagePair *pair, std::vector<char> *inliers);
+
 // Estimates a homography matrix using LO-RANSAC followed by non-linear refinement
 // Convention is x2 = H*x1
 // Threshold for transfer error is set by RansacOptions.max_reproj_error

@@ -309,8 +309,8 @@ void RDFundamentalEstimator::generate_models(std::vector<ProjectiveImagePair> *m
     //  solver with list of def vals
     for (double k1 : rd_vals) {
         for (double k2 : rd_vals) {
-            Camera cam1 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, k1}, -1, -1);
-            Camera cam2 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, k2}, -1, -1);
+            Camera cam1 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, k1}, -1, -1);
+            Camera cam2 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, k2}, -1, -1);
             for (size_t k = 0; k < sample_sz; ++k) {
                 cam1.unproject(x1[sample[k]], &x1s[k]);
                 cam2.unproject(x2[sample[k]], &x2s[k]);
@@ -354,8 +354,8 @@ void SharedRDFundamentalEstimator::generate_models(std::vector<ProjectiveImagePa
 
     //  solver with list of def vals
     for (double k_param : rd_vals) {
-        Camera cam1 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, k_param}, -1, -1);
-        Camera cam2 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, k_param}, -1, -1);
+        Camera cam1 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, k_param}, -1, -1);
+        Camera cam2 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, k_param}, -1, -1);
         for (size_t k = 0; k < sample_sz; ++k) {
             cam1.unproject(x1[sample[k]], &x1s[k]);
             cam2.unproject(x2[sample[k]], &x2s[k]);
@@ -381,5 +381,112 @@ void SharedRDFundamentalEstimator::refine_model(ProjectiveImagePair *F_cam_pair)
     bundle_opt.loss_scale = opt.max_error;
 
     refine_shared_rd_fundamental(x1, x2, F_cam_pair, bundle_opt);
+}
+
+void RDFocalRelposeEstimator::generate_models(std::vector<ImagePair> *models) {
+    sampler.generate_sample(&sample);
+
+    // The standard 10pt solver
+    if (rd_vals.empty()) {
+        std::vector<ProjectiveImagePair> F_models;
+        for (size_t k = 0; k < sample_sz; ++k) {
+            x1s[k] = x1[sample[k]].homogeneous();
+            x2s[k] = x2[sample[k]].homogeneous();
+        }
+        relpose_k2Fk1_10pt(x1s, x2s, &F_models);
+        models->reserve(F_models.size());
+        varying_focal_relpose_from_projective_pair(F_models, x1s, x2s, models);
+        return;
+    }
+
+    //  solver with list of def vals
+    for (double k1 : rd_vals) {
+        for (double k2 : rd_vals) {
+            Camera cam1 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, k1}, -1, -1);
+            Camera cam2 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, k2}, -1, -1);
+            for (size_t k = 0; k < sample_sz; ++k) {
+                cam1.unproject(x1[sample[k]], &x1s[k]);
+                cam2.unproject(x2[sample[k]], &x2s[k]);
+            }
+
+            std::vector<Eigen::Matrix3d> local_F_models;
+            local_F_models.reserve(3);
+            relpose_7pt(x1s, x2s, &local_F_models);
+            std::vector<ImagePair> local_image_pair_models;
+            local_image_pair_models.reserve(local_F_models.size());
+            varying_focal_relpose_from_F(local_F_models, x1s, x2s, &local_image_pair_models);
+
+            models->reserve(models->size() + distance(local_image_pair_models.begin(), local_image_pair_models.end()));
+            for (ImagePair &image_pair : local_image_pair_models){
+                Camera camera1 = Camera("SIMPLE_DIVISION", {image_pair.camera1.focal(), 0.0, 0.0, k1}, -1, -1);
+                Camera camera2 = Camera("SIMPLE_DIVISION", {image_pair.camera2.focal(), 0.0, 0.0, k2}, -1, -1);
+                models->emplace_back(image_pair.pose, camera1, camera2);
+            }
+        }
+    }
+}
+
+double RDFocalRelposeEstimator::score_model(const ImagePair &image_pair, size_t *inlier_count) {
+    return compute_tangent_sampson_msac_score(image_pair, x1, x2, opt.max_error * opt.max_error, inlier_count);
+}
+
+void RDFocalRelposeEstimator::refine_model(ImagePair *image_pair) {
+    BundleOptions bundle_opt = opt.bundle;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_error;
+    bundle_opt.max_iterations = 25;
+
+    refine_relpose(x1, x2, image_pair, bundle_opt);
+//    refine_rd_fundamental(x1, x2, F_cam_pair, bundle_opt);
+}
+
+void SharedRDFocalRelposeEstimator::generate_models(std::vector<ImagePair> *models) {
+    sampler.generate_sample(&sample);
+
+    // The standard 10pt solver
+    if (rd_vals.empty()) {
+        for (size_t k = 0; k < sample_sz; ++k) {
+            x1s[k] = x1[sample[k]].homogeneous();
+            x2s[k] = x2[sample[k]].homogeneous();
+        }
+        std::vector<ProjectiveImagePair> F_models;
+        relpose_kFk_9pt(x1s, x2s, &F_models);
+
+        models->reserve(F_models.size());
+
+        varying_focal_relpose_from_projective_pair(F_models, x1s, x2s, models);
+
+        return;
+    }
+
+    //  solver with list of def vals
+    for (double k_param : rd_vals) {
+        Camera cam = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, k_param}, -1, -1);
+        for (size_t k = 0; k < sample_sz; ++k) {
+            cam.unproject(x1[sample[k]], &x1s[k]);
+            cam.unproject(x2[sample[k]], &x2s[k]);
+        }
+
+        std::vector<ImagePair> local_models;
+        relpose_6pt_shared_focal(x1s, x2s, &local_models);
+        models->reserve(models->size() + distance(local_models.begin(), local_models.end()));
+        for (const ImagePair &image_pair : local_models) {
+            Camera camera = Camera("SIMPLE_DIVISION", {image_pair.camera1.focal(), 0.0, 0.0, k_param}, -1, -1);
+            models->emplace_back(image_pair.pose, camera, camera);
+        }
+    }
+}
+
+double SharedRDFocalRelposeEstimator::score_model(const ImagePair &image_pair, size_t *inlier_count) {
+    return compute_tangent_sampson_msac_score(image_pair, x1, x2, opt.max_error * opt.max_error, inlier_count);
+}
+
+void SharedRDFocalRelposeEstimator::refine_model(ImagePair *image_pair) {
+    BundleOptions bundle_opt = opt.bundle;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_error;
+    bundle_opt.max_iterations = 25;
+
+    refine_relpose(x1, x2, image_pair, bundle_opt);
 }
 } // namespace poselib
