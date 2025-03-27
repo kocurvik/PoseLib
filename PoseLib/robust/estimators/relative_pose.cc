@@ -35,6 +35,8 @@
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
 #include "PoseLib/solvers/relpose_k2Fk1_10pt.h"
+#include "PoseLib/solvers/relpose_k2Fk1_9pt.h"
+#include "PoseLib/solvers/relpose_kFk_8pt.h"
 #include "PoseLib/solvers/relpose_kFk_9pt.h"
 
 #include <iostream>
@@ -393,7 +395,12 @@ void RDFocalRelposeEstimator::generate_models(std::vector<ImagePair> *models) {
             x1s[k] = x1[sample[k]].homogeneous();
             x2s[k] = x2[sample[k]].homogeneous();
         }
-        relpose_k2Fk1_10pt(x1s, x2s, &F_models);
+
+        if (opt.use_minimal) {
+            relpose_k2Fk1_9pt(x1s, x2s, &F_models);
+        } else {
+            relpose_k2Fk1_10pt(x1s, x2s, &F_models);
+        }
         models->reserve(F_models.size());
         varying_focal_relpose_from_projective_pair(F_models, x1s, x2s, models);
         return;
@@ -450,11 +457,16 @@ void SharedRDFocalRelposeEstimator::generate_models(std::vector<ImagePair> *mode
             x2s[k] = x2[sample[k]].homogeneous();
         }
         std::vector<ProjectiveImagePair> F_models;
-        relpose_kFk_9pt(x1s, x2s, &F_models);
+
+        if (opt.use_minimal) {
+            relpose_kFk_8pt(x1s, x2s, &F_models);
+        } else {
+            relpose_kFk_9pt(x1s, x2s, &F_models);
+        }
 
         models->reserve(F_models.size());
 
-        varying_focal_relpose_from_projective_pair(F_models, x1s, x2s, models);
+        shared_focal_relpose_from_projective_pair(F_models, x1s, x2s, models);
 
         return;
     }

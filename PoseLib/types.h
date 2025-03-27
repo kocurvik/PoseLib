@@ -121,6 +121,7 @@ struct RelativePoseOptions {
     bool estimate_extra_params = false;
     bool shared_intrinsics = false;
     bool tangent_sampson = false;
+    bool use_minimal = true;
 
     // Whether we should use real focal length checking: https://arxiv.org/abs/2311.16304
     // Assumes that principal points of both cameras are at origin.

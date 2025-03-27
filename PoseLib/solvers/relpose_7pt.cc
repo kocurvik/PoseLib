@@ -127,4 +127,39 @@ void varying_focal_relpose_from_projective_pair(const std::vector<ProjectiveImag
     }
 }
 
+void shared_focal_relpose_from_projective_pair(const std::vector<ProjectiveImagePair> &proj_pairs,
+                                                std::vector<Point3D> &x1s, std::vector<Point3D> &x2s,
+                                                ImagePairVector *models) {
+    for (const ProjectiveImagePair &proj_pair : proj_pairs) {
+
+        double focal = shared_focals_from_fundamental(proj_pair.F, Eigen::Vector2d::Zero());
+
+
+        if (std::isnan(focal))
+            continue;
+
+        Camera camera = Camera("SIMPLE_DIVISION", {focal, 0, 0, proj_pair.camera1.params[3]}, -1, -1);
+
+        Eigen::DiagonalMatrix<double, 3> K(focal, focal, 1.0);
+
+        Eigen::Matrix3d E = K * proj_pair.F * K;
+
+        std::vector<CameraPose> poses;
+
+        std::vector<Point3D> x1h(x1s.size());
+        std::vector<Point3D> x2h(x1s.size());
+
+        for (size_t i = 0; i < x1s.size(); ++i){
+            camera.unproject(x1s[i].hnormalized(), &x1h[i]);
+            camera.unproject(x2s[i].hnormalized(), &x2h[i]);
+        }
+
+        motion_from_essential(E, x1h, x2h, &poses);
+
+        for (const CameraPose &pose : poses) {
+            models->emplace_back(pose, camera, camera);
+        }
+    }
+}
+
 } // namespace poselib

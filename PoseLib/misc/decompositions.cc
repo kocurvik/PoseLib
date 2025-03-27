@@ -3,6 +3,26 @@
 #include "PoseLib/misc/camera_models.h"
 
 namespace poselib {
+double shared_focals_from_fundamental(const Eigen::Matrix3d &F, const Point2D &pp) {
+    Eigen::Matrix3d T;
+    T << 1.0, 0.0, pp(0), 0.0, 1.0, pp(1), 0.0, 0.0, 1.0;
+    Eigen::Matrix3d G = T.transpose() * F * T;
+
+    Eigen::JacobiSVD<Eigen::Matrix3d> svd(G, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    double a = svd.singularValues()[0];
+    double b = svd.singularValues()[1];
+
+    double u13 = svd.matrixU()(2, 0);
+    double u23 = svd.matrixU()(2, 1);
+    double v13 = svd.matrixV()(2, 0);
+    double v23 = svd.matrixV()(2, 1);
+
+    double la1 = a * u13 * u23 * (1 - v13 * v13) + b * v13 * v23 * (1 - u23 * u23);
+    double lb1 = u23 * v13 * (a * u13 * v13 + b * u23 * v23);
+
+    return sqrt(-lb1 / la1);
+}
+
 std::pair<Camera, Camera> focals_from_fundamental(const Eigen::Matrix3d &F, const Point2D &pp1, const Point2D &pp2) {
     Eigen::Vector3d p1 = pp1.homogeneous();
     Eigen::Vector3d p2 = pp2.homogeneous();

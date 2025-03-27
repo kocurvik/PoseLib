@@ -92,6 +92,7 @@ void update_relative_pose_options(const py::dict &input, RelativePoseOptions &op
     update(input, "shared_intrinsics", opt.shared_intrinsics);
     update(input, "tangent_sampson", opt.tangent_sampson);
     update(input, "real_focal_check", opt.real_focal_check);
+    update(input, "use_minimal", opt.use_minimal);
     if(input.contains("ransac")) {
         update_ransac_options(input["ransac"].cast<py::dict>(), opt.ransac);
     }

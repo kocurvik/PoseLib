@@ -283,7 +283,7 @@ class RDFocalRelposeEstimator {
     RDFocalRelposeEstimator(const RelativePoseOptions &opt, const std::vector<Point2D> &points2D_1,
                             const std::vector<Point2D> &points2D_2, const std::vector<double> &ks, const double min_k,
                             const double max_k)
-        : sample_sz(ks.empty() ? 10 : 7), num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2),
+        : sample_sz(ks.empty() ? (opt.use_minimal ? 9 : 10) : 7), num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2),
           sampler(num_data, sample_sz, opt.ransac), min_k(min_k), max_k(max_k) {
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);
@@ -320,7 +320,7 @@ class SharedRDFocalRelposeEstimator {
     SharedRDFocalRelposeEstimator(const RelativePoseOptions &opt, const std::vector<Point2D> &points2D_1,
                                   const std::vector<Point2D> &points2D_2, const std::vector<double> &ks,
                                   const double min_k, const double max_k)
-        : sample_sz(ks.empty() ? 9 : 7), num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2),
+        : sample_sz(ks.empty() ? (opt.use_minimal ? 8 : 9) : 6), num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2),
           sampler(num_data, sample_sz, opt.ransac), min_k(min_k), max_k(max_k) {
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);

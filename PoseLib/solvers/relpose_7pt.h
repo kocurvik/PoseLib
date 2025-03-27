@@ -48,6 +48,10 @@ void varying_focal_relpose_from_projective_pair(const std::vector<ProjectiveImag
                                                 std::vector<Point3D> &x1s, std::vector<Point3D> &x2s,
                                                 ImagePairVector *models);
 
+void shared_focal_relpose_from_projective_pair(const std::vector<ProjectiveImagePair> &proj_pairs,
+                                               std::vector<Point3D> &x1s, std::vector<Point3D> &x2s,
+                                               ImagePairVector *models);
+
 }; // namespace poselib
 
 #endif

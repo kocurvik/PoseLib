@@ -29,7 +29,11 @@ set(SOURCES
     solvers/relpose_7pt.cc
     solvers/relpose_6pt_focal.cc
     solvers/relpose_k2Fk1_10pt.cc
+    solvers/relpose_k2Fk1_9pt.cc
+    solvers/relpose_k2Fk1_9pt_utils.cc
+    solvers/rd_utils.cc
     solvers/relpose_kFk_9pt.cc
+    solvers/relpose_kFk_8pt.cc
     solvers/gen_relpose_upright_4pt.cc
     solvers/gen_relpose_5p1pt.cc
     solvers/gen_relpose_6pt.cc
@@ -85,7 +89,11 @@ set(HEADERS_PUBLIC
     solvers/relpose_7pt.h
     solvers/relpose_6pt_focal.h
     solvers/relpose_k2Fk1_10pt.h
+    solvers/relpose_k2Fk1_9pt.h
+    solvers/relpose_k2Fk1_9pt_utils.h
+    solvers/rd_utils.h
     solvers/relpose_kFk_9pt.h
+    solvers/relpose_kFk_8pt.h
     solvers/gen_relpose_upright_4pt.h
     solvers/gen_relpose_5p1pt.h
     solvers/gen_relpose_6pt.h
