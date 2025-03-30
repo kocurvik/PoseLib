@@ -510,8 +510,8 @@ void RelposeLOEstimator::generate_models(std::vector<ImagePair> *models) {
 
     sampler.generate_sample(&sample);
     for (size_t k = 0; k < sample_sz; ++k) {
-        x1s[k] = x1[sample[k]].homogeneous().normalized();
-        x2s[k] = x2[sample[k]].homogeneous().normalized();
+        x1s[k] = x1u[sample[k]].homogeneous().normalized();
+        x2s[k] = x2u[sample[k]].homogeneous().normalized();
     }
     std::vector<CameraPose> pose_models;
     relpose_5pt(x1s, x2s, &pose_models);
