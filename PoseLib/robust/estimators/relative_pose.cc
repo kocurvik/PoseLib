@@ -517,7 +517,7 @@ void RelposeLOEstimator::generate_models(std::vector<ImagePair> *models) {
     relpose_5pt(x1s, x2s, &pose_models);
 
     models->reserve(pose_models.size());
-    for (CameraPose pose : pose_models){
+    for (const CameraPose& pose : pose_models){
         models->emplace_back(ImagePair(pose, camera_1, camera_2));
     }
 }
