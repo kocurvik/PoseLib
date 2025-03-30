@@ -389,7 +389,7 @@ void RDFocalRelposeEstimator::generate_models(std::vector<ImagePair> *models) {
     sampler.generate_sample(&sample);
 
     // The standard 10pt solver
-    if (rd_vals.empty()) {
+    if (rd_vals_1.empty()) {
         std::vector<ProjectiveImagePair> F_models;
         for (size_t k = 0; k < sample_sz; ++k) {
             x1s[k] = x1[sample[k]].homogeneous();
@@ -407,8 +407,8 @@ void RDFocalRelposeEstimator::generate_models(std::vector<ImagePair> *models) {
     }
 
     //  solver with list of def vals
-    for (double k1 : rd_vals) {
-        for (double k2 : rd_vals) {
+    for (double k1 : rd_vals_1) {
+        for (double k2 : rd_vals_2) {
             Camera cam1 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, k1}, -1, -1);
             Camera cam2 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, k2}, -1, -1);
             for (size_t k = 0; k < sample_sz; ++k) {
@@ -425,8 +425,10 @@ void RDFocalRelposeEstimator::generate_models(std::vector<ImagePair> *models) {
 
             models->reserve(models->size() + distance(local_image_pair_models.begin(), local_image_pair_models.end()));
             for (ImagePair &image_pair : local_image_pair_models){
-                Camera camera1 = Camera("SIMPLE_DIVISION", {image_pair.camera1.focal(), 0.0, 0.0, k1}, -1, -1);
-                Camera camera2 = Camera("SIMPLE_DIVISION", {image_pair.camera2.focal(), 0.0, 0.0, k2}, -1, -1);
+                double scaled_k1 = image_pair.camera1.focal() * image_pair.camera1.focal() * k1;
+                double scaled_k2 = image_pair.camera2.focal() * image_pair.camera2.focal() * k2;
+                Camera camera1 = Camera("SIMPLE_DIVISION", {image_pair.camera1.focal(), 0.0, 0.0, scaled_k1}, -1, -1);
+                Camera camera2 = Camera("SIMPLE_DIVISION", {image_pair.camera2.focal(), 0.0, 0.0, scaled_k2}, -1, -1);
                 models->emplace_back(image_pair.pose, camera1, camera2);
             }
         }
@@ -483,7 +485,8 @@ void SharedRDFocalRelposeEstimator::generate_models(std::vector<ImagePair> *mode
         relpose_6pt_shared_focal(x1s, x2s, &local_models);
         models->reserve(models->size() + distance(local_models.begin(), local_models.end()));
         for (const ImagePair &image_pair : local_models) {
-            Camera camera = Camera("SIMPLE_DIVISION", {image_pair.camera1.focal(), 0.0, 0.0, k_param}, -1, -1);
+            double scaled_k_param = image_pair.camera1.focal() * image_pair.camera1.focal() * k_param;
+            Camera camera = Camera("SIMPLE_DIVISION", {image_pair.camera1.focal(), 0.0, 0.0, scaled_k_param}, -1, -1);
             models->emplace_back(image_pair.pose, camera, camera);
         }
     }
@@ -501,4 +504,36 @@ void SharedRDFocalRelposeEstimator::refine_model(ImagePair *image_pair) {
 
     refine_relpose(x1, x2, image_pair, bundle_opt);
 }
+
+void RelposeLOEstimator::generate_models(std::vector<ImagePair> *models) {
+    sampler.generate_sample(&sample);
+
+    sampler.generate_sample(&sample);
+    for (size_t k = 0; k < sample_sz; ++k) {
+        x1s[k] = x1[sample[k]].homogeneous().normalized();
+        x2s[k] = x2[sample[k]].homogeneous().normalized();
+    }
+    std::vector<CameraPose> pose_models;
+    relpose_5pt(x1s, x2s, &pose_models);
+
+    models->reserve(pose_models.size());
+    for (CameraPose pose : pose_models){
+        models->emplace_back(ImagePair(pose, camera_1, camera_2));
+    }
+}
+
+double RelposeLOEstimator::score_model(const ImagePair &image_pair, size_t *inlier_count) {
+    return compute_tangent_sampson_msac_score(image_pair, x1, x2, opt.max_error * opt.max_error, inlier_count);
+}
+
+void RelposeLOEstimator::refine_model(ImagePair *image_pair) {
+    BundleOptions bundle_opt = opt.bundle;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_error;
+    bundle_opt.max_iterations = 25;
+
+    refine_relpose(x1, x2, image_pair, bundle_opt);
+}
+
+
 } // namespace poselib

@@ -231,8 +231,8 @@ RansacStats ransac_shared_rd_fundamental(const std::vector<Point2D> &x1, const s
 }
 
 RansacStats ransac_focal_rd_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                    std::vector<double> &ks, const double min_k, const double max_k,
-                                    const RelativePoseOptions &opt, ImagePair *best_model,
+                                    std::vector<double> &ks_1, std::vector<double> &ks_2, const double min_k,
+                                    const double max_k, const RelativePoseOptions &opt, ImagePair *best_model,
                                     std::vector<char> *best_inliers) {
 
     best_model->pose = CameraPose();
@@ -242,12 +242,28 @@ RansacStats ransac_focal_rd_relpose(const std::vector<Point2D> &x1, const std::v
 
     if (opt.shared_intrinsics){
         assert(opt.bundle.shared_inrinsics);
-        SharedRDFocalRelposeEstimator estimator(opt, x1, x2, ks, min_k, max_k);
+        SharedRDFocalRelposeEstimator estimator(opt, x1, x2, ks_1, min_k, max_k);
         stats = ransac<SharedRDFocalRelposeEstimator, ImagePair>(estimator, opt.ransac, best_model);
     } else {
-        RDFocalRelposeEstimator estimator(opt, x1, x2, ks, min_k, max_k);
+        RDFocalRelposeEstimator estimator(opt, x1, x2, ks_1, ks_2, min_k, max_k);
         stats = ransac<RDFocalRelposeEstimator, ImagePair>(estimator, opt.ransac, best_model);
     }
+
+    get_tangent_sampson_inliers(*best_model, x1, x2, opt.max_error * opt.max_error, best_inliers);
+    return stats;
+}
+
+RansacStats ransac_relpose_lo(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                              const Camera &camera_1, const Camera &camera_2, const RelativePoseOptions &opt,
+                              ImagePair *best_model, std::vector<char> *best_inliers) {
+
+    best_model->pose = CameraPose();
+    best_model->camera1 = camera_1;
+    best_model->camera2 = camera_2;
+    RansacStats stats;
+
+    RelposeLOEstimator estimator(opt, x1, x2, camera_1, camera_2);
+    stats = ransac<RelposeLOEstimator, ImagePair>(estimator, opt.ransac, best_model);
 
     get_tangent_sampson_inliers(*best_model, x1, x2, opt.max_error * opt.max_error, best_inliers);
     return stats;

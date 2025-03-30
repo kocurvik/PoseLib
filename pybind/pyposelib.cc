@@ -495,6 +495,30 @@ std::pair<CameraPose, py::dict> estimate_relative_pose_wrapper(const std::vector
     return std::make_pair(pose, output_dict);
 }
 
+std::pair<ImagePair, py::dict> estimate_relative_pose_lo_wrapper(const std::vector<Eigen::Vector2d> points2D_1,
+                                                                 const std::vector<Eigen::Vector2d> points2D_2,
+                                                                 const py::dict &camera1_dict,
+                                                                 const py::dict &camera2_dict,
+                                                                 const py::dict &opt_dict) {
+
+    Camera camera1 = camera_from_dict(camera1_dict);
+    Camera camera2 = camera_from_dict(camera2_dict);
+
+    RelativePoseOptions opt;
+    update_relative_pose_options(opt_dict, opt);
+
+    ImagePair image_pair;
+    std::vector<char> inlier_mask;
+
+    RansacStats stats = estimate_relative_pose_lo(points2D_1, points2D_2, camera1, camera2, opt, &image_pair,
+                                                  &inlier_mask);
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(image_pair, output_dict);
+}
+
 std::pair<ImagePair, py::dict>
 estimate_shared_focal_relative_pose_wrapper(const std::vector<Eigen::Vector2d> points2D_1,
                                             const std::vector<Eigen::Vector2d> points2D_2, const Eigen::Vector2d pp,
@@ -618,7 +642,8 @@ estimate_shared_rd_fundamental_wrapper(const std::vector<Eigen::Vector2d> points
 
 std::pair<ImagePair, py::dict>
 estimate_focal_rd_relpose_wrapper(const std::vector<Eigen::Vector2d> points2D_1,
-                                  const std::vector<Eigen::Vector2d> points2D_2, std::vector<double> ks,
+                                  const std::vector<Eigen::Vector2d> points2D_2, std::vector<double> ks_1,
+                                  std::vector<double> ks_2,
                                   const py::dict &opt_dict) {
 
     RelativePoseOptions opt;
@@ -627,7 +652,7 @@ estimate_focal_rd_relpose_wrapper(const std::vector<Eigen::Vector2d> points2D_1,
     ImagePair pair;
     std::vector<char> inlier_mask;
 
-    RansacStats stats = estimate_focal_rd_relpose(points2D_1, points2D_2, ks, opt, &pair, &inlier_mask);
+    RansacStats stats = estimate_focal_rd_relpose(points2D_1, points2D_2, ks_1, ks_2, opt, &pair, &inlier_mask);
 
     py::dict output_dict;
     write_to_dict(stats, output_dict);
@@ -1061,6 +1086,9 @@ PYBIND11_MODULE(poselib, m) {
     m.def("estimate_relative_pose", &poselib::estimate_relative_pose_wrapper, py::arg("points2D_1"),
           py::arg("points2D_2"), py::arg("camera1_dict"), py::arg("camera2_dict"), py::arg("opt") = py::dict(),
           "Relative pose estimation with non-linear refinement.");
+    m.def("estimate_relative_pose_lo", &poselib::estimate_relative_pose_lo_wrapper, py::arg("points2D_1"),
+          py::arg("points2D_2"), py::arg("camera1_dict"), py::arg("camera2_dict"), py::arg("opt") = py::dict(),
+          "Relative pose estimation with non-linear refinement.");
     m.def("estimate_shared_focal_relative_pose", &poselib::estimate_shared_focal_relative_pose_wrapper,
           py::arg("points2D_1"), py::arg("points2D_2"), py::arg("pp") = Eigen::Vector2d::Zero(),
           py::arg("opt") = py::dict(),
@@ -1079,8 +1107,8 @@ PYBIND11_MODULE(poselib, m) {
           "with non-linear refinement. If rd_param_samples is empty uses 9pt solver, otherwise uses a sampling "
           "strategy + 7pt sovler.");
     m.def("estimate_focal_rd_relpose", &poselib::estimate_focal_rd_relpose_wrapper, py::arg("points2D_1"),
-          py::arg("points2D_2"), py::arg("rd_param_samples") = py::list(), py::arg("opt") = py::dict(),
-          "...");
+          py::arg("points2D_2"), py::arg("rd_param_samples_1") = py::list(), py::arg("rd_param_samples_2") = py::list(),
+          py::arg("opt") = py::dict(), "...");
     m.def("estimate_homography", &poselib::estimate_homography_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
           py::arg("opt") = py::dict(), "Homography matrix estimation with non-linear refinement.");
     m.def("estimate_generalized_relative_pose", &poselib::estimate_generalized_relative_pose_wrapper,

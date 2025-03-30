@@ -83,9 +83,13 @@ RansacStats ransac_shared_rd_fundamental(const std::vector<Point2D> &x1, const s
                                          std::vector<char> *best_inliers);
 
 RansacStats ransac_focal_rd_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                    std::vector<double> &ks, const double min_k, const double max_k,
-                                    const RelativePoseOptions &opt, ImagePair *best_model,
+                                    std::vector<double> &ks_1, std::vector<double> &ks_2, const double min_k,
+                                    const double max_k, const RelativePoseOptions &opt, ImagePair *best_model,
                                     std::vector<char> *best_inliers);
+
+RansacStats ransac_relpose_lo(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                              const Camera &camera_1, const Camera &camera_2, const RelativePoseOptions &opt,
+                              ImagePair *best_model, std::vector<char> *best_inliers);
 
 RansacStats ransac_homography(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                               const HomographyOptions &opt, Eigen::Matrix3d *best_model,
