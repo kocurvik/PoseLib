@@ -67,11 +67,15 @@ RansacStats estimate_absolute_pose_pnpl(const std::vector<Point2D> &points2D, co
 // Threshold for Sampson error is set by RansacOptions.max_epipolar_error
 RansacStats estimate_relative_pose(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
                                    const Camera &camera1, const Camera &camera2, const RelativePoseOptions &opt,
-                                   CameraPose *relative_pose, std::vector<char> *inliers);
+                                   CameraPose *relative_pose, std::vector<char> *inliers,
+                                   const Eigen::Vector3d &gcam_1 = Eigen::Vector3d::Zero(),
+                                   const Eigen::Vector3d &gcam_2 = Eigen::Vector3d::Zero());
 
 RansacStats estimate_relative_pose_lo(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                       const Camera &camera1, const Camera &camera2, const RelativePoseOptions &opt,
-                                      ImagePair *pair, std::vector<char> *inliers);
+                                      ImagePair *pair, std::vector<char> *inliers,
+                                      const Eigen::Vector3d &gcam_1 = Eigen::Vector3d::Zero(),
+                                      const Eigen::Vector3d &gcam_2 = Eigen::Vector3d::Zero());
 
 // Estimates relative pose with shared unknown focal length using LO-RANSAC followed by non-linear refinement
 // Threshold for Sampson error is set by RansacOptions.max_epipolar_error

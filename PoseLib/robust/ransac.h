@@ -62,7 +62,8 @@ RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
                            const RelativePoseOptions &opt, CameraPose *best_model, std::vector<char> *best_inliers);
 RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const Camera &camera1,
                            const Camera &camera2, const RelativePoseOptions &opt, CameraPose *best_model,
-                           std::vector<char> *best_inliers);
+                           std::vector<char> *best_inliers, const Eigen::Vector3d &gcam_1 = Eigen::Vector3d::Zero(),
+                           const Eigen::Vector3d &gcam_2 = Eigen::Vector3d::Zero());
 
 RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         const RelativePoseOptions &opt, ImagePair *best_model,
@@ -89,7 +90,9 @@ RansacStats ransac_focal_rd_relpose(const std::vector<Point2D> &x1, const std::v
 
 RansacStats ransac_relpose_lo(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                               const Camera &camera_1, const Camera &camera_2, const RelativePoseOptions &opt,
-                              ImagePair *best_model, std::vector<char> *best_inliers);
+                              ImagePair *best_model, std::vector<char> *best_inliers,
+                              const Eigen::Vector3d &gcam_1 = Eigen::Vector3d::Zero(),
+                              const Eigen::Vector3d &gcam_2 = Eigen::Vector3d::Zero());
 
 RansacStats ransac_homography(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                               const HomographyOptions &opt, Eigen::Matrix3d *best_model,

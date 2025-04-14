@@ -41,9 +41,11 @@ namespace poselib {
 class RelativePoseEstimator {
   public:
     RelativePoseEstimator(const RelativePoseOptions &opt, const std::vector<Point2D> &points2D_1,
-                          const std::vector<Point2D> &points2D_2)
-        : num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2),
-          sampler(num_data, sample_sz, opt.ransac) {
+                          const std::vector<Point2D> &points2D_2,
+                          const Eigen::Vector3d &gcam_1 = Eigen::Vector3d::Zero(),
+                          const Eigen::Vector3d &gcam_2 = Eigen::Vector3d::Zero())
+        : sample_sz((gcam_1.norm() > 0) ? 3 : 5), num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2),
+          gcam_1(gcam_1), gcam_2(gcam_2), sampler(num_data, sample_sz, opt.ransac) {
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);
         sample.resize(sample_sz);
@@ -53,13 +55,14 @@ class RelativePoseEstimator {
     double score_model(const CameraPose &pose, size_t *inlier_count) const;
     void refine_model(CameraPose *pose) const;
 
-    const size_t sample_sz = 5;
+    const size_t sample_sz;
     const size_t num_data;
 
   private:
     const RelativePoseOptions &opt;
     const std::vector<Point2D> &x1;
     const std::vector<Point2D> &x2;
+    const Eigen::Vector3d gcam_1, gcam_2;
 
     RandomSampler sampler;
     // pre-allocated vectors for sampling
@@ -72,14 +75,17 @@ class RelativePoseEstimator {
 class CameraRelativePoseEstimator {
   public:
     CameraRelativePoseEstimator(const RelativePoseOptions &opt, const std::vector<Point2D> &points2D_1,
-                                const std::vector<Point2D> &points2D_2, const Camera &camera1, const Camera &camera2)
-        : num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2), camera1(camera1), camera2(camera2),
-          sampler(num_data, sample_sz, opt.ransac) {
+                                const std::vector<Point2D> &points2D_2, const Camera &camera1, const Camera &camera2,
+                                const Eigen::Vector3d &gcam_1 = Eigen::Vector3d::Zero(),
+                                const Eigen::Vector3d &gcam_2 = Eigen::Vector3d::Zero())
+        : sample_sz((gcam_1.norm() > 0) ? 3 : 5), num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2),
+          camera1(camera1), camera2(camera2), gcam_1(gcam_1), gcam_2(gcam_2), sampler(num_data, sample_sz, opt.ransac) {
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);
         sample.resize(sample_sz);
         camera1.unproject_with_jac(x1, &d1, &M1);
         camera2.unproject_with_jac(x2, &d2, &M2);
+
     }
 
     void generate_models(std::vector<CameraPose> *models);
@@ -95,6 +101,7 @@ class CameraRelativePoseEstimator {
     const std::vector<Point2D> &x2;
     const Camera &camera1;
     const Camera &camera2;
+    const Eigen::Vector3d gcam_1, gcam_2;
 
   public:
     std::vector<Point3D> d1, d2;
@@ -357,9 +364,12 @@ class SharedRDFocalRelposeEstimator {
 class RelposeLOEstimator {
   public:
     RelposeLOEstimator(const RelativePoseOptions &opt, const std::vector<Point2D> &points2D_1,
-                            const std::vector<Point2D> &points2D_2, const Camera &camera_1, const Camera &camera_2)
-        : sample_sz(5), num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2), camera_1(camera_1),
-          camera_2(camera_2), sampler(num_data, sample_sz, opt.ransac) {
+                       const std::vector<Point2D> &points2D_2, const Camera &camera_1, const Camera &camera_2,
+                       const Eigen::Vector3d &gcam_1 = Eigen::Vector3d::Zero(),
+                       const Eigen::Vector3d &gcam_2 = Eigen::Vector3d::Zero())
+        : sample_sz((gcam_1.norm() > 0) ? 3 :  5), num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2),
+          camera_1(camera_1), camera_2(camera_2), gcam_1(gcam_1), gcam_2(gcam_2),
+          sampler(num_data, sample_sz, opt.ransac) {
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);
         x1u.resize(x1.size());
@@ -384,6 +394,7 @@ class RelposeLOEstimator {
     const std::vector<Point2D> &x1;
     const std::vector<Point2D> &x2;
     const Camera camera_1, camera_2;
+    const Eigen::Vector3d gcam_1, gcam_2;
 
     RandomSampler sampler;
     // pre-allocated vectors for sampling

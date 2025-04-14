@@ -146,11 +146,11 @@ RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
 }
 RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const Camera &camera1,
                            const Camera &camera2, const RelativePoseOptions &opt, CameraPose *best_model,
-                           std::vector<char> *best_inliers) {
+                           std::vector<char> *best_inliers, const Eigen::Vector3d &gcam_1, const Eigen::Vector3d &gcam_2) {
 
     best_model->q << 1.0, 0.0, 0.0, 0.0;
     best_model->t.setZero();
-    CameraRelativePoseEstimator estimator(opt, x1, x2, camera1, camera2);
+    CameraRelativePoseEstimator estimator(opt, x1, x2, camera1, camera2, gcam_1, gcam_2);
     RansacStats stats = ransac<CameraRelativePoseEstimator>(estimator, opt.ransac, best_model);
 
     get_tangent_sampson_inliers(*best_model, estimator.d1, estimator.d2, estimator.M1, estimator.M2,
@@ -255,14 +255,15 @@ RansacStats ransac_focal_rd_relpose(const std::vector<Point2D> &x1, const std::v
 
 RansacStats ransac_relpose_lo(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                               const Camera &camera_1, const Camera &camera_2, const RelativePoseOptions &opt,
-                              ImagePair *best_model, std::vector<char> *best_inliers) {
+                              ImagePair *best_model, std::vector<char> *best_inliers,
+                              const Eigen::Vector3d &gcam_1, const Eigen::Vector3d &gcam_2) {
 
     best_model->pose = CameraPose();
     best_model->camera1 = camera_1;
     best_model->camera2 = camera_2;
     RansacStats stats;
 
-    RelposeLOEstimator estimator(opt, x1, x2, camera_1, camera_2);
+    RelposeLOEstimator estimator(opt, x1, x2, camera_1, camera_2, gcam_1, gcam_2);
     stats = ransac<RelposeLOEstimator, ImagePair>(estimator, opt.ransac, best_model);
 
     get_tangent_sampson_inliers(*best_model, x1, x2, opt.max_error * opt.max_error, best_inliers);

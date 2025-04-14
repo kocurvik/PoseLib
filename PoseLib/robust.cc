@@ -229,7 +229,8 @@ RansacStats estimate_absolute_pose_pnpl(const std::vector<Point2D> &points2D, co
 
 RansacStats estimate_relative_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                    const Camera &camera1, const Camera &camera2, const RelativePoseOptions &opt,
-                                   CameraPose *pose, std::vector<char> *inliers) {
+                                   CameraPose *pose, std::vector<char> *inliers,
+                                   const Eigen::Vector3d &gcam_1, const Eigen::Vector3d &gcam_2) {
 
     const size_t num_pts = x1.size();
     RansacStats stats;
@@ -261,7 +262,8 @@ RansacStats estimate_relative_pose(const std::vector<Point2D> &x1, const std::ve
             camera2_scaled.params[3] *= camera2_scaled.focal() * camera2_scaled.focal();
         }
 
-        stats = ransac_relpose(x1_scaled, x2_scaled, camera1_scaled, camera2_scaled, opt_scaled, pose, inliers);
+        stats = ransac_relpose(x1_scaled, x2_scaled, camera1_scaled, camera2_scaled, opt_scaled, pose, inliers,
+                               gcam_1, gcam_2);
 
         if (stats.num_inliers > 5) {
             std::vector<Point2D> x1_inliers;
@@ -313,7 +315,8 @@ RansacStats estimate_relative_pose(const std::vector<Point2D> &x1, const std::ve
 
 RansacStats estimate_relative_pose_lo(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                       const Camera &camera1, const Camera &camera2, const RelativePoseOptions &opt,
-                                      ImagePair *pair, std::vector<char> *inliers) {
+                                      ImagePair *pair, std::vector<char> *inliers,
+                                      const Eigen::Vector3d &gcam_1, const Eigen::Vector3d &gcam_2) {
 
     const size_t num_pts = x1.size();
     if (num_pts < 10) {
@@ -346,7 +349,7 @@ RansacStats estimate_relative_pose_lo(const std::vector<Point2D> &x1, const std:
 
 
     RansacStats stats =
-        ransac_relpose_lo(x1_norm, x2_norm, camera1_scaled, camera2_scaled, opt_scaled, pair, inliers);
+        ransac_relpose_lo(x1_norm, x2_norm, camera1_scaled, camera2_scaled, opt_scaled, pair, inliers, gcam_1, gcam_2);
 
     if (stats.num_inliers > 9) {
         // Collect inlier for additional non-linear refinement

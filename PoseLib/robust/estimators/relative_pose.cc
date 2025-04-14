@@ -38,6 +38,7 @@
 #include "PoseLib/solvers/relpose_k2Fk1_9pt.h"
 #include "PoseLib/solvers/relpose_kFk_8pt.h"
 #include "PoseLib/solvers/relpose_kFk_9pt.h"
+#include "PoseLib/solvers/relpose_upright_3pt.h"
 
 #include <iostream>
 
@@ -49,7 +50,11 @@ void RelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {
         x1s[k] = x1[sample[k]].homogeneous().normalized();
         x2s[k] = x2[sample[k]].homogeneous().normalized();
     }
-    relpose_5pt(x1s, x2s, models);
+    if (sample_sz == 3) {
+        relpose_upright_3pt(x1s, x2s, gcam_1, gcam_2, models);
+    } else {
+        relpose_5pt(x1s, x2s, models);
+    }
 }
 
 double RelativePoseEstimator::score_model(const CameraPose &pose, size_t *inlier_count) const {
@@ -88,7 +93,12 @@ void CameraRelativePoseEstimator::generate_models(std::vector<CameraPose> *model
         x1s[k] = d1[sample[k]];
         x2s[k] = d2[sample[k]];
     }
-    relpose_5pt(x1s, x2s, models);
+
+    if (sample_sz == 3) {
+        relpose_upright_3pt(x1s, x2s, gcam_1, gcam_2, models);
+    } else {
+        relpose_5pt(x1s, x2s, models);
+    }
 }
 
 double CameraRelativePoseEstimator::score_model(const CameraPose &pose, size_t *inlier_count) const {
@@ -508,13 +518,17 @@ void SharedRDFocalRelposeEstimator::refine_model(ImagePair *image_pair) {
 void RelposeLOEstimator::generate_models(std::vector<ImagePair> *models) {
     sampler.generate_sample(&sample);
 
-    sampler.generate_sample(&sample);
+    std::vector<CameraPose> pose_models;
     for (size_t k = 0; k < sample_sz; ++k) {
         x1s[k] = x1u[sample[k]].homogeneous().normalized();
         x2s[k] = x2u[sample[k]].homogeneous().normalized();
     }
-    std::vector<CameraPose> pose_models;
-    relpose_5pt(x1s, x2s, &pose_models);
+
+    if (sample_sz == 3) {
+        relpose_upright_3pt(x1s, x2s, gcam_1, gcam_2, &pose_models);
+    } else {
+        relpose_5pt(x1s, x2s, &pose_models);
+    }
 
     models->reserve(pose_models.size());
     for (const CameraPose& pose : pose_models){
