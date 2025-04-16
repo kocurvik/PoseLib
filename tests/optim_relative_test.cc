@@ -352,8 +352,10 @@ bool test_tangent_sampson_fix_camera_relative_pose_refinement() {
 
 bool test_tangent_sampson_camera_relative_pose_jacobian() {
     const size_t N = 50;
-    std::string camera1_str = "3 RADIAL 1936 1296 2425.85 932.38 629.325 -0.04012 0.00123";
-    std::string camera2_str = "0 SIMPLE_RADIAL 1936 1296 2425.85 932.383 628.265 -0.0397695";
+//    std::string camera1_str = "3 RADIAL 1936 1296 2425.85 932.38 629.325 -0.04012 0.00123";
+    std::string camera1_str = "3 SIMPLE_DIVISION 1936 1296 2425.85 932.38 629.325 -0.000000123";
+//    std::string camera2_str = "0 SIMPLE_RADIAL 1936 1296 2425.85 932.383 628.265 -0.0397695";
+    std::string camera2_str = "3 SIMPLE_DIVISION 1936 1296 2425.85 932.38 629.325 -0.000009397695";
     Camera camera1, camera2;
     camera1.initialize_from_txt(camera1_str);
     camera2.initialize_from_txt(camera2_str);
@@ -403,7 +405,9 @@ bool test_tangent_sampson_camera_relative_pose_jacobian() {
 
 bool test_tangent_sampson_camera_relative_pose_refinement() {
     const size_t N = 50;
-    std::string camera1_str = "3 RADIAL 1936 1296 2425.85 932.38 629.325 -0.04012 0.00123";
+//    std::string camera1_str = "3 RADIAL 1936 1296 2425.85 932.38 629.325 -0.04012 0.00123";
+    std::string camera1_str = "3 SIMPLE_DIVISION 1936 1296 2425.85 932.38 629.325 -0.000054012";
+
     std::string camera2_str = "0 SIMPLE_RADIAL 1936 1296 2425.85 932.383 628.265 -0.0397695";
     camera2_str = camera1_str;
     Camera camera1, camera2;
@@ -463,7 +467,8 @@ bool test_tangent_sampson_camera_relative_pose_refinement() {
 
 bool test_tangent_sampson_shared_camera_relative_pose_refinement() {
     const size_t N = 50;
-    std::string camera_str = "0 SIMPLE_RADIAL 1936 1296 2425.85 932.383 628.265 -0.0397695";
+//    std::string camera_str = "0 SIMPLE_RADIAL 1936 1296 2425.85 932.383 628.265 -0.0397695";
+    std::string camera_str = "0 SIMPLE_DIVISION 1936 1296 2425.85 932.383 628.265 -0.0397695";
     Camera camera;
     camera.initialize_from_txt(camera_str);
 

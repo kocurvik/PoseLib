@@ -33,6 +33,7 @@
 #include "../../types.h"
 #include "optim_utils.h"
 #include "refiner_base.h"
+#include <iostream>
 
 namespace poselib {
 
@@ -387,23 +388,79 @@ class CameraRelativePoseRefiner : public RefinerBase<ImagePair, Accumulator> {
                 J_M21 = -s * inv_nJ_C * M2[k].col(0).transpose() * E * d1[k] * d1[k].transpose() * E.transpose();
                 J_M22 = -s * inv_nJ_C * M2[k].col(1).transpose() * E * d1[k] * d1[k].transpose() * E.transpose();
 
-                // Since we don't have analytic second order mixed partial derivatives, we do a finite difference
-                // approximation of the analytic jacobian w.r.t. the camera intrinsics
-                const double eps = 1e-6;
-                Eigen::Matrix<double, 3, Eigen::Dynamic> dxp, dp_e1, dp_e2;
-                Eigen::Matrix<double, 3, 2> dummy0;
-                Eigen::Vector3d dummy;
-                Eigen::Vector2d x_e1, x_e2;
+                Eigen::Matrix<double, 3, Eigen::Dynamic> dp_e1, dp_e2;
 
-                // For first camera
-                x_e1 << x1[k](0) + eps, x1[k](1);
-                x_e2 << x1[k](0), x1[k](1) + eps;
-                camera1.unproject_with_jac(x_e1, &dummy, &dummy0, &dp_e1);
-                camera1.unproject_with_jac(x_e2, &dummy, &dummy0, &dp_e2);
-                dp_e1 -= d1_p[k];
-                dp_e1 /= eps;
-                dp_e2 -= d1_p[k];
-                dp_e2 /= eps;
+                if (camera1.model_id == 102 and camera1_refine_idx.size() == 2) {
+                    dp_e1.resize(3, 4);
+                    dp_e2.resize(3, 4);
+                    
+                    double f = camera1.params[0];
+                    double kk = camera1.params[3];
+                    double c0 = x1[k](0)*x1[k](0);
+                    double c1 = c0;
+                    double c2 = f*f;
+                    double c3 = c1*c2;
+                    double c4 = x1[k](1)*x1[k](1);
+                    double c5 = c4;
+                    double c6 = c2*c5;
+                    double c7 = 2*kk;
+                    double c8 = c2 * c2;
+                    double c9 = kk*kk;
+                    double c10 = 2*c1*c5*c9 + c9*(x1[k](0)*x1[k](0)*x1[k](0)*x1[k](0)) + c9*(x1[k](1)*x1[k](1)*x1[k](1)*x1[k](1));
+                    double c11 = c10 + c3*c7 + c3 + c6*c7 + c6 + c8;
+                    double c12 = std::pow(c11, -3.0/2.0);
+                    double c13 = c9*(x1[k](0)*x1[k](0)*x1[k](0));
+                    double c14 = c5*c9;
+                    double c15 = c12*(c13 + c14*x1[k](0));
+                    double c16 = c10 - c8;
+                    double c17 = c12*c16;
+                    double c18 = std::pow(c11, -5.0/2.0);
+                    double c19 = c16*c18*(2*c13 + 2*c14*x1[k](0) + c2*c7*x1[k](0) + c2*x1[k](0));
+                    double c20 = c1 + c5;
+                    double c21 = c2 + c20*kk;
+                    double c22 = c2*c20 + c21*c21;
+                    double c23 = std::pow(c22, -3.0/2.0);
+                    double c24 = c20*c21*c23;
+                    double c25 = std::pow(c22, -5.0/2.0);
+                    double c26 = c2 + c21*c7;
+                    double c27 = f*x1[k](0)*x1[k](1)*(3*c20*c21*c25*c26 - c20*c23*c7 - 2*c21*c23);
+                    double c28 = 1.0/f;
+                    double c29 = c2*c21 + c7*(c2*c5 - c22);
+                    double c30 = -3*c20*c25*c26*c28*c29 + 2*c23*c28*c29;
+                    double c31 = 4*c2*c20*c23 - 3*c2*c25*c26*c20*c20;
+                    double c32 = c9*(x1[k](1)*x1[k](1)*x1[k](1));
+                    double c33 = c1*c9;
+                    double c34 = c12*(c32 + c33*x1[k](1));
+                    double c35 = c16*c18*(c2*c7*x1[k](1) + c2*x1[k](1) + 2*c32 + 2*c33*x1[k](1));
+                    dp_e1(0, 0) = 4*c15*x1[k](0) + c17 - 3*c19*x1[k](0);
+                    dp_e1(0, 3) = f*(3*c0*c20*c21*c25*c26 - c1*c20*c23*c7 - 2*c1*c21*c23 - c24);
+                    dp_e1(1, 0) = x1[k](1)*(4*c15 - 3*c19);
+                    dp_e1(1, 3) = c27;
+                    dp_e1(2, 0) = x1[k](0)*(c20*c23*c28*c7*(c2 - 2*c26) + c30);
+                    dp_e1(2, 3) = c31*x1[k](0);
+                    dp_e2(0, 0) = x1[k](0)*(4*c34 - 3*c35);
+                    dp_e2(0, 3) = c27;
+                    dp_e2(1, 0) = c17 + 4*c34*x1[k](1) - 3*c35*x1[k](1);
+                    dp_e2(1, 3) = f*(3*c20*c21*c25*c26*c4 - c20*c23*c5*c7 - 2*c21*c23*c5 - c24);
+                    dp_e2(2, 0) = x1[k](1)*(2*c20*c23*c28*(c2*kk - 4*c21*c9) + c30);
+                    dp_e2(2, 3) = c31*x1[k](1);
+//                    std::cout << "Symbolic: " << std::endl << dp_e1 << std::endl;
+                } else {
+                    const double eps = 1e-6;
+                    //                Eigen::Matrix<double, 3, 2> dummy0;
+                    Eigen::Vector3d dummy;
+                    Eigen::Vector2d x_e1, x_e2;
+
+                    // For first camera
+                    x_e1 << x1[k](0) + eps, x1[k](1);
+                    x_e2 << x1[k](0), x1[k](1) + eps;
+                    camera1.unproject_with_jac(x_e1, &dummy, nullptr, &dp_e1);
+                    camera1.unproject_with_jac(x_e2, &dummy, nullptr, &dp_e2);
+                    dp_e1 -= d1_p[k];
+                    dp_e1 /= eps;
+                    dp_e2 -= d1_p[k];
+                    dp_e2 /= eps;
+                }
 
                 for (size_t i = 0; i < camera1_refine_idx.size(); ++i) {
                     J(0, 5 + i) = J_d1.dot(d1_p[k].col(camera1_refine_idx[i])) +
@@ -411,15 +468,80 @@ class CameraRelativePoseRefiner : public RefinerBase<ImagePair, Accumulator> {
                                   J_M12.dot(dp_e2.col(camera1_refine_idx[i]));
                 }
 
-                // For second camera
-                x_e1 << x2[k](0) + eps, x2[k](1);
-                x_e2 << x2[k](0), x2[k](1) + eps;
-                camera2.unproject_with_jac(x_e1, &dummy, nullptr, &dp_e1);
-                camera2.unproject_with_jac(x_e2, &dummy, nullptr, &dp_e2);
-                dp_e1 -= d2_p[k];
-                dp_e1 /= eps;
-                dp_e2 -= d2_p[k];
-                dp_e2 /= eps;
+                if (camera2.model_id == 102 and camera1_refine_idx.size() == 2) {
+                    dp_e1.resize(3, 4);
+                    dp_e2.resize(3, 4);
+                    
+                    double f = camera2.params[0];
+                    double kk = camera2.params[3];
+                    double c0 = x2[k](0)*x2[k](0);
+                    double c1 = c0;
+                    double c2 = f*f;
+                    double c3 = c1*c2;
+                    double c4 = x2[k](1)*x2[k](1);
+                    double c5 = c4;
+                    double c6 = c2*c5;
+                    double c7 = 2*kk;
+                    double c8 = c2 * c2;
+                    double c9 = kk*kk;
+                    double c10 = 2*c1*c5*c9 + c9*(x2[k](0)*x2[k](0)*x2[k](0)*x2[k](0)) + c9*(x2[k](1)*x2[k](1)*x2[k](1)*x2[k](1));
+                    double c11 = c10 + c3*c7 + c3 + c6*c7 + c6 + c8;
+                    double c12 = std::pow(c11, -3.0/2.0);
+                    double c13 = c9*(x2[k](0)*x2[k](0)*x2[k](0));
+                    double c14 = c5*c9;
+                    double c15 = c12*(c13 + c14*x2[k](0));
+                    double c16 = c10 - c8;
+                    double c17 = c12*c16;
+                    double c18 = std::pow(c11, -5.0/2.0);
+                    double c19 = c16*c18*(2*c13 + 2*c14*x2[k](0) + c2*c7*x2[k](0) + c2*x2[k](0));
+                    double c20 = c1 + c5;
+                    double c21 = c2 + c20*kk;
+                    double c22 = c2*c20 + c21*c21;
+                    double c23 = std::pow(c22, -3.0/2.0);
+                    double c24 = c20*c21*c23;
+                    double c25 = std::pow(c22, -5.0/2.0);
+                    double c26 = c2 + c21*c7;
+                    double c27 = f*x2[k](0)*x2[k](1)*(3*c20*c21*c25*c26 - c20*c23*c7 - 2*c21*c23);
+                    double c28 = 1.0/f;
+                    double c29 = c2*c21 + c7*(c2*c5 - c22);
+                    double c30 = -3*c20*c25*c26*c28*c29 + 2*c23*c28*c29;
+                    double c31 = 4*c2*c20*c23 - 3*c2*c25*c26*c20*c20;
+                    double c32 = c9*(x2[k](1)*x2[k](1)*x2[k](1));
+                    double c33 = c1*c9;
+                    double c34 = c12*(c32 + c33*x2[k](1));
+                    double c35 = c16*c18*(c2*c7*x2[k](1) + c2*x2[k](1) + 2*c32 + 2*c33*x2[k](1));
+                    dp_e1(0, 0) = 4*c15*x2[k](0) + c17 - 3*c19*x2[k](0);
+                    dp_e1(0, 3) = f*(3*c0*c20*c21*c25*c26 - c1*c20*c23*c7 - 2*c1*c21*c23 - c24);
+                    dp_e1(1, 0) = x2[k](1)*(4*c15 - 3*c19);
+                    dp_e1(1, 3) = c27;
+                    dp_e1(2, 0) = x2[k](0)*(c20*c23*c28*c7*(c2 - 2*c26) + c30);
+                    dp_e1(2, 3) = c31*x2[k](0);
+                    dp_e2(0, 0) = x2[k](0)*(4*c34 - 3*c35);
+                    dp_e2(0, 3) = c27;
+                    dp_e2(1, 0) = c17 + 4*c34*x2[k](1) - 3*c35*x2[k](1);
+                    dp_e2(1, 3) = f*(3*c20*c21*c25*c26*c4 - c20*c23*c5*c7 - 2*c21*c23*c5 - c24);
+                    dp_e2(2, 0) = x2[k](1)*(2*c20*c23*c28*(c2*kk - 4*c21*c9) + c30);
+                    dp_e2(2, 3) = c31*x2[k](1);
+
+//                    std::cout << "Symbolic1: " << std::endl << dp_e1 << std::endl;
+//                    std::cout << "Symbolic2: " << std::endl << dp_e2 << std::endl;
+                } else {
+                    Eigen::Vector3d dummy;
+                    Eigen::Vector2d x_e1, x_e2;
+                    const double eps = 1e-6;
+
+                    // For second camera
+                    x_e1 << x2[k](0) + eps, x2[k](1);
+                    x_e2 << x2[k](0), x2[k](1) + eps;
+                    camera2.unproject_with_jac(x_e1, &dummy, nullptr, &dp_e1);
+                    camera2.unproject_with_jac(x_e2, &dummy, nullptr, &dp_e2);
+                    dp_e1 -= d2_p[k];
+                    dp_e1 /= eps;
+                    dp_e2 -= d2_p[k];
+                    dp_e2 /= eps;
+//                    std::cout << "Numeric1: " << std::endl << dp_e1 << std::endl;
+//                    std::cout << "Numeric2: " << std::endl << dp_e2 << std::endl;
+                }
 
                 if (shared_intrinsics) {
                     for (size_t i = 0; i < camera1_refine_idx.size(); ++i) {
