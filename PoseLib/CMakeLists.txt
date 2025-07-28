@@ -7,7 +7,7 @@ set(SOURCES
     solvers/p2p2pl.cc
     solvers/p3ll.cc
     solvers/p3p.cc
-    solvers/p3p_ding.cc
+    solvers/p3p_lambdatwist.cc
     solvers/p4pf.cc
     solvers/p5lp_radial.cc
     solvers/p6lp.cc
@@ -34,6 +34,7 @@ set(SOURCES
     misc/essential.cc
     misc/re3q3.cc
     misc/colmap_models.cc
+        misc/decompositions.cc
     robust.cc
     robust/ransac.cc
     robust/bundle.cc
@@ -55,7 +56,7 @@ set(HEADERS_PUBLIC
     solvers/p2p2pl.h
     solvers/p3ll.h
     solvers/p3p.h
-    solvers/p3p_ding.h
+    solvers/p3p_lambdatwist.h
     solvers/p4pf.h
     solvers/p5lp_radial.h
     solvers/p6lp.h
@@ -84,6 +85,7 @@ set(HEADERS_PUBLIC
     misc/sturm.h
     misc/essential.h
     misc/re3q3.h
+        misc/decompositions.h
     robust.h
     types.h
     camera_pose.h

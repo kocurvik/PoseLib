@@ -74,7 +74,7 @@ class CMakeBuild(build_ext):
 # logic and declaration, and simpler if you include description/version in a file.
 setup(
     name="poselib",
-    version="2.0.2",
+    version="2.0.4",
     author="Viktor Larsson and contributors",
     author_email="viktor.larsson@math.lth.se",
     description="",
@@ -82,4 +82,5 @@ setup(
     ext_modules=[CMakeExtension("pyposelib")],
     cmdclass={"build_ext": CMakeBuild},
     zip_safe=False,
+    install_requires=["numpy"],
 )

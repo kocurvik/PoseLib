@@ -48,6 +48,12 @@ struct Camera {
     void project_with_jac(const Eigen::Vector2d &x, Eigen::Vector2d *xp, Eigen::Matrix2d *jac) const;
     void unproject(const Eigen::Vector2d &xp, Eigen::Vector2d *x) const;
 
+    // vector wrappers for the project/unprojection
+    void project(const std::vector<Eigen::Vector2d> &x, std::vector<Eigen::Vector2d> *xp) const;
+    void project_with_jac(const std::vector<Eigen::Vector2d> &x, std::vector<Eigen::Vector2d> *xp,
+                          std::vector<Eigen::Matrix<double, 2, 2>> *jac) const;
+    void unproject(const std::vector<Eigen::Vector2d> &xp, std::vector<Eigen::Vector2d> *x) const;
+
     // Update the camera parameters such that the projections are rescaled
     void rescale(double scale);
     // Return camera model as string
@@ -88,7 +94,8 @@ SETUP_CAMERA_SHARED_DEFS(PinholeCameraModel, "PINHOLE", 1);
 SETUP_CAMERA_SHARED_DEFS(SimpleRadialCameraModel, "SIMPLE_RADIAL", 2);
 SETUP_CAMERA_SHARED_DEFS(RadialCameraModel, "RADIAL", 3);
 SETUP_CAMERA_SHARED_DEFS(OpenCVCameraModel, "OPENCV", 4);
-SETUP_CAMERA_SHARED_DEFS(OpenCVFisheyeCameraModel, "OPENCV_FISHEYE", 8);
+SETUP_CAMERA_SHARED_DEFS(OpenCVFisheyeCameraModel, "OPENCV_FISHEYE", 5);
+SETUP_CAMERA_SHARED_DEFS(FullOpenCVCameraModel, "FULL_OPENCV", 6);
 
 #define SWITCH_CAMERA_MODELS                                                                                           \
     SWITCH_CAMERA_MODEL_CASE(NullCameraModel)                                                                          \
@@ -97,11 +104,8 @@ SETUP_CAMERA_SHARED_DEFS(OpenCVFisheyeCameraModel, "OPENCV_FISHEYE", 8);
     SWITCH_CAMERA_MODEL_CASE(SimpleRadialCameraModel)                                                                  \
     SWITCH_CAMERA_MODEL_CASE(RadialCameraModel)                                                                        \
     SWITCH_CAMERA_MODEL_CASE(OpenCVCameraModel)                                                                        \
-    SWITCH_CAMERA_MODEL_CASE(OpenCVFisheyeCameraModel)
-
-// TODO add more models
-// SETUP_CAMERA_SHARED_DEFS(OpenCVCameraModel , "OPENCV", 4);
-// SETUP_CAMERA_SHARED_DEFS(FullOpenCVCameraModel, "FULL_OPENCV", 6);
+    SWITCH_CAMERA_MODEL_CASE(OpenCVFisheyeCameraModel)                                                                 \
+    SWITCH_CAMERA_MODEL_CASE(FullOpenCVCameraModel)
 
 #undef SETUP_CAMERA_SHARED_DEFS
 
