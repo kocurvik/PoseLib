@@ -77,11 +77,12 @@ RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &poin
                                                 std::vector<char> *inliers);
 
 RansacStats estimate_calib_known_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                      const Eigen::Matrix3d &R, const Point3D &t, const CalibMethod &method,
-                                      bool optimize_relpose, const RansacOptions &ransac_opt,
-                                      const BundleOptions &bundle_opt, ImagePair *image_pair,
-                                      std::vector<char> *inliers);
+                                      const Eigen::Matrix3d &R, const Point3D &t, const RelativePoseOptions &opt,
+                                      ImagePair *image_pair, std::vector<char> *inliers);
 
+RansacStats estimate_threeview_trf(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                   const std::vector<Point2D> &x3, const double alpha, const RelativePoseOptions &opt,
+                                   ImageTriplet *image_triplet, std::vector<char> *inliers);
 
 // Estimates a fundamental matrix using LO-RANSAC followed by non-linear refinement
 // NOTE: USE estimate_relative_pose IF YOU KNOW THE INTRINSICS!!!

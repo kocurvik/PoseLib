@@ -358,54 +358,127 @@ RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &poin
 }
 
 RansacStats estimate_calib_known_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                      const Eigen::Matrix3d &R, const Point3D &t, const CalibMethod &method,
-                                      bool optimize_relpose, const RansacOptions &ransac_opt,
-                                      const BundleOptions &bundle_opt, ImagePair *image_pair,
-                                      std::vector<char> *inliers) {
+                                      const Eigen::Matrix3d &R, const Point3D &t, const RelativePoseOptions &opt,
+                                      ImagePair *image_pair, std::vector<char> *inliers) {
 
     Eigen::Matrix3d T1, T2;
     std::vector<Point2D> x1_norm = x1;
     std::vector<Point2D> x2_norm = x2;
 
-    double scale = normalize_points(x1_norm, x2_norm, T1, T2, true, false, true);
-    RansacOptions ransac_opt_scaled = ransac_opt;
-    ransac_opt_scaled.max_epipolar_error /= scale;
-    BundleOptions bundle_opt_scaled = bundle_opt;
-    bundle_opt_scaled.loss_scale /= scale;
+//    double scale = normalize_points(x1_norm, x2_norm, T1, T2, true, false, true);
+//    double scale = normalize_points(x1_norm, x2_norm, T1, T2, true, false, true);
+    double scale = 1.0;
+    RelativePoseOptions opt_scaled = opt;
+    opt_scaled.max_error /= scale;
+    opt_scaled.bundle.loss_scale /= scale;
 
-    RansacStats stats = ransac_calib_known_pose(x1_norm, x2_norm, R, t, method, optimize_relpose, ransac_opt_scaled,
-                                                image_pair, inliers);
+    RansacStats stats = ransac_calib_known_pose(x1_norm, x2_norm, R, t, opt_scaled, image_pair, inliers);
 
-//    if (stats.num_inliers > 2) {
-//        // Collect inlier for additional bundle adjustment
-//        // TODO: use camera models for this refinement!
-//        std::vector<Point2D> x1_inliers;
-//        std::vector<Point2D> x2_inliers;
-//        x1_inliers.reserve(stats.num_inliers);
-//        x2_inliers.reserve(stats.num_inliers);
-//
-//        for (size_t k = 0; k < num_pts; ++k) {
-//            if (!(*inliers)[k])
-//                continue;
-//            x1_inliers.push_back(x1_calib[k]);
-//            x2_inliers.push_back(x2_calib[k]);
-//        }
-//
-//        BundleOptions scaled_bundle_opt = bundle_opt;
-//        scaled_bundle_opt.loss_scale = bundle_opt.loss_scale * 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
-//
-//        refine_relpose(x1_inliers, x2_inliers, pose, scaled_bundle_opt);
-//    }
-    image_pair->camera1.params[0] *= scale;
-    image_pair->camera2.params[0] *= scale;
+    if (stats.num_inliers > 2) {
+        // Collect inlier for additional bundle adjustment
+        // TODO: use camera models for this refinement!
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
 
-    image_pair->camera1.params[1] *= scale;
-    image_pair->camera2.params[1] *= scale;
-    image_pair->camera1.params[2] *= scale;
-    image_pair->camera2.params[2] *= scale;
+        for (size_t k = 0; k < x1.size(); ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1_norm[k]);
+            x2_inliers.push_back(x2_norm[k]);
+        }
+        BundleOptions scaled_bundle_opt = opt_scaled.bundle;
+
+        refine_relpose(x1_inliers, x2_inliers, image_pair, scaled_bundle_opt);
+    }
+//    image_pair->camera1.params[0] *= scale;
+//    image_pair->camera2.params[0] *= scale;
+//    image_pair->camera1.params[1] *= scale;
+//    image_pair->camera2.params[1] *= scale;
+//    image_pair->camera1.params[2] *= scale;
+//    image_pair->camera2.params[2] *= scale;
+    image_pair->camera1.rescale(scale);
+    image_pair->camera2.rescale(scale);
+
+    // SIMPLE DIVISION
+    if (image_pair->camera1.model_id == 102){
+        double inv_scale_sq = 1 / (scale * scale);
+        image_pair->camera1.params[3] *= inv_scale_sq;
+        image_pair->camera2.params[3] *= inv_scale_sq;
+    }
 
     return stats;
 }
+
+
+
+RansacStats estimate_threeview_trf(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                   const std::vector<Point2D> &x3, const double alpha, const RelativePoseOptions &opt,
+                                      ImageTriplet *image_triplet, std::vector<char> *inliers) {
+
+    Eigen::Matrix3d T1, T2;
+    std::vector<Point2D> x1_norm = x1;
+    std::vector<Point2D> x2_norm = x2;
+    std::vector<Point2D> x3_norm = x3;
+
+    double scale = 0.0;
+    for (size_t k = 0; k < x1.size(); ++k) {
+        scale += x1[k].norm();
+        scale += x2[k].norm();
+        scale += x3[k].norm();
+    }
+
+    scale /= std::sqrt(3) * x1.size();
+
+//    scale = 1.0;
+
+    for (size_t k = 0; k < x1.size(); ++k) {
+        x1_norm[k] /= scale;
+        x2_norm[k] /= scale;
+        x3_norm[k] /= scale;
+    }
+
+//    std::cout << "Focal after scaling: " << 1200.0 / scale << std::endl;
+//    std::cout << "k after scaling: " << 5e-8 * scale * scale << std::endl;
+
+    RelativePoseOptions opt_scaled = opt;
+    opt_scaled.max_error /= scale;
+    opt_scaled.bundle.loss_scale /= scale;
+
+    RansacStats stats = ransac_threeview_trf(x1_norm, x2_norm, x3_norm, alpha, opt_scaled, image_triplet, inliers);
+
+    if (stats.num_inliers > 2) {
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        std::vector<Point2D> x3_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+        x3_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < x1_norm.size(); ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1_norm[k]);
+            x2_inliers.push_back(x2_norm[k]);
+            x3_inliers.push_back(x3_norm[k]);
+        }
+
+        refine_3v_shared_camera_relpose(x1_inliers, x2_inliers, x3_inliers, alpha, image_triplet, opt_scaled.bundle);
+    }
+
+
+//    image_triplet->camera.rescale(scale);
+
+    // SIMPLE DIVISION
+    image_triplet->camera.params[3] /= image_triplet->camera.focal() * image_triplet->camera.focal();
+    image_triplet->camera.params[3] /= scale * scale;
+    image_triplet->camera.params[0] *= scale;
+
+    return stats;
+}
+
+
 
 RansacStats estimate_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                  const RelativePoseOptions &opt, Eigen::Matrix3d *F, std::vector<char> *inliers) {

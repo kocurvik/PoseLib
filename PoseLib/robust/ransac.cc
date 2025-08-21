@@ -160,16 +160,35 @@ RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
 }
 
 RansacStats ransac_calib_known_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                    const Eigen::Matrix3d &R, const Point3D &t, CalibMethod method, bool optimize_relpose,
-                                    const RansacOptions &opt, ImagePair *best_model, std::vector<char> *best_inliers) {
+                                    const Eigen::Matrix3d &R, const Point3D &t, const RelativePoseOptions &opt,
+                                    ImagePair *best_model, std::vector<char> *best_inliers) {
     best_model->pose = CameraPose(R, t);
-    best_model->camera1 = Camera("SIMPLE_PINHOLE", std::vector<double>{1.0, 0.0, 0.0}, -1, -1);
-    best_model->camera2 = best_model->camera2;
+    if (opt.bundle.refine_extra_params){
+        best_model->camera1 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+        best_model->camera2 = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+    } else {
+        best_model->camera1 = Camera("SIMPLE_PINHOLE", std::vector<double>{1.0, 0.0, 0.0}, -1, -1);
+        best_model->camera2 = Camera("SIMPLE_PINHOLE", std::vector<double>{1.0, 0.0, 0.0}, -1, -1);
+    }
 
-    CalibWithKnownPoseEstimator estimator(opt, method, x1, x2, R, t, optimize_relpose);
-    RansacStats stats = ransac<CalibWithKnownPoseEstimator>(estimator, opt, best_model);
+    CalibWithKnownPoseEstimator estimator(opt, x1, x2, R, t);
+    RansacStats stats = ransac<CalibWithKnownPoseEstimator>(estimator, opt.ransac, best_model);
 
-//    get_inliers(*best_model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
+    get_tangent_sampson_inliers(*best_model, x1, x2, opt.max_error * opt.max_error, best_inliers);
+    return stats;
+}
+
+RansacStats ransac_threeview_trf(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                 const std::vector<Point2D> &x3, double alpha, const RelativePoseOptions &opt,
+                                    ImageTriplet *best_model, std::vector<char> *best_inliers) {
+    best_model->poses.pose12 = CameraPose();
+    best_model->poses.pose13 = CameraPose();
+    best_model->camera = Camera("SIMPLE_DIVISION", std::vector<double>{1.0, 0.0, 0.0, 0.0}, -1, -1);
+
+    ThreeViewTRFEstimator estimator(opt, x1, x2, x3, alpha);
+    RansacStats stats = ransac<ThreeViewTRFEstimator>(estimator, opt.ransac, best_model);
+
+    get_tangent_sampson_inliers(*best_model, x1, x2, x3, opt.max_error * opt.max_error, best_inliers);
     return stats;
 }
 

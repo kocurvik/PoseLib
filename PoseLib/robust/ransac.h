@@ -65,12 +65,16 @@ RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
                            std::vector<char> *best_inliers);
 
 RansacStats ransac_calib_known_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                    const Eigen::Matrix3d &R, const Point3D &t, CalibMethod method, bool optimize_relpose,
-                                    const RansacOptions &opt, ImagePair *best_model, std::vector<char> *best_inliers);
+                                    const Eigen::Matrix3d &R, const Point3D &t, const RelativePoseOptions &opt,
+                                    ImagePair *best_model, std::vector<char> *best_inliers);
+
+RansacStats ransac_threeview_trf(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                 const std::vector<Point2D> &x3, double alpha, const RelativePoseOptions &opt,
+                                 ImageTriplet *best_model, std::vector<char> *best_inliers);
 
 RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                        const RelativePoseOptions &opt, ImagePair *best_model,
-                                        std::vector<char> *best_inliers);
+                                    const RelativePoseOptions &opt, ImagePair *best_model,
+                                    std::vector<char> *best_inliers);
 
 RansacStats ransac_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                const RelativePoseOptions &opt, Eigen::Matrix3d *best_model,

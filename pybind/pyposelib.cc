@@ -828,27 +828,39 @@ std::tuple<Camera, Camera, int> focals_from_fundamental_iterative_wrapper(const 
 std::pair<ImagePair, py::dict> calib_with_known_pose_wrapper(const std::vector<Point2D> &points2D_1,
                                                              const std::vector<Point2D> &points2D_2,
                                                              const Eigen::Matrix3d &R, const Point3D &t,
-                                                             const CalibMethod &method, bool optimize_relpose,
-                                                             const py::dict &ransac_opt_dict,
-                                                             const py::dict &bundle_opt_dict) {
-    RansacOptions ransac_opt;
-    update_ransac_options(ransac_opt_dict, ransac_opt);
-
-    BundleOptions bundle_opt;
-    bundle_opt.loss_scale = 0.5 * ransac_opt.max_epipolar_error;
-    update_bundle_options(bundle_opt_dict, bundle_opt);
+                                                             const py::dict &opt_dict) {
+    RelativePoseOptions opt;
+    update_relative_pose_options(opt_dict, opt);
 
     ImagePair image_pair;
     std::vector<char> inlier_mask;
 
     std::vector<Image> output;
-    RansacStats stats = estimate_calib_known_pose(points2D_1, points2D_2, R, t, method, optimize_relpose, ransac_opt,
-                                                  bundle_opt, &image_pair, &inlier_mask);
+    RansacStats stats = estimate_calib_known_pose(points2D_1, points2D_2, R, t, opt, &image_pair, &inlier_mask);
 
     py::dict output_dict;
     write_to_dict(stats, output_dict);
     output_dict["inliers"] = convert_inlier_vector(inlier_mask);
     return std::make_pair(image_pair, output_dict);
+}
+
+std::pair<ImageTriplet, py::dict> estimate_threeview_trf_wrapper(const std::vector<Point2D> &points2D_1,
+                                                                 const std::vector<Point2D> &points2D_2,
+                                                                 const std::vector<Point2D> &points2D_3,
+                                                                 const double alpha, const py::dict &opt_dict) {
+    RelativePoseOptions opt;
+    update_relative_pose_options(opt_dict, opt);
+
+    ImageTriplet image_triplet;
+    std::vector<char> inlier_mask;
+
+    RansacStats stats = estimate_threeview_trf(points2D_1, points2D_2, points2D_3, alpha, opt, &image_triplet,
+                                               &inlier_mask);
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(image_triplet, output_dict);
 }
 
 std::pair<std::vector<CameraPose>, std::vector<Point3D>> motion_from_homography_wrapper(Eigen::Matrix3d &H){
@@ -878,6 +890,12 @@ PYBIND11_MODULE(poselib, m) {
         .def("__repr__", [](const poselib::CameraPose &a) {
             return "[q: " + toString(a.q.transpose()) + ", " + "t: " + toString(a.t.transpose()) + "]";
         });
+
+    py::class_<poselib::ThreeViewCameraPose>(m, "ThreeViewCameraPose")
+            .def(py::init<>())
+            .def_readwrite("pose12", &poselib::ThreeViewCameraPose::pose12)
+            .def_readwrite("pose13", &poselib::ThreeViewCameraPose::pose13)
+            .def("pose23", &poselib::ThreeViewCameraPose::pose23);
 
     py::class_<poselib::Camera>(m, "Camera")
         .def(py::init(&poselib::camera_from_dict))
@@ -1007,6 +1025,15 @@ PYBIND11_MODULE(poselib, m) {
                    ", camera1: " + a.camera1.to_cameras_txt() + ", camera2: " + a.camera2.to_cameras_txt() + "]";
         });
 
+    py::class_<poselib::ImageTriplet>(m, "ImageTriplet")
+        .def(py::init<>())
+        .def(py::init<poselib::ThreeViewCameraPose, poselib::Camera>())
+        .def_readwrite("poses", &poselib::ImageTriplet::poses)
+        .def_readwrite("camera", &poselib::ImageTriplet::camera)
+        .def("__repr__", [](const poselib::ImageTriplet &a) {
+            return "camera: " + a.camera.to_cameras_txt();
+        });
+
     py::class_<poselib::PairwiseMatches>(m, "PairwiseMatches")
         .def(py::init<>())
         .def_readwrite("cam_id1", &poselib::PairwiseMatches::cam_id1)
@@ -1107,19 +1134,13 @@ PYBIND11_MODULE(poselib, m) {
           py::arg("points3D"), py::arg("opt") = py::dict(),
           "Absolute pose estimation for the 1D radial camera model with non-linear refinement.");
 
-    py::enum_<poselib::CalibMethod>(m, "CalibMethod")
-        .value("CALIB_FOCAL_2P", poselib::CalibMethod::CALIB_FOCAL_2P)
-        .value("CALIB_FOCAL_3P", poselib::CalibMethod::CALIB_FOCAL_3P)
-        .value("CALIB_FOCAL_PRINCIPAL_7P", poselib::CalibMethod::CALIB_FOCAL_PRINCIPAL_7P)
-        .value("CALIB_SHARED_FOCAL_1P", poselib::CalibMethod::CALIB_SHARED_FOCAL_1P)
-        .value("CALIB_SHARED_FOCAL_2P", poselib::CalibMethod::CALIB_SHARED_FOCAL_2P)
-        .value("CALIB_SHARED_FOCAL_PRINCIPAL_4P", poselib::CalibMethod::CALIB_SHARED_FOCAL_PRINCIPAL_4P)
-        .export_values();
-
     m.def("calib_with_known_pose", &poselib::calib_with_known_pose_wrapper, py::arg("points2D_1"),
-          py::arg("points2D_2"), py::arg("R"), py::arg("t"), py::arg("CalibMethod"), py::arg("optimize_relpose"),
-          py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
+          py::arg("points2D_2"), py::arg("R"), py::arg("t"), py::arg("opt") = py::dict(),
           "Camera calibration under known realtive pose");
+
+    m.def("estimate_threeview_uncal_translation", &poselib::estimate_threeview_trf_wrapper, py::arg("points2D_1"),
+          py::arg("points2D_2"), py::arg("points2D_3"), py::arg("alpha"), py::arg("opt") = py::dict(),
+          "Relative pose and intnrinsics estiamtion for threeview pure translation with known distance ratio.");
 
     m.def("motion_from_homography", &poselib::motion_from_homography_wrapper, py::arg("H"));
     m.def("focals_from_fundamental", &poselib::focals_from_fundamental, py::arg("F"), py::arg("pp1"), py::arg("pp2"));

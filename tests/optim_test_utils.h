@@ -125,7 +125,8 @@ template <typename Refiner, typename Model> double verify_jacobian(Refiner &refi
         max_err = std::max(err, max_err);
         if (max_err > 1e-3) {
             std::cout << "Jacobian failure! \n J=\n" << acc.Js[k] << "\nJ (finite) = \n" << J_est[k] << "\n";
-            break;
+            std::cout << "k: " << k << std::endl;
+//            break;
         }
     }
     return max_err;

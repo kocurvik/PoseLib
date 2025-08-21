@@ -37,6 +37,8 @@
 #include "PoseLib/solvers/relpose_7pt.h"
 #include "PoseLib/solvers/relpose_k2Fk1_10pt.h"
 #include "PoseLib/solvers/relpose_kFk_9pt.h"
+#include "PoseLib/solvers/calib_known_motion_rd.h"
+#include "PoseLib/solvers/relpose_3v_TRF.h"
 
 #include <iostream>
 
@@ -160,155 +162,98 @@ void CalibWithKnownPoseEstimator::generate_models(ImagePairVector *models) {
         x2s[k] = x2[sample[k]];
     }
 
-    switch(method){
-        case CALIB_FOCAL_2P:
-            calib_known_motion_f_2p(x1s, x2s, E, pose, models);
-            break;
-        case CALIB_FOCAL_3P:
-            calib_known_motion_f_3p(x1s, x2s, E, pose, models);
-            break;
-        case CALIB_FOCAL_PRINCIPAL_7P:
-            calib_known_motion_fpp_7p(x1s, x2s, E, pose, models);
-            break;
-        case CALIB_SHARED_FOCAL_PRINCIPAL_4P:
+    if (opt.shared_intrinsics){
+        if (opt.estimate_focal_length and !opt.estimate_principal_point and !opt.estimate_extra_params) {
+            if (sample_sz == 2) {
+                calib_known_motion_shared_f_2p(x1s, x2s, E, pose, models);
+            } else {
+                calib_known_motion_shared_f_1p(x1s[0], x2s[0], E, pose, models);
+            }
+            return;
+        }
+
+        if (opt.estimate_focal_length and !opt.estimate_principal_point and opt.estimate_extra_params){
+            if (sample_sz == 3) {
+                calib_known_motion_shared_frd_3p(x1s, x2s, E, pose, models);
+            } else {
+                if (opt.pure_translation) {
+                    calib_known_motion_shared_frd_norot_2p(x1s, x2s, E, pose, models);
+                } else {
+                    calib_known_motion_shared_frd_2p(x1s, x2s, E, pose, models);
+                }
+            }
+            return;
+        }
+
+        if (opt.estimate_focal_length and opt.estimate_principal_point and !opt.estimate_extra_params) {
             calib_known_motion_shared_fpp_4p(x1s, x2s, E, pose, models);
-            break;
-        case CALIB_SHARED_FOCAL_1P:
-            calib_known_motion_shared_f_1p(x1s[0], x2s[0], E, pose, models);
-            break;
-        case CALIB_SHARED_FOCAL_2P:
-            calib_known_motion_shared_f_2p(x1s, x2s, E, pose, models);
-            break;
+            return;
+        }
+    } else {
+        if (opt.estimate_focal_length and !opt.estimate_principal_point and !opt.estimate_extra_params) {
+            if (sample_sz == 3) {
+                calib_known_motion_f_3p(x1s, x2s, E, pose, models);
+            } else {
+                calib_known_motion_f_2p(x1s, x2s, E, pose, models);
+            }
+            return;
+        }
+
+        if (opt.bundle.refine_focal_length and opt.bundle.refine_principal_point and !opt.bundle.refine_extra_params) {
+            calib_known_motion_fpp_7p(x1s, x2s, E, pose, models);
+            return;
+        }
     }
 }
 
 double CalibWithKnownPoseEstimator::score_model(const ImagePair &image_pair, size_t *inlier_count) const {
-//    Eigen::DiagonalMatrix<double, 3> K1_inv(1.0, 1.0, image_pair.camera1.focal());
-//    Eigen::DiagonalMatrix<double, 3> K2_inv(1.0, 1.0, image_pair.camera2.focal());
-    Eigen::Matrix3d F = image_pair.camera2.inverse_calib_matrix().transpose() * (E * image_pair.camera1.inverse_calib_matrix());
-
-    return compute_sampson_msac_score(F, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
+//    double score = compute_tangent_sampson_msac_score(image_pair, x1, x2, opt.max_error * opt.max_error, inlier_count);
+    double score = compute_tangent_sampson_msac_score(E, x1, x2, image_pair.camera1, image_pair.camera2, opt.max_error * opt.max_error, inlier_count);
+    return score;
 }
 
 void CalibWithKnownPoseEstimator::refine_model(ImagePair *image_pair) const {
-    BundleOptions bundle_opt;
+    BundleOptions bundle_opt = opt.bundle;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
-    bundle_opt.loss_scale = opt.max_epipolar_error;
-    bundle_opt.max_iterations = opt.lo_iterations;
+    bundle_opt.loss_scale = opt.max_error;
+    bundle_opt.max_iterations = opt.ransac.lo_iterations;
 
-//    Eigen::DiagonalMatrix<double, 3> K_inv(1.0, 1.0, image_pair->camera1.focal());
-//    Eigen::Matrix3d F = K_inv * (E * K_inv);
-//
-//    // Find approximate inliers and bundle over these with a truncated loss
-//    std::vector<char> inliers;
-//    int num_inl = get_inliers(F, x1, x2, 5 * (opt.max_epipolar_error * opt.max_epipolar_error), &inliers);
-//    std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
-//    x1_inlier.reserve(num_inl);
-//    x2_inlier.reserve(num_inl);
-//
-//    if (num_inl <= sample_sz) {
-//        return;
-//    }
-//
-//    for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
-//        if (inliers[pt_k]) {
-//            x1_inlier.push_back(x1[pt_k]);
-//            x2_inlier.push_back(x2[pt_k]);
-//        }
-//    }
-
-    if (optimize_relpose) {
-        switch (method) {
-            case CALIB_FOCAL_2P:
-            case CALIB_FOCAL_3P:
-                refine_focal_relpose(x1, x2, image_pair, bundle_opt);
-                break;
-            case CALIB_FOCAL_PRINCIPAL_7P:
-                throw std::runtime_error("NYI CALIB_SHARED_FOCAL_PRINCIPAL_4P relpose opt");
-                break;
-            case CALIB_SHARED_FOCAL_1P:
-            case CALIB_SHARED_FOCAL_2P:
-                refine_shared_focal_relpose(x1, x2, image_pair, bundle_opt);
-                break;
-            case CALIB_SHARED_FOCAL_PRINCIPAL_4P:
-                throw std::runtime_error("NYI CALIB_SHARED_FOCAL_PRINCIPAL_4P relpose opt");
-                break;
-        }
-        return;
-    }
-
-    switch (method) {
-        case CALIB_FOCAL_2P:
-        case CALIB_FOCAL_3P:
-            refine_calib_focal(x1, x2, image_pair, bundle_opt);
-            break;
-        case CALIB_FOCAL_PRINCIPAL_7P:
-            refine_calib_focal_principal(x1, x2, image_pair, bundle_opt);
-            break;
-        case CALIB_SHARED_FOCAL_1P:
-        case CALIB_SHARED_FOCAL_2P:
-            refine_calib_shared_focal(x1, x2, image_pair, bundle_opt);
-            break;
-        case CALIB_SHARED_FOCAL_PRINCIPAL_4P:
-            refine_calib_shared_focal_principal(x1, x2, image_pair, bundle_opt);
-            break;
-
-    }
-
+    refine_relpose(x1, x2, image_pair, bundle_opt);
 }
 
-void CalibRDWithKnownPoseEstimator::generate_models(ImagePairVector *models) {
+
+void ThreeViewTRFEstimator::generate_models(std::vector<ImageTriplet> *models) {
     sampler.generate_sample(&sample);
     for (size_t k = 0; k < sample_sz; ++k){
         x1s[k] = x1[sample[k]];
         x2s[k] = x2[sample[k]];
+        x3s[k] = x3[sample[k]];
     }
 
-    switch(method){
-        case CALIB_SHARED_RD_FOCAL_2P:
-            calib_known_motion_rd_f_2p(x1s, x2s, E, pose, models);
-            break;
-        case CALIB_SHARED_RD_FOCAL_3P:
-            calib_known_motion_rd_f_3p(x1s, x2s, E, pose, models);
-            break;
-    }
+    relpose_3v_trf(x1s, x2s, x3s, alpha, opt, models);
 }
 
-double CalibRDWithKnownPoseEstimator::score_model(const ImagePair &image_pair, size_t *inlier_count) const {
-    if (optimize_relpose){
-        Eigen::Matrix3d EE;
-        essential_from_motion(image_pair.pose, &EE);
+double ThreeViewTRFEstimator::score_model(const ImageTriplet &image_triplet, size_t *inlier_count) const {
+//    double score = compute_tangent_sampson_msac_score(image_pair, x1, x2, opt.max_error * opt.max_error, inlier_count);
+    double focal = image_triplet.camera.focal();
+    double k = image_triplet.camera.params[3];
 
-        return compute_tangent_sampson_msac_score(EE, x1, x2, image_pair.camera1, image_pair.camera2,
-                                                  opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
-    }
-    return compute_tangent_sampson_msac_score(E, x1, x2, image_pair.camera1, image_pair.camera2,
-                                              opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
+
+    double score = compute_tangent_sampson_msac_score(image_triplet, x1, x2, x3, opt.max_error * opt.max_error,
+                                                      inlier_count);
+
+    std::cout << "f: " << focal << " k: " << k << " inliers: " << *inlier_count << " score: " << score << std::endl;
+
+    return score;
 }
 
-void CalibRDWithKnownPoseEstimator::refine_model(ImagePair *image_pair) const {
-    BundleOptions bundle_opt;
+void ThreeViewTRFEstimator::refine_model(ImageTriplet *image_triplet) const {
+    BundleOptions bundle_opt = opt.bundle;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
-    bundle_opt.loss_scale = opt.max_epipolar_error;
-    bundle_opt.max_iterations = opt.lo_iterations;
-
-    if (optimize_relpose) {
-        switch (method) {
-            case CALIB_SHARED_RD_FOCAL_2P:
-            case CALIB_SHARED_RD_FOCAL_3P:
-                refine_shared_rd_focal_relpose(x1, x2, image_pair, bundle_opt);
-                break;
-        }
-        return;
-    }
-
-    switch (method) {
-        case CALIB_SHARED_RD_FOCAL_2P:
-        case CALIB_SHARED_RD_FOCAL_3P:
-            refine_calib_shared_rd_focal(x1, x2, image_pair, bundle_opt);
-            break;
-    }
-
+    bundle_opt.loss_scale = opt.max_error;
+    bundle_opt.max_iterations = opt.ransac.lo_iterations;
+    // TODO: Implement
+    refine_3v_shared_camera_relpose(x1, x2, x3, alpha, image_triplet, bundle_opt);
 }
 
 void GeneralizedRelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {

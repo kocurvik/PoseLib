@@ -90,6 +90,13 @@ BundleStats refine_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
 BundleStats refine_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, ImagePair *pair,
                            const BundleOptions &opt = BundleOptions(),
                            const std::vector<double> &weights = std::vector<double>());
+
+// Relative pose refinement. Minimizes Tangent Sampson error error.
+BundleStats refine_3v_shared_camera_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                            const std::vector<Point2D> &x3, double alpha,
+                                            ImageTriplet *image_triplet, const BundleOptions &opt,
+                                            const std::vector<double> &weights = std::vector<double>());
+
 // Version for pre-computed undistorted points and jacobians
 BundleStats refine_relpose(const std::vector<Point3D> &d1, const std::vector<Point3D> &d2,
                            const std::vector<Eigen::Matrix<double, 3, 2>> &M1,

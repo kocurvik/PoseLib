@@ -223,7 +223,8 @@ SETUP_CAMERA_SHARED_DEFS(SimpleDivisionCameraModel, "SIMPLE_DIVISION", 102);
     SWITCH_CAMERA_MODEL_CASE(RadialFisheyeCameraModel)                                                                 \
     SWITCH_CAMERA_MODEL_CASE(ThinPrismFisheyeCameraModel)                                                              \
     SWITCH_CAMERA_MODEL_CASE(Radial1DCameraModel)                                                                      \
-    SWITCH_CAMERA_MODEL_CASE(SphericalCameraModel);
+    SWITCH_CAMERA_MODEL_CASE(SphericalCameraModel);\
+    SWITCH_CAMERA_MODEL_CASE(SimpleDivisionCameraModel);
 
 #undef SETUP_CAMERA_SHARED_DEFS
 

@@ -33,12 +33,9 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "min_iterations", ransac_opt.min_iterations);
     update(input, "dyn_num_trials_mult", ransac_opt.dyn_num_trials_mult);
     update(input, "success_prob", ransac_opt.success_prob);
-    update(input, "max_reproj_error", ransac_opt.max_reproj_error);
-    update(input, "max_epipolar_error", ransac_opt.max_epipolar_error);
     update(input, "seed", ransac_opt.seed);
     update(input, "progressive_sampling", ransac_opt.progressive_sampling);
     update(input, "max_prosac_iterations", ransac_opt.max_prosac_iterations);
-    update(input, "real_focal_check", ransac_opt.real_focal_check);
     update(input, "min_fov", ransac_opt.min_fov);
     update(input, "estimate_focal_length", ransac_opt.estimate_focal_length);
     update(input, "estimate_extra_params", ransac_opt.estimate_extra_params);
@@ -58,6 +55,9 @@ void update_bundle_options(const py::dict &input, BundleOptions &bundle_opt) {
     update(input, "refine_focal_length", bundle_opt.refine_focal_length);
     update(input, "refine_principal_point", bundle_opt.refine_principal_point);
     update(input, "refine_extra_params", bundle_opt.refine_extra_params);
+    update(input, "refine_pose", bundle_opt.refine_pose);
+    update(input, "shared_camera", bundle_opt.shared_camera);
+    update(input, "weight_alpha", bundle_opt.weight_alpha);
 
     if (input.contains("loss_type")) {
         std::string loss_type = input["loss_type"].cast<std::string>();
@@ -97,9 +97,14 @@ void update_relative_pose_options(const py::dict &input, RelativePoseOptions &op
     update(input, "max_error", opt.max_error);
     update(input, "estimate_focal_length", opt.estimate_focal_length);
     update(input, "estimate_extra_params", opt.estimate_extra_params);
+    update(input, "estimate_principal_point", opt.estimate_principal_point);
+    update(input, "pure_translation", opt.pure_translation);
     update(input, "shared_intrinsics", opt.shared_intrinsics);
     update(input, "tangent_sampson", opt.tangent_sampson);
     update(input, "real_focal_check", opt.real_focal_check);
+    update(input, "sample_sz", opt.sample_sz);
+    update(input, "theta", opt.theta);
+    update(input, "theta_tol", opt.theta_tol);
     if(input.contains("ransac")) {
         update_ransac_options(input["ransac"].cast<py::dict>(), opt.ransac);
     }
@@ -125,12 +130,9 @@ void write_to_dict(const RansacOptions &ransac_opt, py::dict &dict) {
     dict["min_iterations"] = ransac_opt.min_iterations;
     dict["dyn_num_trials_mult"] = ransac_opt.dyn_num_trials_mult;
     dict["success_prob"] = ransac_opt.success_prob;
-    dict["max_reproj_error"] = ransac_opt.max_reproj_error;
-    dict["max_epipolar_error"] = ransac_opt.max_epipolar_error;
     dict["seed"] = ransac_opt.seed;
     dict["progressive_sampling"] = ransac_opt.progressive_sampling;
     dict["max_prosac_iterations"] = ransac_opt.max_prosac_iterations;
-    dict["real_focal_check"] = ransac_opt.real_focal_check;
     dict["min_fov"] = ransac_opt.min_fov;
     dict["estimate_focal_length"] = ransac_opt.estimate_focal_length;
     dict["estimate_extra_params"] = ransac_opt.estimate_extra_params;
@@ -167,6 +169,9 @@ void write_to_dict(const BundleOptions &bundle_opt, py::dict &dict) {
     dict["refine_focal_length"] = bundle_opt.refine_focal_length;
     dict["refine_principal_point"] = bundle_opt.refine_principal_point;
     dict["refine_extra_params"] = bundle_opt.refine_extra_params;
+    dict["refine_pose"] = bundle_opt.refine_pose;
+    dict["shared_camera"] = bundle_opt.shared_camera;
+    dict["weight_alpha"] = bundle_opt.weight_alpha;
 }
 
 void write_to_dict(const AbsolutePoseOptions &opt, py::dict &dict) {
@@ -196,9 +201,12 @@ void write_to_dict(const RelativePoseOptions &opt, py::dict &dict) {
     dict["max_error"] = opt.max_error;
     dict["estimate_focal_length"] = opt.estimate_focal_length;
     dict["estimate_extra_params"] = opt.estimate_extra_params;
+    dict["estimate_principal_point"] = opt.estimate_principal_point;
+    dict["pure_translation"] = opt.pure_translation;
     dict["shared_intrinsics"] = opt.shared_intrinsics;
     dict["tangent_sampson"] = opt.tangent_sampson;
     dict["real_focal_check"] = opt.real_focal_check;
+    dict["sample_sz"] = opt.sample_sz;
 }
 
 void write_to_dict(const HomographyOptions &opt, py::dict &dict) {

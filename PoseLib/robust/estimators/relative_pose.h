@@ -139,28 +139,13 @@ class SharedFocalRelativePoseEstimator {
 
 class CalibWithKnownPoseEstimator {
   public:
-    CalibWithKnownPoseEstimator(const RansacOptions &ransac_opt, const CalibMethod &method,
+    CalibWithKnownPoseEstimator(const RelativePoseOptions &opt,
                                 const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                const Eigen::Matrix3d &R, const Point3D &t, bool optimize_relpose)
-        : num_data(x1.size()), opt(ransac_opt), method(method), x1(x1), x2(x2), optimize_relpose(optimize_relpose),
-          sampler(num_data, 2, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
-        switch (method){
-            case (CALIB_SHARED_FOCAL_1P):
-                sample_sz = 1; break;
-            case (CALIB_SHARED_FOCAL_2P):
-            case (CALIB_FOCAL_2P):
-                sample_sz = 2; break;
-            case (CALIB_FOCAL_3P):
-                sample_sz = 3; break;
-            case (CALIB_SHARED_FOCAL_PRINCIPAL_4P):
-                sample_sz = 4; break;
-            case (CALIB_FOCAL_PRINCIPAL_7P):
-                sample_sz = 7; break;
-            default:
-                throw std::runtime_error("NYI");
-        }
+                                const Eigen::Matrix3d &R, const Point3D &t)
+        : num_data(x1.size()), sample_sz(opt.sample_sz), opt(opt), x1(x1), x2(x2),
+          sampler(num_data, sample_sz, opt.ransac) {
 
-        sampler = RandomSampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations);
+        sampler = RandomSampler(num_data, sample_sz, opt.ransac);
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);
         sample.resize(sample_sz);
@@ -176,11 +161,9 @@ class CalibWithKnownPoseEstimator {
     size_t sample_sz;
 
   private:
-    const RansacOptions &opt;
-    const CalibMethod &method;
+    const RelativePoseOptions &opt;
     const std::vector<Point2D> &x1;
     const std::vector<Point2D> &x2;
-    const bool optimize_relpose;
     Eigen::Matrix3d E;
     CameraPose pose;
 
@@ -190,49 +173,37 @@ class CalibWithKnownPoseEstimator {
     std::vector<size_t> sample;
 };
 
-class CalibRDWithKnownPoseEstimator {
+class ThreeViewTRFEstimator {
   public:
-    CalibRDWithKnownPoseEstimator(const RansacOptions &ransac_opt, const CalibRDMethod &method,
-                                  const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                  const Eigen::Matrix3d &R, const Point3D &t, bool optimize_relpose)
-        : num_data(x1.size()), opt(ransac_opt), method(method), x1(x1), x2(x2), optimize_relpose(optimize_relpose),
-          sampler(num_data, 2, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations) {
-        switch (method){
-            case (CALIB_SHARED_RD_FOCAL_2P):
-                sample_sz = 2; break;
-            case (CALIB_SHARED_RD_FOCAL_3P):
-                sample_sz = 3; break;
-            default:
-                throw std::runtime_error("NYI");
-        }
-
-        sampler = RandomSampler(num_data, sample_sz, opt.seed, opt.progressive_sampling, opt.max_prosac_iterations);
+    ThreeViewTRFEstimator(const RelativePoseOptions &opt,
+                                const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                const std::vector<Point2D> &x3, double alpha)
+        : num_data(x1.size()), sample_sz(opt.sample_sz), opt(opt), x1(x1), x2(x2), x3(x3), alpha(alpha),
+        sampler(num_data, sample_sz, opt.ransac) {
+        sampler = RandomSampler(num_data, sample_sz, opt.ransac);
         x1s.resize(sample_sz);
         x2s.resize(sample_sz);
+        x3s.resize(sample_sz);
         sample.resize(sample_sz);
-        pose = CameraPose(R, t);
-        essential_from_motion(pose, &E);
     }
 
-    void generate_models(ImagePairVector *models);
-    double score_model(const ImagePair &image_pair, size_t *inlier_count) const;
-    void refine_model(ImagePair *image_pair) const;
+    void generate_models(std::vector<ImageTriplet> *models);
+    double score_model(const ImageTriplet &image_triplet, size_t *inlier_count) const;
+    void refine_model(ImageTriplet *image_triplet) const;
 
     const size_t num_data;
     size_t sample_sz;
 
   private:
-    const RansacOptions &opt;
-    const CalibRDMethod &method;
+    const RelativePoseOptions &opt;
     const std::vector<Point2D> &x1;
     const std::vector<Point2D> &x2;
-    const bool optimize_relpose;
-    Eigen::Matrix3d E;
-    CameraPose pose;
+    const std::vector<Point2D> &x3;
+    const double alpha;
 
     RandomSampler sampler;
     // pre-allocated vectors for sampling
-    std::vector<Eigen::Vector2d> x1s, x2s;
+    std::vector<Eigen::Vector2d> x1s, x2s, x3s;
     std::vector<size_t> sample;
 };
 

@@ -2374,60 +2374,60 @@ void SimpleDivisionCameraModel::unproject(const std::vector<double> &params, con
     x->normalize();
 }
 
-void SimpleDivisionCameraModel::unproject_with_jac(const std::vector<double> &params, const Eigen::Vector2d &xp,
-                                             Eigen::Vector3d *x, Eigen::Matrix<double, 3, 2> *jac,
-                                             Eigen::Matrix<double, 3, Eigen::Dynamic> *jac_p) {
-    const double x0 = (xp(0) - params[1]) / params[0];
-    const double y0 = (xp(1) - params[2]) / params[0];
-    const double r2 = x0 * x0 + y0 * y0;
-
-    (*x)[0] = x0;
-    (*x)[1] = y0;
-    (*x)[2] = 1.0 + params[3] * r2;
-    double inv_norm = 1.0 / x->norm();
-
-    (*x) *= inv_norm;
-
-    if (jac) {
-        (*jac)(0, 0) = params[0] * (1 - (*x)(0) * (*x)(0)) + 2 * (*x)(0) * (*x)(2) * params[3] * (params[1] - xp[0]);
-        (*jac)(0, 1) = (*x)(0) * (-params[0] * (*x)(1) + 2 * (*x)(2) * params[3] * (params[2] - xp[1]));
-        (*jac)(1, 0) = (*x)(1) * (-params[0] * (*x)(0) + 2 * (*x)(2) * params[3] * (params[1] - xp[0]));
-        (*jac)(1, 1) = params[0] * (1 - (*x)(1) * (*x)(1)) + 2 * (*x)(1) * (*x)(2) * params[3] * (params[2] - xp[1]);
-        (*jac)(2, 0) = -params[0] * (*x)(0) * (*x)(2) + 2 * params[3] * (params[1] - xp[0]) * ((*x)(2) * (*x)(2) - 1);
-        (*jac)(2, 1) = -params[0] * (*x)(1) * (*x)(2) + 2 * params[3] * (params[2] - xp[1]) * ((*x)(2) * (*x)(2) - 1);
-        jac->col(0) *= inv_norm / (params[0] * params[0]);
-        jac->col(1) *= inv_norm / (params[0] * params[0]);
-    }
-
-    if (jac_p) {
-        jac_p->resize(3, 4);
-        (*jac_p)(0, 0) = (params[1] - xp[0]) * (-params[0] * ((*x)(0) * (*x)(0) - 1) +
-                                                2 * (*x)(0) * (*x)(2) * params[3] * (params[1] - xp[0]));
-        (*jac_p)(0, 0) +=
-            (*x)(0) * (params[2] - xp[1]) * (-params[0] * (*x)(1) + 2 * (*x)(2) * params[3] * (params[2] - xp[1]));
-        (*jac_p)(0, 1) = params[0] * ((*x)(0) * (*x)(0) - 1) - 2 * (*x)(0) * (*x)(2) * params[3] * (params[1] - xp[0]);
-        (*jac_p)(0, 2) = (*x)(0) * (params[0] * (*x)(1) - 2 * (*x)(2) * params[3] * (params[2] - xp[1]));
-        (*jac_p)(0, 3) = -(*x)(0) * (*x)(2) * r2;
-        (*jac_p)(1, 0) =
-            (*x)(1) * (params[1] - xp[0]) * (-params[0] * (*x)(0) + 2 * (*x)(2) * params[3] * (params[1] - xp[0]));
-        (*jac_p)(1, 0) += (params[2] - xp[1]) * (-params[0] * ((*x)(1) * (*x)(1) - 1) +
-                                                2 * (*x)(1) * (*x)(2) * params[3] * (params[2] - xp[1]));
-        (*jac_p)(1, 1) = (*x)(1) * (params[0] * (*x)(0) - 2 * (*x)(2) * params[3] * (params[1] - xp[0]));
-        (*jac_p)(1, 2) = params[0] * ((*x)(1) * (*x)(1) - 1) - 2 * (*x)(1) * (*x)(2) * params[3] * (params[2] - xp[1]);
-        (*jac_p)(1, 3) = -(*x)(1) * (*x)(2) * r2;
-        (*jac_p)(2, 0) = (params[1] - xp[0]) * (-params[0] * (*x)(0) * (*x)(2) +
-                                                2 * params[3] * (params[1] - xp[0]) * ((*x)(1) * (*x)(1) - 1));
-        (*jac_p)(2, 0) += (params[2] - xp[1]) * (-params[0] * (*x)(1) * (*x)(2) +
-                                                2 * params[3] * (params[2] - xp[1]) * ((*x)(1) * (*x)(1) - 1));
-        (*jac_p)(2, 1) = params[0] * (*x)(0) * (*x)(2) - 2 * params[3] * (params[1] - xp[0]) * ((*x)(1) * (*x)(1) - 1);
-        (*jac_p)(2, 2) = params[0] * (*x)(1) * (*x)(2) - 2 * params[3] * (params[2] - xp[1]) * ((*x)(1) * (*x)(1) - 1);
-        (*jac_p)(2, 3) = r2 * (1 - (*x)(2) * (*x)(2));
-        jac_p->col(0) /= std::pow(params[0], 3);
-        jac_p->col(1) /= std::pow(params[0], 2);
-        jac_p->col(2) /= std::pow(params[0], 2);
-        *jac_p *= inv_norm;
-    }
-}
+//void SimpleDivisionCameraModel::unproject_with_jac(const std::vector<double> &params, const Eigen::Vector2d &xp,
+//                                             Eigen::Vector3d *x, Eigen::Matrix<double, 3, 2> *jac,
+//                                             Eigen::Matrix<double, 3, Eigen::Dynamic> *jac_p) {
+//    const double x0 = (xp(0) - params[1]) / params[0];
+//    const double y0 = (xp(1) - params[2]) / params[0];
+//    const double r2 = x0 * x0 + y0 * y0;
+//
+//    (*x)[0] = x0;
+//    (*x)[1] = y0;
+//    (*x)[2] = 1.0 + params[3] * r2;
+//    double inv_norm = 1.0 / x->norm();
+//
+//    (*x) *= inv_norm;
+//
+//    if (jac) {
+//        (*jac)(0, 0) = params[0] * (1 - (*x)(0) * (*x)(0)) + 2 * (*x)(0) * (*x)(2) * params[3] * (params[1] - xp[0]);
+//        (*jac)(0, 1) = (*x)(0) * (-params[0] * (*x)(1) + 2 * (*x)(2) * params[3] * (params[2] - xp[1]));
+//        (*jac)(1, 0) = (*x)(1) * (-params[0] * (*x)(0) + 2 * (*x)(2) * params[3] * (params[1] - xp[0]));
+//        (*jac)(1, 1) = params[0] * (1 - (*x)(1) * (*x)(1)) + 2 * (*x)(1) * (*x)(2) * params[3] * (params[2] - xp[1]);
+//        (*jac)(2, 0) = -params[0] * (*x)(0) * (*x)(2) + 2 * params[3] * (params[1] - xp[0]) * ((*x)(2) * (*x)(2) - 1);
+//        (*jac)(2, 1) = -params[0] * (*x)(1) * (*x)(2) + 2 * params[3] * (params[2] - xp[1]) * ((*x)(2) * (*x)(2) - 1);
+//        jac->col(0) *= inv_norm / (params[0] * params[0]);
+//        jac->col(1) *= inv_norm / (params[0] * params[0]);
+//    }
+//
+//    if (jac_p) {
+//        jac_p->resize(3, 4);
+//        (*jac_p)(0, 0) = (params[1] - xp[0]) * (-params[0] * ((*x)(0) * (*x)(0) - 1) +
+//                                                2 * (*x)(0) * (*x)(2) * params[3] * (params[1] - xp[0]));
+//        (*jac_p)(0, 0) +=
+//            (*x)(0) * (params[2] - xp[1]) * (-params[0] * (*x)(1) + 2 * (*x)(2) * params[3] * (params[2] - xp[1]));
+//        (*jac_p)(0, 1) = params[0] * ((*x)(0) * (*x)(0) - 1) - 2 * (*x)(0) * (*x)(2) * params[3] * (params[1] - xp[0]);
+//        (*jac_p)(0, 2) = (*x)(0) * (params[0] * (*x)(1) - 2 * (*x)(2) * params[3] * (params[2] - xp[1]));
+//        (*jac_p)(0, 3) = -(*x)(0) * (*x)(2) * r2;
+//        (*jac_p)(1, 0) =
+//            (*x)(1) * (params[1] - xp[0]) * (-params[0] * (*x)(0) + 2 * (*x)(2) * params[3] * (params[1] - xp[0]));
+//        (*jac_p)(1, 0) += (params[2] - xp[1]) * (-params[0] * ((*x)(1) * (*x)(1) - 1) +
+//                                                2 * (*x)(1) * (*x)(2) * params[3] * (params[2] - xp[1]));
+//        (*jac_p)(1, 1) = (*x)(1) * (params[0] * (*x)(0) - 2 * (*x)(2) * params[3] * (params[1] - xp[0]));
+//        (*jac_p)(1, 2) = params[0] * ((*x)(1) * (*x)(1) - 1) - 2 * (*x)(1) * (*x)(2) * params[3] * (params[2] - xp[1]);
+//        (*jac_p)(1, 3) = -(*x)(1) * (*x)(2) * r2;
+//        (*jac_p)(2, 0) = (params[1] - xp[0]) * (-params[0] * (*x)(0) * (*x)(2) +
+//                                                2 * params[3] * (params[1] - xp[0]) * ((*x)(1) * (*x)(1) - 1));
+//        (*jac_p)(2, 0) += (params[2] - xp[1]) * (-params[0] * (*x)(1) * (*x)(2) +
+//                                                2 * params[3] * (params[2] - xp[1]) * ((*x)(1) * (*x)(1) - 1));
+//        (*jac_p)(2, 1) = params[0] * (*x)(0) * (*x)(2) - 2 * params[3] * (params[1] - xp[0]) * ((*x)(1) * (*x)(1) - 1);
+//        (*jac_p)(2, 2) = params[0] * (*x)(1) * (*x)(2) - 2 * params[3] * (params[2] - xp[1]) * ((*x)(1) * (*x)(1) - 1);
+//        (*jac_p)(2, 3) = r2 * (1 - (*x)(2) * (*x)(2));
+//        jac_p->col(0) /= std::pow(params[0], 3);
+//        jac_p->col(1) /= std::pow(params[0], 2);
+//        jac_p->col(2) /= std::pow(params[0], 2);
+//        *jac_p *= inv_norm;
+//    }
+//}
 
 const size_t SimpleDivisionCameraModel::num_params = 4;
 const std::string SimpleDivisionCameraModel::params_info() { return "f, cx, cy, k"; };

@@ -104,6 +104,39 @@ struct alignas(32) ProjectiveImagePair {
     ProjectiveImagePair() : F(Eigen::Matrix3d::Identity()), camera1(Camera()), camera2(Camera()) {}
     ProjectiveImagePair(Eigen::Matrix3d F, Camera camera1, Camera camera2) : F(F), camera1(camera1), camera2(camera2) {}
 };
+
+struct alignas(32) ThreeViewCameraPose {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    // Rotation is represented as a unit quaternion
+    // with real part first, i.e. QW, QX, QY, QZ
+    CameraPose pose12;
+    CameraPose pose13;
+
+    // Constructors (Defaults to identity camera)
+    ThreeViewCameraPose() : pose12(CameraPose()), pose13(CameraPose()) {}
+    ThreeViewCameraPose(CameraPose pose12, CameraPose pose13) : pose12(pose12), pose13(pose13) {}
+
+    const CameraPose pose23() const {
+        Eigen::Matrix3d R23 = pose13.R() * pose12.R().transpose();
+        Eigen::Vector3d t23 = - R23 * pose12.t + pose13.t;
+
+        return CameraPose(R23, t23);
+    }
+};
+
+struct alignas(32) ImageTriplet {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    // Rotation is represented as a unit quaternion
+    // with real part first, i.e. QW, QX, QY, QZ
+    ThreeViewCameraPose poses;
+    Camera camera;
+
+    // Constructors (Defaults to identity camera)
+    ImageTriplet() : poses(ThreeViewCameraPose()), camera(Camera()) {}
+    ImageTriplet(ThreeViewCameraPose poses, Camera camera) : poses(poses), camera(camera) {}
+};
 } // namespace poselib
 
 #endif

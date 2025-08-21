@@ -233,6 +233,34 @@ BundleStats refine_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
+// 3v relative pose refinement. Allows for general camera models
+template <typename WeightType>
+BundleStats refine_3v_shared_camera_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                            const std::vector<Point2D> &x3, double alpha, ImageTriplet *image_triplet,
+                                            const BundleOptions &opt, const WeightType &weights) {
+    IterationCallback callback = setup_callback(opt);
+    std::vector<size_t> camera_refine_idx = image_triplet->camera.get_param_refinement_idx(opt);
+    ThreeViewSharedCameraRefiner<decltype(weights)> refiner(x1, x2, x3, camera_refine_idx, alpha, opt.weight_alpha, weights);
+    return lm_impl<decltype(refiner)>(refiner, image_triplet, opt, callback);
+}
+
+// Entry point for relative pose with unknown shared focal refinement
+    BundleStats refine_3v_shared_camera_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                                const std::vector<Point2D> &x3, double alpha,
+                                                ImageTriplet *image_triplet, const BundleOptions &opt,
+                                                const std::vector<double> &weights) {
+    double inv_alpha_root = 1.0 / std::sqrt(alpha);
+    if (weights.size() == x1.size()) {
+        return refine_3v_shared_camera_relpose<std::vector<double>>(x1, x2, x3, inv_alpha_root, image_triplet, opt,
+                                                                    weights);
+    } else {
+        return refine_3v_shared_camera_relpose<UniformWeightVector>(x1, x2, x3, inv_alpha_root, image_triplet, opt,
+                                                                    UniformWeightVector());
+    }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
 // Relative pose (essential matrix) refinement. Allows for general camera models
 
 template <typename WeightType>
@@ -260,8 +288,14 @@ BundleStats refine_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
         IterationCallback callback = setup_callback(opt);
         std::vector<size_t> camera1_refine_idx = pair->camera1.get_param_refinement_idx(opt);
         std::vector<size_t> camera2_refine_idx = pair->camera2.get_param_refinement_idx(opt);
-        CameraRelativePoseRefiner<decltype(weights)> refiner(x1, x2, camera1_refine_idx, camera2_refine_idx, false,
-                                                             weights);
+
+        if (!opt.refine_pose) {
+            CameraRelativeFixPoseRefiner<decltype(weights)> refiner(x1, x2, camera1_refine_idx, camera2_refine_idx,
+                                                                    opt.shared_camera, weights);
+            return lm_impl<decltype(refiner)>(refiner, pair, opt, callback);
+        }
+        CameraRelativePoseRefiner<decltype(weights)> refiner(x1, x2, camera1_refine_idx, camera2_refine_idx,
+                                                             opt.shared_camera, weights);
         return lm_impl<decltype(refiner)>(refiner, pair, opt, callback);
     }
 }
@@ -308,123 +342,6 @@ BundleStats refine_shared_focal_relpose(const std::vector<Point2D> &x1, const st
         return refine_shared_focal_relpose<UniformWeightVector>(x1, x2, image_pair, opt, UniformWeightVector());
     }
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////
-// Relative pose with unknown focal refinement
-
-template <typename WeightType>
-BundleStats refine_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                        ImagePair *image_pair, const BundleOptions &opt, const WeightType &weights) {
-    IterationCallback callback = setup_callback(opt);
-    FocalRelativePoseRefiner<decltype(weights)> refiner(x1, x2, weights);
-    return lm_impl<decltype(refiner)>(refiner, image_pair, opt, callback);
-}
-
-// Entry point for relative pose with unknown shared focal refinement
-BundleStats refine_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                        ImagePair *image_pair, const BundleOptions &opt,
-                                        const std::vector<double> &weights) {
-    if (weights.size() == x1.size()) {
-        return refine_focal_relpose<std::vector<double>>(x1, x2, image_pair, opt, weights);
-    } else {
-        return refine_focal_relpose<UniformWeightVector>(x1, x2, image_pair, opt, UniformWeightVector());
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////
-// Calib refinements
-
-template <typename WeightType>
-BundleStats refine_calib_shared_focal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                      ImagePair *image_pair, const BundleOptions &opt, const WeightType &weights) {
-    IterationCallback callback = setup_callback(opt);
-    CalibSharedFocalRefiner<decltype(weights)> refiner(x1, x2, weights);
-    return lm_impl<decltype(refiner)>(refiner, image_pair, opt, callback);
-}
-
-BundleStats refine_calib_shared_focal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                      ImagePair *image_pair, const BundleOptions &opt,
-                                      const std::vector<double> &weights) {
-    if (weights.size() == x1.size()) {
-        return refine_calib_shared_focal<std::vector<double>>(x1, x2, image_pair, opt, weights);
-    } else {
-        return refine_calib_shared_focal<UniformWeightVector>(x1, x2, image_pair, opt, UniformWeightVector());
-    }
-}
-
-template <typename WeightType>
-BundleStats refine_calib_shared_focal_principal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                                ImagePair *image_pair, const BundleOptions &opt,
-                                                const WeightType &weights) {
-    IterationCallback callback = setup_callback(opt);
-    CalibSharedFocalPrincipalRefiner<decltype(weights)> refiner(x1, x2, weights);
-    return lm_impl<decltype(refiner)>(refiner, image_pair, opt, callback);
-}
-
-BundleStats refine_calib_shared_focal_principal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                                ImagePair *image_pair, const BundleOptions &opt,
-                                                const std::vector<double> &weights) {
-    if (weights.size() == x1.size()) {
-        return refine_calib_shared_focal_principal<std::vector<double>>(x1, x2, image_pair, opt, weights);
-    } else {
-        return refine_calib_shared_focal_principal<UniformWeightVector>(x1, x2, image_pair, opt, UniformWeightVector());
-    }
-}
-
-template <typename WeightType>
-BundleStats refine_calib_focal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                      ImagePair *image_pair, const BundleOptions &opt, const WeightType &weights) {
-    IterationCallback callback = setup_callback(opt);
-    CalibFocalRefiner<decltype(weights)> refiner(x1, x2, weights);
-    return lm_impl<decltype(refiner)>(refiner, image_pair, opt, callback);
-}
-
-BundleStats refine_calib_focal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                      ImagePair *image_pair, const BundleOptions &opt,
-                                      const std::vector<double> &weights) {
-    if (weights.size() == x1.size()) {
-        return refine_calib_focal<std::vector<double>>(x1, x2, image_pair, opt, weights);
-    } else {
-        return refine_calib_focal<UniformWeightVector>(x1, x2, image_pair, opt, UniformWeightVector());
-    }
-}
-
-template <typename WeightType>
-BundleStats refine_calib_focal_principal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                         ImagePair *image_pair, const BundleOptions &opt, const WeightType &weights) {
-    IterationCallback callback = setup_callback(opt);
-    CalibFocalPrincipalRefiner<decltype(weights)> refiner(x1, x2, weights);
-    return lm_impl<decltype(refiner)>(refiner, image_pair, opt, callback);
-}
-
-BundleStats refine_calib_focal_principal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                      ImagePair *image_pair, const BundleOptions &opt,
-                                      const std::vector<double> &weights) {
-    if (weights.size() == x1.size()) {
-        return refine_calib_focal_principal<std::vector<double>>(x1, x2, image_pair, opt, weights);
-    } else {
-        return refine_calib_focal_principal<UniformWeightVector>(x1, x2, image_pair, opt, UniformWeightVector());
-    }
-}
-
-template <typename WeightType>
-BundleStats refine_calib_shared_rd_focal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                         ImagePair *image_pair, const BundleOptions &opt, const WeightType &weights) {
-    IterationCallback callback = setup_callback(opt);
-    CalibSharedRDFocalRefiner<decltype(weights)> refiner(x1, x2, weights);
-    return lm_impl<decltype(refiner)>(refiner, image_pair, opt, callback);
-}
-
-BundleStats refine_calib_shared_rd_focal(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                      ImagePair *image_pair, const BundleOptions &opt,
-                                      const std::vector<double> &weights) {
-    if (weights.size() == x1.size()) {
-        return refine_calib_shared_rd_focal<std::vector<double>>(x1, x2, image_pair, opt, weights);
-    } else {
-        return refine_calib_shared_rd_focal<UniformWeightVector>(x1, x2, image_pair, opt, UniformWeightVector());
-    }
-}
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 // Uncalibrated relative pose (fundamental matrix) refinement

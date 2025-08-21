@@ -36,25 +36,15 @@
 
 namespace poselib {
 
-enum CalibMethod { CALIB_SHARED_FOCAL_1P, CALIB_SHARED_FOCAL_2P, CALIB_SHARED_FOCAL_PRINCIPAL_4P, CALIB_FOCAL_2P,
-                   CALIB_FOCAL_3P, CALIB_FOCAL_PRINCIPAL_7P};
-
-enum CalibRDMethod {CALIB_SHARED_RD_FOCAL_2P, CALIB_SHARED_RD_FOCAL_3P};
-
 struct RansacOptions {
     size_t max_iterations = 100000;
     size_t min_iterations = 1000;
     double dyn_num_trials_mult = 3.0;
     double success_prob = 0.9999;
-    double max_reproj_error = 12.0;  // used for 2D-3D matches
-    double max_epipolar_error = 1.0; // used for 2D-2D matches
     unsigned long seed = 0;
     // If we should use PROSAC sampling. Assumes data is sorted
     bool progressive_sampling = false;
     size_t max_prosac_iterations = 100000;
-    // Whether we should use real focal length checking: https://arxiv.org/abs/2311.16304
-    // Assumes that principal points of both cameras are at origin.
-    bool real_focal_check = false;
     // Minimum (effective) field-of-view to accept when estimating focal length
     // in degrees. Effective means based on the image points supplied
     // and not on the actual image size.
@@ -94,6 +84,9 @@ struct BundleOptions {
     bool refine_focal_length = false;
     bool refine_extra_params = false;
     bool refine_principal_point = false;
+    bool refine_pose = true;
+    bool shared_camera = false;
+    double weight_alpha = 0.0;
 };
 
 struct BundleStats {
@@ -136,12 +129,18 @@ struct RelativePoseOptions {
 
     bool estimate_focal_length = false;
     bool estimate_extra_params = false;
+    bool estimate_principal_point = false;
+    bool pure_translation = false;
     bool shared_intrinsics = false;
     bool tangent_sampson = false;
 
     // Whether we should use real focal length checking: https://arxiv.org/abs/2311.16304
     // Assumes that principal points of both cameras are at origin.
     bool real_focal_check = false;
+
+    size_t sample_sz = 0;
+    double theta = 0.0;
+    double theta_tol = 0.0;
 };
 
 struct HomographyOptions {
