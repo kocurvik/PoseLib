@@ -38,7 +38,7 @@ set(MAX_STURM_RECURSION_DEPTH_LIMIT 300 CACHE STRING
 	"Maximum recursion depth for Sturm sequence solver of univariate polynomials.")
 
 target_compile_definitions(
-	PoseLib PRIVATE
+	PoseLib PUBLIC
 	MAX_STURM_RECURSION_DEPTH_LIMIT=${MAX_STURM_RECURSION_DEPTH_LIMIT}
 )
 
