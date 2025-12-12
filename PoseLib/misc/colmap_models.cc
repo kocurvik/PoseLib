@@ -40,7 +40,7 @@ static const size_t UNDIST_MAX_ITER = 25;
 ///////////////////////////////////////////////////////////////////
 // Camera - base class storing ID
 
-Camera::Camera() { Camera(-1, {}, -1, -1); }
+Camera::Camera() : model_id(-1), width(-1), height(-1), params() {}
 Camera::Camera(const std::string &model_name, const std::vector<double> &p, int w, int h) {
     model_id = id_from_string(model_name);
     params = p;
@@ -641,7 +641,6 @@ void FullOpenCVCameraModel::unproject(const std::vector<double> &params, const E
                                       Eigen::Vector2d *x) {
     Eigen::Vector2d xp0;
     xp0 << (xp(0) - params[2]) / params[0], (xp(1) - params[3]) / params[1];
-    Eigen::Vector2d x0;
     *x = undistort_full_opencv(params[4], params[5], params[6], params[7], params[8], params[9], params[10], params[11],
                                xp0);
 }
