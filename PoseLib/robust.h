@@ -86,6 +86,13 @@ RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &poin
                                                 const RelativePoseOptions &opt, ImagePair *image_pair,
                                                 std::vector<char> *inliers);
 
+// Estimates relative pose with two different unknown focal lengths using LO-RANSAC followed by non-linear refinement
+// Threshold for Sampson error is set by RansacOptions.max_epipolar_error
+RansacStats estimate_varying_focal_relative_pose(const std::vector<Point2D> &points2D_1,
+                                                 const std::vector<Point2D> &points2D_2, const Point2D &pp1,
+                                                 const Point2D &pp2, const RelativePoseOptions &opt,
+                                                 ImagePair *image_pair, std::vector<char> *inliers);
+
 // Estimates relative pose with shared unknown focal length from point correspondences with estimated monodepth
 // using LO-RANSAC followed by non-linear refinement. The points are assumed to be normalized such that pp = [0,0].
 // Uses hybrid scoring with reprojection and epipolar errors
