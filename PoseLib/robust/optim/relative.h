@@ -597,7 +597,7 @@ template <typename ResidualWeightVector = UniformWeightVector, typename Accumula
 class VaryingFocalRelativePoseRefiner : public RefinerBase<ImagePair, Accumulator> {
   public:
     VaryingFocalRelativePoseRefiner(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
-                                   const ResidualWeightVector &w = ResidualWeightVector())
+                                    const ResidualWeightVector &w = ResidualWeightVector())
         : x1(points2D_1), x2(points2D_2), weights(w) {
         this->num_params = 7;
     }
@@ -652,7 +652,6 @@ class VaryingFocalRelativePoseRefiner : public RefinerBase<ImagePair, Accumulato
 
         df1 << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, E(0, 2), E(1, 2), E(2, 2) * f2;
         df2 << 0.0, 0.0, E(2, 0), 0.0, 0.0, E(2, 1), 0.0, 0.0, E(2, 2) * f1;
-
 
         for (size_t k = 0; k < x1.size(); ++k) {
             double C = x2[k].homogeneous().dot(F * x1[k].homogeneous());

@@ -301,7 +301,7 @@ BundleStats refine_shared_focal_relpose(const std::vector<Point2D> &x1, const st
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename WeightType>
 BundleStats refine_varying_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                        ImagePair *image_pair, const BundleOptions &opt, const WeightType &weights) {
+                                         ImagePair *image_pair, const BundleOptions &opt, const WeightType &weights) {
     IterationCallback callback = setup_callback(opt);
     VaryingFocalRelativePoseRefiner<decltype(weights)> refiner(x1, x2, weights);
     return lm_impl<decltype(refiner)>(refiner, image_pair, opt, callback);
@@ -309,8 +309,8 @@ BundleStats refine_varying_focal_relpose(const std::vector<Point2D> &x1, const s
 
 // Entry point for relative pose with unknown varying focal refinement
 BundleStats refine_varying_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
-                                        ImagePair *image_pair, const BundleOptions &opt,
-                                        const std::vector<double> &weights) {
+                                         ImagePair *image_pair, const BundleOptions &opt,
+                                         const std::vector<double> &weights) {
     if (weights.size() == x1.size()) {
         return refine_varying_focal_relpose<std::vector<double>>(x1, x2, image_pair, opt, weights);
     } else {
