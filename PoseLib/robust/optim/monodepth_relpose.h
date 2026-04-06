@@ -323,16 +323,18 @@ class MonoDepthRelPoseRefiner : public RefinerBase<MonoDepthTwoViewGeometry, Acc
 // Monodepth relative pose with shared focal length refinement.
 // Points are in centered pixel coordinates. Focal is shared by both cameras.
 // Parameters: [rotation(3), translation(3), scale(1), focal(1)] = 8
+//   or with shift: [rotation(3), translation(3), scale(1), focal(1), shift1(1), shift2(1)] = 10
 template <typename ResidualWeightVector = UniformWeightVector, typename Accumulator = NormalAccumulator>
 class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair, Accumulator> {
   public:
     MonoDepthSharedFocalRelPoseRefiner(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
                                        const std::vector<double> &d1, const std::vector<double> &d2,
                                        const double scale_reproj, const double weight_sampson,
+                                       const bool refine_shift,
                                        const ResidualWeightVector &w = ResidualWeightVector())
         : x1(points2D_1), x2(points2D_2), d1(d1), d2(d2), scale_reproj(scale_reproj), weight_sampson(weight_sampson),
-          weights(w) {
-        this->num_params = 8;
+          refine_shift(refine_shift), weights(w) {
+        this->num_params = refine_shift ? 10 : 8;
     }
 
     double compute_residual(Accumulator &acc, const MonoDepthImagePair &image_pair) {
@@ -393,6 +395,7 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
         const double shift_2 = geometry.shift2;
         const double f = image_pair.camera1.focal();
         const double sr = std::sqrt(scale_reproj);
+        const int np = this->num_params;
 
         Eigen::Matrix3d E;
         essential_from_motion(geometry.pose, &E);
@@ -448,7 +451,7 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
                     Jproj(0, 2) = -f * Z1(0) * inv_z * inv_z;
                     Jproj(1, 2) = -f * Z1(1) * inv_z * inv_z;
 
-                    Eigen::Matrix<double, 2, 8> J;
+                    Eigen::Matrix<double, 2, Eigen::Dynamic> J(2, np);
                     // Jacobian w.r.t. rotation
                     Eigen::Matrix<double, 2, 3> dZ = Jproj * R;
                     J.col(0) = -X1i(2) * dZ.col(1) + X1i(1) * dZ.col(2);
@@ -464,6 +467,13 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
                         (d1[i] + shift_1) * Eigen::Vector3d(-x1[i](0) / (f * f), -x1[i](1) / (f * f), 0.0);
                     Eigen::Vector3d dZ1_df = R * dX1_df;
                     J.col(7) = xp_cal + Jproj * dZ1_df;
+
+                    if (refine_shift) {
+                        // Jacobian w.r.t. shift1
+                        J.col(8) = Jproj * R * b1;
+                        // Jacobian w.r.t. shift2 (forward reprojection doesn't depend on shift2)
+                        J.col(9).setZero();
+                    }
 
                     res *= sr;
                     J *= sr;
@@ -481,7 +491,7 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
                     Jproj(0, 2) = -f * Z2(0) * inv_z * inv_z;
                     Jproj(1, 2) = -f * Z2(1) * inv_z * inv_z;
 
-                    Eigen::Matrix<double, 2, 8> J;
+                    Eigen::Matrix<double, 2, Eigen::Dynamic> J(2, np);
                     // Jacobian w.r.t. rotation
                     Eigen::Vector3d X2t = X2i - geometry.pose.t;
                     Eigen::Matrix3d dZdr;
@@ -503,6 +513,13 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
                     Eigen::Vector3d dZ2_df = Rt * dX2_df;
                     J.col(7) = xp_cal + Jproj * dZ2_df;
 
+                    if (refine_shift) {
+                        // Jacobian w.r.t. shift1 (backward reprojection doesn't depend on shift1)
+                        J.col(8).setZero();
+                        // Jacobian w.r.t. shift2
+                        J.col(9) = scale * Jproj * Rt * b2;
+                    }
+
                     res *= sr;
                     J *= sr;
                     acc.add_jacobian(res, J, weights[i]);
@@ -514,11 +531,13 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
                 Eigen::Matrix<double, 1, 9> dF_mat;
                 const double r = compute_sampson_jacobian(x1[i], x2[i], F, dF_mat);
 
-                Eigen::Matrix<double, 1, 8> J_sam;
+                Eigen::Matrix<double, 1, Eigen::Dynamic> J_sam(1, np);
+                J_sam.setZero();
                 J_sam.block<1, 3>(0, 0) = dF_mat * dR_F;
                 J_sam.block<1, 3>(0, 3) = dF_mat * dt_F;
                 J_sam(0, 6) = 0.0; // Sampson doesn't depend on scale
                 J_sam(0, 7) = (dF_mat * df_F)(0, 0);
+                // Sampson doesn't depend on shift1, shift2
 
                 acc.add_jacobian(r, J_sam, weight_sampson * weights[i]);
             }
@@ -530,8 +549,13 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
         result.geometry.pose.q = quat_step_post(image_pair.geometry.pose.q, dp.block<3, 1>(0, 0));
         result.geometry.pose.t = image_pair.geometry.pose.t + dp.block<3, 1>(3, 0);
         result.geometry.scale = image_pair.geometry.scale + dp(6);
-        result.geometry.shift1 = image_pair.geometry.shift1;
-        result.geometry.shift2 = image_pair.geometry.shift2;
+        if (refine_shift) {
+            result.geometry.shift1 = image_pair.geometry.shift1 + dp(8);
+            result.geometry.shift2 = image_pair.geometry.shift2 + dp(9);
+        } else {
+            result.geometry.shift1 = image_pair.geometry.shift1;
+            result.geometry.shift2 = image_pair.geometry.shift2;
+        }
         double new_focal = image_pair.camera1.focal() + dp(7);
         result.camera1 = Camera("SIMPLE_PINHOLE", {new_focal, 0, 0}, -1, -1);
         result.camera2 = result.camera1;
@@ -544,6 +568,7 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
     const std::vector<double> &d1;
     const std::vector<double> &d2;
     const double scale_reproj, weight_sampson;
+    const bool refine_shift;
     const ResidualWeightVector &weights;
 
   private:
@@ -557,16 +582,18 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
 // Monodepth relative pose with two different focal lengths.
 // Points are in centered pixel coordinates. Each camera has its own focal.
 // Parameters: [rotation(3), translation(3), scale(1), focal1(1), focal2(1)] = 9
+//   or with shift: [rotation(3), translation(3), scale(1), focal1(1), focal2(1), shift1(1), shift2(1)] = 11
 template <typename ResidualWeightVector = UniformWeightVector, typename Accumulator = NormalAccumulator>
 class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair, Accumulator> {
   public:
     MonoDepthVaryingFocalRelPoseRefiner(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
                                         const std::vector<double> &d1, const std::vector<double> &d2,
                                         const double scale_reproj, const double weight_sampson,
+                                        const bool refine_shift,
                                         const ResidualWeightVector &w = ResidualWeightVector())
         : x1(points2D_1), x2(points2D_2), d1(d1), d2(d2), scale_reproj(scale_reproj), weight_sampson(weight_sampson),
-          weights(w) {
-        this->num_params = 9;
+          refine_shift(refine_shift), weights(w) {
+        this->num_params = refine_shift ? 11 : 9;
     }
 
     double compute_residual(Accumulator &acc, const MonoDepthImagePair &image_pair) {
@@ -629,6 +656,7 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
         const double f1 = image_pair.camera1.focal();
         const double f2 = image_pair.camera2.focal();
         const double sr = std::sqrt(scale_reproj);
+        const int np = this->num_params;
 
         Eigen::Matrix3d E;
         essential_from_motion(geometry.pose, &E);
@@ -688,7 +716,7 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
                     Jproj(0, 2) = -f2 * Z1(0) * inv_z * inv_z;
                     Jproj(1, 2) = -f2 * Z1(1) * inv_z * inv_z;
 
-                    Eigen::Matrix<double, 2, 9> J;
+                    Eigen::Matrix<double, 2, Eigen::Dynamic> J(2, np);
                     // Jacobian w.r.t. rotation
                     Eigen::Matrix<double, 2, 3> dZ = Jproj * R;
                     J.col(0) = -X1i(2) * dZ.col(1) + X1i(1) * dZ.col(2);
@@ -704,6 +732,13 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
                     J.col(7) = Jproj * R * dX1_df1;
                     // Jacobian w.r.t. f2 (affects projection only)
                     J.col(8) = xp_cal;
+
+                    if (refine_shift) {
+                        // Jacobian w.r.t. shift1
+                        J.col(9) = Jproj * R * b1;
+                        // Jacobian w.r.t. shift2 (forward reprojection doesn't depend on shift2)
+                        J.col(10).setZero();
+                    }
 
                     res *= sr;
                     J *= sr;
@@ -721,7 +756,7 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
                     Jproj(0, 2) = -f1 * Z2(0) * inv_z * inv_z;
                     Jproj(1, 2) = -f1 * Z2(1) * inv_z * inv_z;
 
-                    Eigen::Matrix<double, 2, 9> J;
+                    Eigen::Matrix<double, 2, Eigen::Dynamic> J(2, np);
                     // Jacobian w.r.t. rotation
                     Eigen::Vector3d X2t = X2i - geometry.pose.t;
                     Eigen::Matrix3d dZdr;
@@ -744,6 +779,13 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
                         scale * (d2[i] + shift_2) * Eigen::Vector3d(-x2[i](0) / (f2 * f2), -x2[i](1) / (f2 * f2), 0.0);
                     J.col(8) = Jproj * Rt * dX2_df2;
 
+                    if (refine_shift) {
+                        // Jacobian w.r.t. shift1 (backward reprojection doesn't depend on shift1)
+                        J.col(9).setZero();
+                        // Jacobian w.r.t. shift2
+                        J.col(10) = scale * Jproj * Rt * b2;
+                    }
+
                     res *= sr;
                     J *= sr;
                     acc.add_jacobian(res, J, weights[i]);
@@ -755,12 +797,14 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
                 Eigen::Matrix<double, 1, 9> dF_mat;
                 const double r = compute_sampson_jacobian(x1[i], x2[i], F, dF_mat);
 
-                Eigen::Matrix<double, 1, 9> J_sam;
+                Eigen::Matrix<double, 1, Eigen::Dynamic> J_sam(1, np);
+                J_sam.setZero();
                 J_sam.block<1, 3>(0, 0) = dF_mat * dR_F;
                 J_sam.block<1, 3>(0, 3) = dF_mat * dt_F;
                 J_sam(0, 6) = 0.0; // Sampson doesn't depend on scale
                 J_sam(0, 7) = (dF_mat * df1_F)(0, 0);
                 J_sam(0, 8) = (dF_mat * df2_F)(0, 0);
+                // Sampson doesn't depend on shift1, shift2
 
                 acc.add_jacobian(r, J_sam, weight_sampson * weights[i]);
             }
@@ -772,8 +816,13 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
         result.geometry.pose.q = quat_step_post(image_pair.geometry.pose.q, dp.block<3, 1>(0, 0));
         result.geometry.pose.t = image_pair.geometry.pose.t + dp.block<3, 1>(3, 0);
         result.geometry.scale = image_pair.geometry.scale + dp(6);
-        result.geometry.shift1 = image_pair.geometry.shift1;
-        result.geometry.shift2 = image_pair.geometry.shift2;
+        if (refine_shift) {
+            result.geometry.shift1 = image_pair.geometry.shift1 + dp(9);
+            result.geometry.shift2 = image_pair.geometry.shift2 + dp(10);
+        } else {
+            result.geometry.shift1 = image_pair.geometry.shift1;
+            result.geometry.shift2 = image_pair.geometry.shift2;
+        }
         result.camera1 = Camera("SIMPLE_PINHOLE", {image_pair.camera1.focal() + dp(7), 0, 0}, -1, -1);
         result.camera2 = Camera("SIMPLE_PINHOLE", {image_pair.camera2.focal() + dp(8), 0, 0}, -1, -1);
         return result;
@@ -785,6 +834,7 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
     const std::vector<double> &d1;
     const std::vector<double> &d2;
     const double scale_reproj, weight_sampson;
+    const bool refine_shift;
     const ResidualWeightVector &weights;
 };
 

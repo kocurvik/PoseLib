@@ -45,8 +45,11 @@ struct RelativePoseProblemInstance {
     CameraPose pose_gt;
     Eigen::Matrix3d H_gt; // for homography problems
     double scale_gt = 1.0;
+    double shift1_gt = 0.0;
+    double shift2_gt = 0.0;
     double focal1_gt = 1.0;
     double focal2_gt = 1.0;
+    double monodepth_scale_gt = 1.0;
 
     // Point-to-point correspondences
     std::vector<Eigen::Vector3d> p1_;
@@ -117,6 +120,7 @@ struct ProblemOptions {
     bool generalized_duplicate_obs_ = false;
     int generalized_first_cam_obs_ = 0; // how many of the points should from the first camera (relpose only)
     bool unknown_scale_ = false;
+    bool unknown_shift_ = false;
     bool unknown_focal_ = false;
     bool unknown_dist_ = false;
     bool varying_focal_ = false;

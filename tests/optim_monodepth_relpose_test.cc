@@ -172,7 +172,46 @@ bool test_monodepth_shared_focal_relpose_jacobian() {
     MonoDepthTwoViewGeometry geometry(pose, 1.0);
     MonoDepthImagePair image_pair(geometry, camera, camera);
 
-    MonoDepthSharedFocalRelPoseRefiner<UniformWeightVector, TestAccumulator> refiner(x1, x2, d1, d2, 1.0, 1.0);
+    MonoDepthSharedFocalRelPoseRefiner<UniformWeightVector, TestAccumulator> refiner(x1, x2, d1, d2, 1.0, 1.0, false);
+
+    const double delta = 1e-6;
+    double jac_err = verify_jacobian<decltype(refiner), MonoDepthImagePair>(refiner, image_pair, delta);
+    REQUIRE_SMALL(jac_err, 1e-6)
+
+    // Test that compute_residual and compute_jacobian are compatible
+    TestAccumulator acc;
+    acc.reset_residual();
+    double r1 = refiner.compute_residual(acc, image_pair);
+    acc.reset_jacobian();
+    refiner.compute_jacobian(acc, image_pair);
+    double r2 = 0.0;
+    for (size_t i = 0; i < acc.rs.size(); ++i) {
+        r2 += acc.weights[i] * acc.rs[i].squaredNorm();
+    }
+    REQUIRE_SMALL(std::abs(r1 - r2), 1e-10);
+
+    return true;
+}
+
+bool test_monodepth_shared_focal_shift_relpose_jacobian() {
+    const size_t N = 10;
+    double f = 1.2;
+    CameraPose pose;
+    std::vector<Point2D> x1, x2;
+    std::vector<double> d1, d2;
+    setup_monodepth_focal_scene(N, pose, x1, x2, d1, d2, f, f);
+
+    double shift1 = 0.5, shift2 = -0.3;
+    for (size_t i = 0; i < N; ++i) {
+        d1[i] -= shift1;
+        d2[i] -= shift2;
+    }
+
+    Camera camera("SIMPLE_PINHOLE", {f, 0, 0}, -1, -1);
+    MonoDepthTwoViewGeometry geometry(pose, 1.0);
+    MonoDepthImagePair image_pair(geometry, camera, camera);
+
+    MonoDepthSharedFocalRelPoseRefiner<UniformWeightVector, TestAccumulator> refiner(x1, x2, d1, d2, 1.0, 1.0, true);
 
     const double delta = 1e-6;
     double jac_err = verify_jacobian<decltype(refiner), MonoDepthImagePair>(refiner, image_pair, delta);
@@ -206,7 +245,47 @@ bool test_monodepth_varying_focal_relpose_jacobian() {
     MonoDepthTwoViewGeometry geometry(pose, 1.0);
     MonoDepthImagePair image_pair(geometry, camera1, camera2);
 
-    MonoDepthVaryingFocalRelPoseRefiner<UniformWeightVector, TestAccumulator> refiner(x1, x2, d1, d2, 1.0, 1.0);
+    MonoDepthVaryingFocalRelPoseRefiner<UniformWeightVector, TestAccumulator> refiner(x1, x2, d1, d2, 1.0, 1.0, false);
+
+    const double delta = 1e-6;
+    double jac_err = verify_jacobian<decltype(refiner), MonoDepthImagePair>(refiner, image_pair, delta);
+    REQUIRE_SMALL(jac_err, 1e-6)
+
+    // Test that compute_residual and compute_jacobian are compatible
+    TestAccumulator acc;
+    acc.reset_residual();
+    double r1 = refiner.compute_residual(acc, image_pair);
+    acc.reset_jacobian();
+    refiner.compute_jacobian(acc, image_pair);
+    double r2 = 0.0;
+    for (size_t i = 0; i < acc.rs.size(); ++i) {
+        r2 += acc.weights[i] * acc.rs[i].squaredNorm();
+    }
+    REQUIRE_SMALL(std::abs(r1 - r2), 1e-10);
+
+    return true;
+}
+
+bool test_monodepth_varying_focal_shift_relpose_jacobian() {
+    const size_t N = 10;
+    double f1 = 1.2, f2 = 0.9;
+    CameraPose pose;
+    std::vector<Point2D> x1, x2;
+    std::vector<double> d1, d2;
+    setup_monodepth_focal_scene(N, pose, x1, x2, d1, d2, f1, f2);
+
+    double shift1 = 0.5, shift2 = -0.3;
+    for (size_t i = 0; i < N; ++i) {
+        d1[i] -= shift1;
+        d2[i] -= shift2;
+    }
+
+    Camera camera1("SIMPLE_PINHOLE", {f1, 0, 0}, -1, -1);
+    Camera camera2("SIMPLE_PINHOLE", {f2, 0, 0}, -1, -1);
+    MonoDepthTwoViewGeometry geometry(pose, 1.0);
+    MonoDepthImagePair image_pair(geometry, camera1, camera2);
+
+    MonoDepthVaryingFocalRelPoseRefiner<UniformWeightVector, TestAccumulator> refiner(x1, x2, d1, d2, 1.0, 1.0, true);
 
     const double delta = 1e-6;
     double jac_err = verify_jacobian<decltype(refiner), MonoDepthImagePair>(refiner, image_pair, delta);
@@ -232,5 +311,8 @@ bool test_monodepth_varying_focal_relpose_jacobian() {
 using namespace test::monodepth_relpose;
 std::vector<Test> register_optim_monodepth_relpose_test() {
     return {TEST(test_monodepth_relpose_jacobian), TEST(test_monodepth_relpose_shift_jacobian),
-            TEST(test_monodepth_shared_focal_relpose_jacobian), TEST(test_monodepth_varying_focal_relpose_jacobian)};
+            TEST(test_monodepth_shared_focal_relpose_jacobian),
+            TEST(test_monodepth_shared_focal_shift_relpose_jacobian),
+            TEST(test_monodepth_varying_focal_relpose_jacobian),
+            TEST(test_monodepth_varying_focal_shift_relpose_jacobian)};
 }

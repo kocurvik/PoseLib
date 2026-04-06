@@ -179,7 +179,8 @@ class SharedFocalMonodepthPoseEstimator {
     SharedFocalMonodepthPoseEstimator(const MonoDepthRelativePoseOptions &options,
                                       const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
                                       const std::vector<double> &d1, const std::vector<double> &d2)
-        : num_data(points2D_1.size()), opt(options), x1(points2D_1), x2(points2D_2), d1(d1), d2(d2),
+        : sample_sz(options.estimate_shift ? 4 : 3), num_data(points2D_1.size()), opt(options), x1(points2D_1),
+          x2(points2D_2), d1(d1), d2(d2),
           sampler(num_data, sample_sz, opt.ransac.seed, opt.ransac.progressive_sampling,
                   opt.ransac.max_prosac_iterations) {
         x1s.resize(sample_sz);
@@ -226,7 +227,8 @@ class VaryingFocalMonodepthPoseEstimator {
     VaryingFocalMonodepthPoseEstimator(const MonoDepthRelativePoseOptions &options,
                                        const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
                                        const std::vector<double> &d1, const std::vector<double> &d2)
-        : num_data(points2D_1.size()), opt(options), x1(points2D_1), x2(points2D_2), d1(d1), d2(d2),
+        : sample_sz(options.estimate_shift ? 4 : 3), num_data(points2D_1.size()), opt(options), x1(points2D_1),
+          x2(points2D_2), d1(d1), d2(d2),
           sampler(num_data, sample_sz, opt.ransac.seed, opt.ransac.progressive_sampling,
                   opt.ransac.max_prosac_iterations) {
         x1s.resize(sample_sz);
@@ -248,7 +250,7 @@ class VaryingFocalMonodepthPoseEstimator {
     double score_model(const MonoDepthImagePair &image_pair, size_t *inlier_count) const;
     void refine_model(MonoDepthImagePair *image_pair) const;
 
-    const size_t sample_sz = 3;
+    const size_t sample_sz;
     const size_t num_data;
 
   private:

@@ -472,7 +472,7 @@ RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Poin
 
         double scale_reproj = (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0]);
         refine_monodepth_shared_focal_relpose(x1_inliers, x2_inliers, d1_inliers, d2_inliers, image_pair, scale_reproj,
-                                              opt.weight_sampson, opt_scaled.bundle);
+                                              opt.weight_sampson, opt_scaled.bundle, opt.estimate_shift);
     }
 
     // rescale back
@@ -531,7 +531,7 @@ RansacStats estimate_varying_focal_monodepth_relative_pose(const std::vector<Poi
 
         double scale_reproj = (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0]);
         refine_monodepth_varying_focal_relpose(x1_inliers, x2_inliers, d1_inliers, d2_inliers, image_pair, scale_reproj,
-                                               opt.weight_sampson, opt_scaled.bundle);
+                                               opt.weight_sampson, opt_scaled.bundle, opt.estimate_shift);
     }
 
     // rescale back

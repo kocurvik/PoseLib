@@ -546,10 +546,11 @@ template <typename WeightType>
 BundleStats refine_monodepth_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                                   const std::vector<double> &d1, const std::vector<double> &d2,
                                                   MonoDepthImagePair *image_pair, double scale_reproj,
-                                                  double weight_alpha, const BundleOptions &opt,
+                                                  double weight_alpha, const BundleOptions &opt, bool refine_shift,
                                                   const WeightType &weights) {
     IterationCallback callback = setup_callback(opt);
-    MonoDepthSharedFocalRelPoseRefiner<WeightType> refiner(x1, x2, d1, d2, scale_reproj, weight_alpha, weights);
+    MonoDepthSharedFocalRelPoseRefiner<WeightType> refiner(x1, x2, d1, d2, scale_reproj, weight_alpha, refine_shift,
+                                                           weights);
     return lm_impl<decltype(refiner)>(refiner, image_pair, opt, callback);
 }
 
@@ -557,14 +558,15 @@ BundleStats refine_monodepth_shared_focal_relpose(const std::vector<Point2D> &x1
 BundleStats refine_monodepth_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                                   const std::vector<double> &d1, const std::vector<double> &d2,
                                                   MonoDepthImagePair *image_pair, double scale_reproj,
-                                                  double weight_alpha, const BundleOptions &opt,
+                                                  double weight_alpha, const BundleOptions &opt, bool refine_shift,
                                                   const std::vector<double> &weights) {
     if (weights.size() == x1.size()) {
         return refine_monodepth_shared_focal_relpose<std::vector<double>>(x1, x2, d1, d2, image_pair, scale_reproj,
-                                                                          weight_alpha, opt, weights);
+                                                                          weight_alpha, opt, refine_shift, weights);
     } else {
         return refine_monodepth_shared_focal_relpose<UniformWeightVector>(x1, x2, d1, d2, image_pair, scale_reproj,
-                                                                          weight_alpha, opt, UniformWeightVector());
+                                                                          weight_alpha, opt, refine_shift,
+                                                                          UniformWeightVector());
     }
 }
 
@@ -575,10 +577,11 @@ template <typename WeightType>
 BundleStats refine_monodepth_varying_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                                    const std::vector<double> &d1, const std::vector<double> &d2,
                                                    MonoDepthImagePair *image_pair, double scale_reproj,
-                                                   double weight_alpha, const BundleOptions &opt,
+                                                   double weight_alpha, const BundleOptions &opt, bool refine_shift,
                                                    const WeightType &weights) {
     IterationCallback callback = setup_callback(opt);
-    MonoDepthVaryingFocalRelPoseRefiner<WeightType> refiner(x1, x2, d1, d2, scale_reproj, weight_alpha, weights);
+    MonoDepthVaryingFocalRelPoseRefiner<WeightType> refiner(x1, x2, d1, d2, scale_reproj, weight_alpha, refine_shift,
+                                                            weights);
     return lm_impl<decltype(refiner)>(refiner, image_pair, opt, callback);
 }
 
@@ -586,14 +589,15 @@ BundleStats refine_monodepth_varying_focal_relpose(const std::vector<Point2D> &x
 BundleStats refine_monodepth_varying_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                                    const std::vector<double> &d1, const std::vector<double> &d2,
                                                    MonoDepthImagePair *image_pair, double scale_reproj,
-                                                   double weight_alpha, const BundleOptions &opt,
+                                                   double weight_alpha, const BundleOptions &opt, bool refine_shift,
                                                    const std::vector<double> &weights) {
     if (weights.size() == x1.size()) {
         return refine_monodepth_varying_focal_relpose<std::vector<double>>(x1, x2, d1, d2, image_pair, scale_reproj,
-                                                                           weight_alpha, opt, weights);
+                                                                           weight_alpha, opt, refine_shift, weights);
     } else {
         return refine_monodepth_varying_focal_relpose<UniformWeightVector>(x1, x2, d1, d2, image_pair, scale_reproj,
-                                                                           weight_alpha, opt, UniformWeightVector());
+                                                                           weight_alpha, opt, refine_shift,
+                                                                           UniformWeightVector());
     }
 }
 

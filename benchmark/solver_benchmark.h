@@ -330,6 +330,18 @@ struct SolverMonodepthSharedFocalRel3pt {
     static std::string name() { return "MonodepthSharedFocalRel3pt"; }
 };
 
+
+struct SolverMonodepthSharedFocalShiftRel4pt {
+    static inline int solve(const RelativePoseProblemInstance &instance,
+                            std::vector<poselib::MonoDepthImagePair> *solutions) {
+        return relpose_monodepth_4pt_shared_focal_shift(instance.x1_, instance.x2_, instance.d1_, instance.d2_,
+                                                        solutions);
+    }
+    typedef CalibPoseValidator validator;
+    typedef MonoDepthImagePair Solution;
+    static std::string name() { return "MonodepthSharedFocalShiftRel4pt"; }
+};
+
 struct SolverMonodepthVaryingFocalRel3pt {
     static inline int solve(const RelativePoseProblemInstance &instance,
                             std::vector<poselib::MonoDepthImagePair> *solutions) {
@@ -338,6 +350,17 @@ struct SolverMonodepthVaryingFocalRel3pt {
     typedef CalibPoseValidator validator;
     typedef MonoDepthImagePair Solution;
     static std::string name() { return "MonodepthVaryingFocalRel3pt"; }
+};
+
+struct SolverMonodepthVaryingFocalShiftRel4pt {
+    static inline int solve(const RelativePoseProblemInstance &instance,
+                            std::vector<poselib::MonoDepthImagePair> *solutions) {
+        return relpose_monodepth_4pt_varying_focal_shift(instance.x1_, instance.x2_, instance.d1_, instance.d2_,
+                                                         solutions);
+    }
+    typedef CalibPoseValidator validator;
+    typedef MonoDepthImagePair Solution;
+    static std::string name() { return "MonodepthVaryingFocalShiftRel4pt"; }
 };
 
 struct SolverRel5pt {

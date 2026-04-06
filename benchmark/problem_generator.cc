@@ -22,7 +22,10 @@ double CalibPoseValidator::compute_pose_error(const RelativePoseProblemInstance 
 double CalibPoseValidator::compute_pose_error(const RelativePoseProblemInstance &instance,
                                               const MonoDepthTwoViewGeometry &monodepth_geometry) {
     return (instance.pose_gt.R() - monodepth_geometry.pose.R()).norm() +
-           (instance.pose_gt.t - monodepth_geometry.pose.t).norm();
+           (instance.pose_gt.t - monodepth_geometry.pose.t).norm() +
+           std::abs(instance.monodepth_scale_gt - monodepth_geometry.scale) / instance.monodepth_scale_gt +
+           std::abs(instance.shift1_gt - monodepth_geometry.shift1) / (monodepth_geometry.shift1 + 1e-12) +
+           std::abs(instance.shift2_gt - monodepth_geometry.shift2) / (monodepth_geometry.shift2 + 1e-12);
 }
 
 double CalibPoseValidator::compute_pose_error(const RelativePoseProblemInstance &instance,
@@ -37,7 +40,10 @@ double CalibPoseValidator::compute_pose_error(const RelativePoseProblemInstance 
     return (instance.pose_gt.R() - image_pair.geometry.pose.R()).norm() +
            (instance.pose_gt.t - image_pair.geometry.pose.t).norm() +
            std::abs(instance.focal1_gt - image_pair.camera1.focal()) / instance.focal1_gt +
-           std::abs(instance.focal2_gt - image_pair.camera2.focal()) / instance.focal2_gt;
+           std::abs(instance.focal2_gt - image_pair.camera2.focal()) / instance.focal2_gt +
+           std::abs(instance.monodepth_scale_gt - image_pair.geometry.scale) / instance.monodepth_scale_gt +
+           std::abs(instance.shift1_gt - image_pair.geometry.shift1) / (image_pair.geometry.shift1 + 1e-12) +
+           std::abs(instance.shift2_gt - image_pair.geometry.shift2) / (image_pair.geometry.shift2 + 1e-12);
 }
 
 bool CalibPoseValidator::is_valid(const AbsolutePoseProblemInstance &instance, const CameraPose &pose, double scale,
@@ -557,6 +563,16 @@ void generate_relpose_problems(int n_problems, std::vector<RelativePoseProblemIn
         if (options.unknown_scale_) {
             instance.scale_gt = scale_gen(random_engine);
         }
+
+        if (options.use_monodepth_) {
+            instance.monodepth_scale_gt = scale_gen(random_engine);
+        }
+
+        if (options.unknown_shift_) {
+            instance.shift1_gt = scale_gen(random_engine) / 10.0;
+            instance.shift2_gt = scale_gen(random_engine) / 10.0;
+        }
+
         if (options.unknown_focal_) {
             instance.focal1_gt = focal_gen(random_engine);
 
@@ -602,6 +618,13 @@ void generate_relpose_problems(int n_problems, std::vector<RelativePoseProblemIn
             // Map into second image
             X = instance.pose_gt.R() * X + instance.pose_gt.t;
             double d2 = X(2);
+
+            if (options.use_monodepth_) {
+                d1 -= instance.shift1_gt;
+                d2 = d2 / instance.monodepth_scale_gt - instance.shift2_gt;
+                if (d1 < 0.0 || d2 < 0.0)
+                    break;
+            }
 
             Eigen::Vector3d x2 = (X - instance.scale_gt * p2).normalized();
 
