@@ -6,7 +6,6 @@ int relpose_monodepth_4pt_varying_focal_shift(const std::vector<Eigen::Vector3d>
                                               const std::vector<double> &depth1, const std::vector<double> &depth2,
                                               std::vector<MonoDepthImagePair> *models) {
     models->clear();
-    models->reserve(1);
 
     Eigen::VectorXd d(24);
     d << x1h[0][0], x1h[1][0], x1h[2][0], x1h[3][0], x1h[0][1], x1h[1][1], x1h[2][1], x1h[3][1], x2h[0][0],
@@ -115,9 +114,7 @@ int relpose_monodepth_4pt_varying_focal_shift(const std::vector<Eigen::Vector3d>
 
     sols.conservativeResize(5,m);
 
-    double best_error = std::numeric_limits<double>::max();
-    MonoDepthImagePair best_model;
-    bool found_best = false;
+    models->reserve(m);
 
     for (int k = 0; k < sols.cols(); ++k){
         double s = sols(0, k);
@@ -160,18 +157,13 @@ int relpose_monodepth_4pt_varying_focal_shift(const std::vector<Eigen::Vector3d>
         Eigen::Vector3d X2_4 = rot.transpose() * (s * (depth2[3] + v) * K2inv * x2h[3] - trans);
         double error = (X2_4 - (depth1[3] + u) * K1inv * x1h[3]).norm() / X2_4.norm();
 
-        if (error < best_error) {
-            MonoDepthTwoViewGeometry pose = MonoDepthTwoViewGeometry(rot, trans, s, u, v);
-            Camera camera1 = Camera("SIMPLE_PINHOLE", std::vector<double>{f, 0.0, 0.0}, -1, -1);
-            Camera camera2 = Camera("SIMPLE_PINHOLE", std::vector<double>{w, 0.0, 0.0}, -1, -1);
-            best_error = error;
-            found_best = true;
-            best_model = MonoDepthImagePair(pose, camera1, camera2);
-        }
-    }
 
-    if (found_best)
-        models->emplace_back(best_model);
+        MonoDepthTwoViewGeometry pose = MonoDepthTwoViewGeometry(rot, trans, s, u, v);
+        Camera camera1 = Camera("SIMPLE_PINHOLE", std::vector<double>{f, 0.0, 0.0}, -1, -1);
+        Camera camera2 = Camera("SIMPLE_PINHOLE", std::vector<double>{w, 0.0, 0.0}, -1, -1);
+        models->emplace_back(pose, camera1, camera2);
+
+    }
     return models->size();
 }
 } // namespace poselib
