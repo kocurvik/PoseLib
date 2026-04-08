@@ -154,10 +154,6 @@ int relpose_monodepth_4pt_varying_focal_shift(const std::vector<Eigen::Vector3d>
         Eigen::Vector3d trans2 = s * (depth2[0] + v) * K2inv*x2h[0];
         Eigen::Vector3d trans = trans2 - trans1;
 
-        Eigen::Vector3d X2_4 = rot.transpose() * (s * (depth2[3] + v) * K2inv * x2h[3] - trans);
-        double error = (X2_4 - (depth1[3] + u) * K1inv * x1h[3]).norm() / X2_4.norm();
-
-
         MonoDepthTwoViewGeometry pose = MonoDepthTwoViewGeometry(rot, trans, s, u, v);
         Camera camera1 = Camera("SIMPLE_PINHOLE", std::vector<double>{f, 0.0, 0.0}, -1, -1);
         Camera camera2 = Camera("SIMPLE_PINHOLE", std::vector<double>{w, 0.0, 0.0}, -1, -1);
