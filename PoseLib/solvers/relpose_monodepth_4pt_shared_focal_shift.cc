@@ -6,7 +6,6 @@ int relpose_monodepth_4pt_shared_focal_shift(const std::vector<Eigen::Vector3d> 
                                              const std::vector<double> &depth1, const std::vector<double> &depth2,
                                              std::vector<MonoDepthImagePair> *models) {
     models->clear();
-    models->reserve(1);
 
     Eigen::VectorXd d(24);
     d << x1h[0][0], x1h[1][0], x1h[2][0], x1h[3][0], x1h[0][1], x1h[1][1], x1h[2][1], x1h[3][1], x2h[0][0],
@@ -109,10 +108,7 @@ int relpose_monodepth_4pt_shared_focal_shift(const std::vector<Eigen::Vector3d> 
     }
 
     sols.conservativeResize(4,m);
-
-    double best_error = std::numeric_limits<double>::max();
-    MonoDepthImagePair best_model;
-    bool found_best = false;
+    models->reserve(m);
 
     for (int k = 0; k < sols.cols(); ++k) {
         double s = sols(0, k);
@@ -144,20 +140,11 @@ int relpose_monodepth_4pt_shared_focal_shift(const std::vector<Eigen::Vector3d> 
         Eigen::Vector3d trans2 = s * (depth2[0] + v) * Kinv * x2h[0];
         Eigen::Vector3d trans = trans2 - trans1;
 
-        Eigen::Vector3d X2_4 = rot.transpose() * (s * (depth2[3] + v) * Kinv * x2h[3] - trans);
-        double error = (X2_4 - (depth1[3] + u) * Kinv * x1h[3]).norm() / X2_4.norm();
 
-        if (error < best_error) {
-            MonoDepthTwoViewGeometry pose = MonoDepthTwoViewGeometry(rot, trans, s, u, v);
-            Camera camera = Camera("SIMPLE_PINHOLE", std::vector<double>{f, 0.0, 0.0}, -1, -1);
-            best_error = error;
-            found_best = true;
-            best_model = MonoDepthImagePair(pose, camera, camera);
-        }
+        MonoDepthTwoViewGeometry pose = MonoDepthTwoViewGeometry(rot, trans, s, u, v);
+        Camera camera = Camera("SIMPLE_PINHOLE", std::vector<double>{f, 0.0, 0.0}, -1, -1);
+        models->emplace_back(pose, camera, camera);
     }
-
-    if (found_best)
-        models->emplace_back(best_model);
     return models->size();
 }
 } // namespace poselib
