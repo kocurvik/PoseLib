@@ -478,12 +478,13 @@ void register_relative_pose(py::module &m) {
 
     m.def("estimate_monodepth_shared_focal_relative_pose", &estimate_monodepth_shared_focal_relative_pose_wrapper,
           py::arg("points2D_1"), py::arg("points2D_2"), py::arg("depth_1"), py::arg("depth_2"),
-          py::arg("opt") = py::dict(),
+          py::arg("pp") = Eigen::Vector2d::Zero(), py::arg("opt") = py::dict(),
           py::arg("initial_image_pair") = py::none(),
           "Relative pose estimation with depth estimates and unknown equal focal lengths with non-linear refinement.");
 
     m.def("estimate_monodepth_varying_focal_relative_pose", &estimate_monodepth_varying_focal_relative_pose_wrapper,
           py::arg("points2D_1"), py::arg("points2D_2"), py::arg("depth_1"), py::arg("depth_2"),
+          py::arg("pp1") = Eigen::Vector2d::Zero(), py::arg("pp2") = Eigen::Vector2d::Zero(),
           py::arg("opt") = py::dict(),
           py::arg("initial_image_pair") = py::none(),
           "Relative pose estimation with depth estimates and unknown different focal lengths with non-linear "
