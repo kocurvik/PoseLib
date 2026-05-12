@@ -121,8 +121,8 @@ estimate_shared_focal_relative_pose_wrapper(const std::vector<Eigen::Vector2d> &
 
 std::pair<MonoDepthImagePair, py::dict> estimate_monodepth_shared_focal_relative_pose_wrapper(
     const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
-    const std::vector<double> &depth_1, const std::vector<double> &depth_2, const py::dict &opt_dict,
-    const std::optional<MonoDepthImagePair> &initial_image_pair) {
+    const std::vector<double> &depth_1, const std::vector<double> &depth_2, const Eigen::Vector2d &pp,
+    const py::dict &opt_dict, const std::optional<MonoDepthImagePair> &initial_image_pair) {
 
     MonoDepthRelativePoseOptions opt;
     update_monodepth_relative_pose_options(opt_dict, opt);
@@ -135,11 +135,9 @@ std::pair<MonoDepthImagePair, py::dict> estimate_monodepth_shared_focal_relative
 
     std::vector<char> inlier_mask;
 
-    std::vector<Image> output;
-
     py::gil_scoped_release release;
-    RansacStats stats = estimate_shared_focal_monodepth_relative_pose(
-        points2D_1, points2D_2, depth_1, depth_2, opt, &image_pair, &inlier_mask);
+    RansacStats stats = estimate_shared_focal_monodepth_relative_pose(points2D_1, points2D_2, depth_1, depth_2, pp, opt,
+                                                                      &image_pair, &inlier_mask);
     py::gil_scoped_acquire acquire;
 
     py::dict output_dict;
@@ -179,7 +177,8 @@ estimate_varying_focal_relative_pose_wrapper(const std::vector<Eigen::Vector2d> 
 
 std::pair<MonoDepthImagePair, py::dict> estimate_monodepth_varying_focal_relative_pose_wrapper(
     const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
-    const std::vector<double> &depth_1, const std::vector<double> &depth_2, const py::dict &opt_dict,
+    const std::vector<double> &depth_1, const std::vector<double> &depth_2, const Eigen::Vector2d &pp1,
+    const Eigen::Vector2d &pp2, const py::dict &opt_dict,
     const std::optional<MonoDepthImagePair> &initial_image_pair) {
 
     MonoDepthRelativePoseOptions opt;
@@ -193,11 +192,9 @@ std::pair<MonoDepthImagePair, py::dict> estimate_monodepth_varying_focal_relativ
 
     std::vector<char> inlier_mask;
 
-    std::vector<Image> output;
-
     py::gil_scoped_release release;
-    RansacStats stats = estimate_varying_focal_monodepth_relative_pose(
-        points2D_1, points2D_2, depth_1, depth_2, opt, &image_pair, &inlier_mask);
+    RansacStats stats = estimate_varying_focal_monodepth_relative_pose(points2D_1, points2D_2, depth_1, depth_2, pp1,
+                                                                       pp2, opt, &image_pair, &inlier_mask);
     py::gil_scoped_acquire acquire;
 
     py::dict output_dict;

@@ -485,7 +485,7 @@ RansacStats estimate_varying_focal_relative_pose(const std::vector<Point2D> &poi
 RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Point2D> &points2D_1,
                                                           const std::vector<Point2D> &points2D_2,
                                                           const std::vector<double> &depth_1,
-                                                          const std::vector<double> &depth_2,
+                                                          const std::vector<double> &depth_2, const Point2D &pp,
                                                           const MonoDepthRelativePoseOptions &opt,
                                                           MonoDepthImagePair *image_pair, std::vector<char> *inliers) {
 
@@ -494,6 +494,11 @@ RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Poin
     Eigen::Matrix3d T1, T2;
     std::vector<Point2D> x1_norm = points2D_1;
     std::vector<Point2D> x2_norm = points2D_2;
+
+    for (size_t i = 0; i < x1_norm.size(); i++) {
+        x1_norm[i] -= pp;
+        x2_norm[i] -= pp;
+    }
 
     // We normalize points here to improve conditioning. Note that the normalization
     // only ammounts to a uniform rescaling of the image coordinate system
@@ -536,8 +541,8 @@ RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Poin
 
     // rescale back
     image_pair->camera1.params[0] *= scale;
-    image_pair->camera1.params[1] = 0; // pp(0);
-    image_pair->camera1.params[2] = 0; // pp(1);
+    image_pair->camera1.params[1] = pp(0);
+    image_pair->camera1.params[2] = pp(1);
     image_pair->camera2 = image_pair->camera1;
 
     return stats;
@@ -546,14 +551,19 @@ RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Poin
 RansacStats estimate_varying_focal_monodepth_relative_pose(const std::vector<Point2D> &points2D_1,
                                                            const std::vector<Point2D> &points2D_2,
                                                            const std::vector<double> &depth_1,
-                                                           const std::vector<double> &depth_2,
-                                                           const MonoDepthRelativePoseOptions &opt,
+                                                           const std::vector<double> &depth_2, const Point2D &pp1,
+                                                           const Point2D &pp2, const MonoDepthRelativePoseOptions &opt,
                                                            MonoDepthImagePair *image_pair, std::vector<char> *inliers) {
     const size_t num_pts = points2D_1.size();
 
     Eigen::Matrix3d T1, T2;
     std::vector<Point2D> x1_norm = points2D_1;
     std::vector<Point2D> x2_norm = points2D_2;
+
+    for (size_t i = 0; i < x1_norm.size(); i++) {
+        x1_norm[i] -= pp1;
+        x2_norm[i] -= pp2;
+    }
 
     // We normalize points here to improve conditioning. Note that the normalization
     // only ammounts to a uniform rescaling of the image coordinate system
@@ -595,7 +605,12 @@ RansacStats estimate_varying_focal_monodepth_relative_pose(const std::vector<Poi
 
     // rescale back
     image_pair->camera1.params[0] *= scale;
+    image_pair->camera1.params[1] = pp1(0);
+    image_pair->camera1.params[2] = pp1(1);
+
     image_pair->camera2.params[0] *= scale;
+    image_pair->camera2.params[1] = pp2(0);
+    image_pair->camera2.params[2] = pp2(1);
 
     return stats;
 }

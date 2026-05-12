@@ -97,23 +97,23 @@ RansacStats estimate_varying_focal_relative_pose(const std::vector<Point2D> &poi
                                                  ImagePair *image_pair, std::vector<char> *inliers);
 
 // Estimates relative pose with shared unknown focal length from point correspondences with estimated monodepth
-// using LO-RANSAC followed by non-linear refinement. The points are assumed to be normalized such that pp = [0,0].
+// using LO-RANSAC followed by non-linear refinement.
 // Uses hybrid scoring with reprojection and epipolar errors
 RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Point2D> &points2D_1,
                                                           const std::vector<Point2D> &points2D_2,
                                                           const std::vector<double> &depths_1,
-                                                          const std::vector<double> &depths_2,
+                                                          const std::vector<double> &depths_2, const Point2D &pp,
                                                           const MonoDepthRelativePoseOptions &opt,
                                                           MonoDepthImagePair *image_pair, std::vector<char> *inliers);
 
 // Estimates relative pose with two different unknown focal lengths from point correspondences with estimated monodepth
-// using LO-RANSAC followed by non-linear refinement. The points are assumed to be normalized such that pp = [0,0].
+// using LO-RANSAC followed by non-linear refinement.
 // Uses hybrid scoring with reprojection and epipolar errors
 RansacStats estimate_varying_focal_monodepth_relative_pose(const std::vector<Point2D> &points2D_1,
                                                            const std::vector<Point2D> &points2D_2,
                                                            const std::vector<double> &depth_1,
-                                                           const std::vector<double> &depth_2,
-                                                           const MonoDepthRelativePoseOptions &opt,
+                                                           const std::vector<double> &depth_2, const Point2D &pp1,
+                                                           const Point2D &pp2, const MonoDepthRelativePoseOptions &opt,
                                                            MonoDepthImagePair *image_pair, std::vector<char> *inliers);
 
 // Estimates a fundamental matrix using LO-RANSAC followed by non-linear refinement
