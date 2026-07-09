@@ -175,12 +175,7 @@ RansacStats ransac_monodepth_relpose(const std::vector<Point2D> &x1, const std::
     best_model->pose.t.setZero();
     RelativePoseMonoDepthEstimator estimator(opt, x1, x2, d1, d2);
     RansacStats stats = ransac<RelativePoseMonoDepthEstimator>(estimator, opt.ransac, best_model);
-    if (opt.weight_sampson > 0.0) {
-        get_inliers(best_model->pose, x1, x2, opt.max_errors[1] * opt.max_errors[1], best_inliers);
-    } else {
-        get_inliers_symmetric_reprojection_error(best_model, x1, x2, d1, d2, opt.max_errors[0] * opt.max_errors[0],
-                                                 best_inliers);
-    }
+    get_monodepth_relative_pose_inliers(best_model, x1, x2, d1, d2, opt, best_inliers);
     return stats;
 }
 
@@ -241,18 +236,7 @@ RansacStats ransac_shared_focal_monodepth_relpose(const std::vector<Point2D> &x1
     SharedFocalMonodepthPoseEstimator estimator(opt, x1, x2, d1, d2);
     RansacStats stats = ransac<SharedFocalMonodepthPoseEstimator>(estimator, opt.ransac, best_model);
 
-    if (opt.weight_sampson > 0.0) {
-        Eigen::Matrix3d K_inv;
-        K_inv << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, best_model->camera1.focal();
-        Eigen::Matrix3d E;
-        essential_from_motion(best_model->geometry.pose, &E);
-        Eigen::Matrix3d F = K_inv * (E * K_inv);
-
-        get_inliers(F, x1, x2, opt.max_errors[1] * opt.max_errors[1], best_inliers);
-    } else {
-        get_inliers_symmetric_reprojection_error(best_model, x1, x2, d1, d2, opt.max_errors[0] * opt.max_errors[0],
-                                                 best_inliers);
-    }
+    get_monodepth_relative_pose_inliers(best_model, x1, x2, d1, d2, opt, best_inliers);
 
     return stats;
 }
@@ -268,17 +252,7 @@ RansacStats ransac_varying_focal_monodepth_relpose(const std::vector<Point2D> &x
     VaryingFocalMonodepthPoseEstimator estimator(opt, x1, x2, d1, d2);
     RansacStats stats = ransac<VaryingFocalMonodepthPoseEstimator>(estimator, opt.ransac, best_model);
 
-    if (opt.weight_sampson > 0.0) {
-        Eigen::DiagonalMatrix<double, 3> K1_inv(1.0, 1.0, best_model->camera1.focal()),
-            K2_inv(1.0, 1.0, best_model->camera2.focal());
-        Eigen::Matrix3d E;
-        essential_from_motion(best_model->geometry.pose, &E);
-        Eigen::Matrix3d F = K2_inv * (E * K1_inv);
-        get_inliers(F, x1, x2, opt.max_errors[1] * opt.max_errors[1], best_inliers);
-    } else {
-        get_inliers_symmetric_reprojection_error(best_model, x1, x2, d1, d2, opt.max_errors[0] * opt.max_errors[0],
-                                                 best_inliers);
-    }
+    get_monodepth_relative_pose_inliers(best_model, x1, x2, d1, d2, opt, best_inliers);
 
     return stats;
 }

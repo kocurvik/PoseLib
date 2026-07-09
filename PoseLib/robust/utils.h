@@ -49,14 +49,34 @@ double compute_msac_score(const CameraPose &pose, double focal, const std::vecto
                           const std::vector<Point3D> &X, double sq_threshold, size_t *inlier_count);
 
 // Returns MSAC score of the symmetric reprojection error using monodepth depth estimates
+double compute_reprojection_error(const MonoDepthTwoViewGeometry &model, const std::vector<Point2D> &x1,
+                                  const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                  const std::vector<double> &d2, double sq_threshold, size_t *inlier_count);
+double compute_reprojection_error(const MonoDepthImagePair &image_pair, const std::vector<Point2D> &x1,
+                                  const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                  const std::vector<double> &d2, double sq_threshold, size_t *inlier_count);
 double compute_symmetric_reprojection_error(const MonoDepthTwoViewGeometry &model, const std::vector<Point2D> &x1,
                                             const std::vector<Point2D> &x2, const std::vector<double> &d1,
                                             const std::vector<double> &d2, double sq_threshold, size_t *inlier_count);
 double compute_symmetric_reprojection_error(const MonoDepthImagePair &image_pair, const std::vector<Point2D> &x1,
                                             const std::vector<Point2D> &x2, const std::vector<double> &d1,
                                             const std::vector<double> &d2, double sq_threshold, size_t *inlier_count);
+double compute_monodepth_relative_pose_error(const MonoDepthTwoViewGeometry &model, const std::vector<Point2D> &x1,
+                                             const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                             const std::vector<double> &d2, const MonoDepthRelativePoseOptions &opt,
+                                             size_t *inlier_count);
+double compute_monodepth_relative_pose_error(const MonoDepthImagePair &image_pair, const std::vector<Point2D> &x1,
+                                             const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                             const std::vector<double> &d2, const MonoDepthRelativePoseOptions &opt,
+                                             size_t *inlier_count);
 
 // Compute inliers using symmetric reprojection error with monodepth depth estimates
+void get_inliers_reprojection_error(const MonoDepthTwoViewGeometry *model, const std::vector<Point2D> &x1,
+                                    const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                    const std::vector<double> &d2, double sq_threshold, std::vector<char> *inliers);
+void get_inliers_reprojection_error(const MonoDepthImagePair *model, const std::vector<Point2D> &x1,
+                                    const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                    const std::vector<double> &d2, double sq_threshold, std::vector<char> *inliers);
 void get_inliers_symmetric_reprojection_error(const MonoDepthTwoViewGeometry *model, const std::vector<Point2D> &x1,
                                               const std::vector<Point2D> &x2, const std::vector<double> &d1,
                                               const std::vector<double> &d2, double sq_threshold,
@@ -65,6 +85,14 @@ void get_inliers_symmetric_reprojection_error(const MonoDepthImagePair *model, c
                                               const std::vector<Point2D> &x2, const std::vector<double> &d1,
                                               const std::vector<double> &d2, double sq_threshold,
                                               std::vector<char> *inliers);
+void get_monodepth_relative_pose_inliers(const MonoDepthTwoViewGeometry *model, const std::vector<Point2D> &x1,
+                                         const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                         const std::vector<double> &d2, const MonoDepthRelativePoseOptions &opt,
+                                         std::vector<char> *inliers);
+void get_monodepth_relative_pose_inliers(const MonoDepthImagePair *model, const std::vector<Point2D> &x1,
+                                         const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                         const std::vector<double> &d2, const MonoDepthRelativePoseOptions &opt,
+                                         std::vector<char> *inliers);
 
 // Returns MSAC score of the Sampson error
 double compute_sampson_msac_score(const CameraPose &pose, const std::vector<Point2D> &x1,

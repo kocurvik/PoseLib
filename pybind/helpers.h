@@ -90,6 +90,44 @@ inline void update_bundle_options(const py::dict &input, BundleOptions &bundle_o
     }
 }
 
+inline bool parse_monodepth_error_type(const std::string &input, MonoDepthRelativePoseOptions::ErrorType &type) {
+    std::string mode = input;
+    for (char &c : mode)
+        c = std::toupper(c);
+
+    if (mode == "SAMPSON" || mode == "SAMPSON_ERROR") {
+        type = MonoDepthRelativePoseOptions::ErrorType::SAMPSON;
+        return true;
+    }
+    if (mode == "REPROJECTION" || mode == "REPROJECTION_ERROR") {
+        type = MonoDepthRelativePoseOptions::ErrorType::REPROJECTION;
+        return true;
+    }
+    if (mode == "SYMMETRIC_REPROJECTION" || mode == "SYMMETRIC_REPROJECTION_ERROR" ||
+        mode == "SYMMETRIC") {
+        type = MonoDepthRelativePoseOptions::ErrorType::SYMMETRIC_REPROJECTION;
+        return true;
+    }
+    if (mode == "HYBRID" || mode == "HYBRID_ERROR") {
+        type = MonoDepthRelativePoseOptions::ErrorType::HYBRID;
+        return true;
+    }
+    return false;
+}
+
+inline void update_monodepth_error_type(const py::dict &input, const std::string &name,
+                                        MonoDepthRelativePoseOptions::ErrorType &type) {
+    if (!input.contains(name)) {
+        return;
+    }
+    py::object value = input[name.c_str()];
+    if (py::isinstance<py::str>(value)) {
+        parse_monodepth_error_type(value.cast<std::string>(), type);
+    } else {
+        type = static_cast<MonoDepthRelativePoseOptions::ErrorType>(value.cast<int>());
+    }
+}
+
 inline void update_absolute_pose_options(const py::dict &input, AbsolutePoseOptions &opt) {
     // Handle nested ransac and bundle options
     if (input.contains("ransac")) {
@@ -169,6 +207,10 @@ inline void update_monodepth_relative_pose_options(const py::dict &input, MonoDe
     }
 
     update(input, "estimate_shift", opt.estimate_shift);
+    update_monodepth_error_type(input, "scoring_type", opt.scoring_type);
+    update_monodepth_error_type(input, "scoring", opt.scoring_type);
+    update_monodepth_error_type(input, "refinement_type", opt.refinement_type);
+    update_monodepth_error_type(input, "refinement", opt.refinement_type);
     update(input, "weight_sampson", opt.weight_sampson);
 }
 

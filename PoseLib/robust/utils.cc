@@ -154,6 +154,72 @@ double compute_msac_score(const CameraPose &pose, double focal, const std::vecto
     return score;
 }
 
+double compute_reprojection_error(const MonoDepthTwoViewGeometry &model, const std::vector<Point2D> &x1,
+                                  const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                  const std::vector<double> &, double sq_threshold, size_t *inlier_count) {
+    *inlier_count = 0;
+    double score = 0.0;
+
+    const Eigen::Matrix3d R = model.pose.R();
+    const Eigen::Vector3d &t = model.pose.t;
+    const double shift1 = model.shift1;
+
+    for (size_t k = 0; k < x1.size(); ++k) {
+        const Eigen::Vector3d Z1 = R * ((d1[k] + shift1) * x1[k].homogeneous().eval()) + t;
+
+        if (Z1(2) > 0) {
+            const double inv_z = 1.0 / Z1(2);
+            const double r0 = Z1(0) * inv_z - x2[k](0);
+            const double r1 = Z1(1) * inv_z - x2[k](1);
+            const double r2 = r0 * r0 + r1 * r1;
+            if (r2 < sq_threshold) {
+                score += r2;
+                (*inlier_count)++;
+            } else {
+                score += sq_threshold;
+            }
+        } else {
+            score += sq_threshold;
+        }
+    }
+    return score;
+}
+
+double compute_reprojection_error(const MonoDepthImagePair &image_pair, const std::vector<Point2D> &x1,
+                                  const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                  const std::vector<double> &, double sq_threshold, size_t *inlier_count) {
+    *inlier_count = 0;
+    double score = 0.0;
+
+    const MonoDepthTwoViewGeometry &geometry = image_pair.geometry;
+    const Eigen::Matrix3d R = geometry.pose.R();
+    const Eigen::Vector3d &t = geometry.pose.t;
+    const double shift1 = geometry.shift1;
+    const double f1 = image_pair.camera1.focal();
+    const double f2 = image_pair.camera2.focal();
+
+    for (size_t k = 0; k < x1.size(); ++k) {
+        const Eigen::Vector3d b1(x1[k](0) / f1, x1[k](1) / f1, 1.0);
+        const Eigen::Vector3d Z1 = R * ((d1[k] + shift1) * b1) + t;
+
+        if (Z1(2) > 0) {
+            const double inv_z = 1.0 / Z1(2);
+            const double r0 = f2 * Z1(0) * inv_z - x2[k](0);
+            const double r1 = f2 * Z1(1) * inv_z - x2[k](1);
+            const double r2 = r0 * r0 + r1 * r1;
+            if (r2 < sq_threshold) {
+                score += r2;
+                (*inlier_count)++;
+            } else {
+                score += sq_threshold;
+            }
+        } else {
+            score += sq_threshold;
+        }
+    }
+    return score;
+}
+
 double compute_symmetric_reprojection_error(const MonoDepthTwoViewGeometry &model, const std::vector<Point2D> &x1,
                                             const std::vector<Point2D> &x2, const std::vector<double> &d1,
                                             const std::vector<double> &d2, double sq_threshold, size_t *inlier_count) {
@@ -257,7 +323,6 @@ double compute_symmetric_reprojection_error(const MonoDepthImagePair &image_pair
             const double r1 = f1 * Z2(1) * inv_z - x1[k](1);
             const double r2 = r0 * r0 + r1 * r1;
             if (r2 < sq_threshold) {
-                is_inlier = true;
                 score += r2;
             } else {
                 score += sq_threshold;
@@ -273,6 +338,131 @@ double compute_symmetric_reprojection_error(const MonoDepthImagePair &image_pair
         }
     }
     return score;
+}
+
+double compute_monodepth_relative_pose_error(const MonoDepthTwoViewGeometry &model, const std::vector<Point2D> &x1,
+                                             const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                             const std::vector<double> &d2, const MonoDepthRelativePoseOptions &opt,
+                                             size_t *inlier_count) {
+    const double sq_reproj_threshold = opt.max_errors[0] * opt.max_errors[0];
+    const double sq_sampson_threshold = opt.max_errors[1] * opt.max_errors[1];
+
+    switch (opt.scoring_type) {
+    case MonoDepthRelativePoseOptions::ErrorType::REPROJECTION:
+        return compute_reprojection_error(model, x1, x2, d1, d2, sq_reproj_threshold, inlier_count);
+    case MonoDepthRelativePoseOptions::ErrorType::SYMMETRIC_REPROJECTION:
+        return compute_symmetric_reprojection_error(model, x1, x2, d1, d2, sq_reproj_threshold, inlier_count);
+    case MonoDepthRelativePoseOptions::ErrorType::HYBRID: {
+        size_t sampson_inliers = 0, reproj_inliers = 0;
+        const double scale_reproj =
+            (sq_reproj_threshold > 0.0) ? sq_sampson_threshold / sq_reproj_threshold : 0.0;
+        const double sampson_score =
+            compute_sampson_msac_score(model.pose, x1, x2, sq_sampson_threshold, &sampson_inliers);
+        const double reproj_score =
+            compute_symmetric_reprojection_error(model, x1, x2, d1, d2, sq_reproj_threshold, &reproj_inliers);
+        std::vector<char> inliers;
+        get_monodepth_relative_pose_inliers(&model, x1, x2, d1, d2, opt, &inliers);
+        *inlier_count = 0;
+        for (char inlier : inliers) {
+            *inlier_count += static_cast<size_t>(inlier);
+        }
+        return opt.weight_sampson * sampson_score + scale_reproj * reproj_score;
+    }
+    default:
+    case MonoDepthRelativePoseOptions::ErrorType::SAMPSON:
+        return compute_sampson_msac_score(model.pose, x1, x2, sq_sampson_threshold, inlier_count);
+    }
+}
+
+double compute_monodepth_relative_pose_error(const MonoDepthImagePair &image_pair, const std::vector<Point2D> &x1,
+                                             const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                             const std::vector<double> &d2, const MonoDepthRelativePoseOptions &opt,
+                                             size_t *inlier_count) {
+    const double sq_reproj_threshold = opt.max_errors[0] * opt.max_errors[0];
+    const double sq_sampson_threshold = opt.max_errors[1] * opt.max_errors[1];
+
+    Eigen::Matrix3d E;
+    essential_from_motion(image_pair.geometry.pose, &E);
+    Eigen::Matrix3d F;
+    if (std::abs(image_pair.camera1.focal() - image_pair.camera2.focal()) < 1e-12) {
+        Eigen::DiagonalMatrix<double, 3> K_inv(1.0, 1.0, image_pair.camera1.focal());
+        F = K_inv * (E * K_inv);
+    } else {
+        Eigen::DiagonalMatrix<double, 3> K1_inv(1.0, 1.0, image_pair.camera1.focal());
+        Eigen::DiagonalMatrix<double, 3> K2_inv(1.0, 1.0, image_pair.camera2.focal());
+        F = K2_inv * (E * K1_inv);
+    }
+
+    switch (opt.scoring_type) {
+    case MonoDepthRelativePoseOptions::ErrorType::REPROJECTION:
+        return compute_reprojection_error(image_pair, x1, x2, d1, d2, sq_reproj_threshold, inlier_count);
+    case MonoDepthRelativePoseOptions::ErrorType::SYMMETRIC_REPROJECTION:
+        return compute_symmetric_reprojection_error(image_pair, x1, x2, d1, d2, sq_reproj_threshold, inlier_count);
+    case MonoDepthRelativePoseOptions::ErrorType::HYBRID: {
+        size_t sampson_inliers = 0, reproj_inliers = 0;
+        const double scale_reproj =
+            (sq_reproj_threshold > 0.0) ? sq_sampson_threshold / sq_reproj_threshold : 0.0;
+        const double sampson_score = compute_sampson_msac_score(F, x1, x2, sq_sampson_threshold, &sampson_inliers);
+        const double reproj_score =
+            compute_symmetric_reprojection_error(image_pair, x1, x2, d1, d2, sq_reproj_threshold, &reproj_inliers);
+        std::vector<char> inliers;
+        get_monodepth_relative_pose_inliers(&image_pair, x1, x2, d1, d2, opt, &inliers);
+        *inlier_count = 0;
+        for (char inlier : inliers) {
+            *inlier_count += static_cast<size_t>(inlier);
+        }
+        return opt.weight_sampson * sampson_score + scale_reproj * reproj_score;
+    }
+    default:
+    case MonoDepthRelativePoseOptions::ErrorType::SAMPSON:
+        return compute_sampson_msac_score(F, x1, x2, sq_sampson_threshold, inlier_count);
+    }
+}
+
+void get_inliers_reprojection_error(const MonoDepthTwoViewGeometry *model, const std::vector<Point2D> &x1,
+                                    const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                    const std::vector<double> &, double sq_threshold, std::vector<char> *inliers) {
+    inliers->resize(x1.size());
+    const Eigen::Matrix3d R = model->pose.R();
+    const Eigen::Vector3d &t = model->pose.t;
+    const double shift1 = model->shift1;
+
+    for (size_t k = 0; k < x1.size(); ++k) {
+        const Eigen::Vector3d Z1 = R * ((d1[k] + shift1) * x1[k].homogeneous().eval()) + t;
+        bool is_inlier = false;
+        if (Z1(2) > 0) {
+            const double inv_z = 1.0 / Z1(2);
+            const double r0 = Z1(0) * inv_z - x2[k](0);
+            const double r1 = Z1(1) * inv_z - x2[k](1);
+            is_inlier = (r0 * r0 + r1 * r1 < sq_threshold);
+        }
+        (*inliers)[k] = is_inlier;
+    }
+}
+
+void get_inliers_reprojection_error(const MonoDepthImagePair *model, const std::vector<Point2D> &x1,
+                                    const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                    const std::vector<double> &, double sq_threshold, std::vector<char> *inliers) {
+    inliers->resize(x1.size());
+    const MonoDepthTwoViewGeometry &geometry = model->geometry;
+    const Eigen::Matrix3d R = geometry.pose.R();
+    const Eigen::Vector3d &t = geometry.pose.t;
+    const double shift1 = geometry.shift1;
+    const double f1 = model->camera1.focal();
+    const double f2 = model->camera2.focal();
+
+    for (size_t k = 0; k < x1.size(); ++k) {
+        const Eigen::Vector3d b1(x1[k](0) / f1, x1[k](1) / f1, 1.0);
+        const Eigen::Vector3d Z1 = R * ((d1[k] + shift1) * b1) + t;
+        bool is_inlier = false;
+        if (Z1(2) > 0) {
+            const double inv_z = 1.0 / Z1(2);
+            const double r0 = f2 * Z1(0) * inv_z - x2[k](0);
+            const double r1 = f2 * Z1(1) * inv_z - x2[k](1);
+            is_inlier = (r0 * r0 + r1 * r1 < sq_threshold);
+        }
+        (*inliers)[k] = is_inlier;
+    }
 }
 
 void get_inliers_symmetric_reprojection_error(const MonoDepthTwoViewGeometry *model, const std::vector<Point2D> &x1,
@@ -364,6 +554,79 @@ void get_inliers_symmetric_reprojection_error(const MonoDepthImagePair *model, c
         }
 
         (*inliers)[k] = is_inlier;
+    }
+}
+
+void get_monodepth_relative_pose_inliers(const MonoDepthTwoViewGeometry *model, const std::vector<Point2D> &x1,
+                                         const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                         const std::vector<double> &d2, const MonoDepthRelativePoseOptions &opt,
+                                         std::vector<char> *inliers) {
+    const double sq_reproj_threshold = opt.max_errors[0] * opt.max_errors[0];
+    const double sq_sampson_threshold = opt.max_errors[1] * opt.max_errors[1];
+    switch (opt.scoring_type) {
+    case MonoDepthRelativePoseOptions::ErrorType::REPROJECTION:
+        get_inliers_reprojection_error(model, x1, x2, d1, d2, sq_reproj_threshold, inliers);
+        break;
+    case MonoDepthRelativePoseOptions::ErrorType::SYMMETRIC_REPROJECTION:
+        get_inliers_symmetric_reprojection_error(model, x1, x2, d1, d2, sq_reproj_threshold, inliers);
+        break;
+    case MonoDepthRelativePoseOptions::ErrorType::HYBRID: {
+        std::vector<char> sampson_inliers, reproj_inliers;
+        get_inliers(model->pose, x1, x2, sq_sampson_threshold, &sampson_inliers);
+        get_inliers_symmetric_reprojection_error(model, x1, x2, d1, d2, sq_reproj_threshold, &reproj_inliers);
+        inliers->resize(x1.size());
+        for (size_t i = 0; i < x1.size(); ++i) {
+            (*inliers)[i] = sampson_inliers[i] && reproj_inliers[i];
+        }
+        break;
+    }
+    default:
+    case MonoDepthRelativePoseOptions::ErrorType::SAMPSON:
+        get_inliers(model->pose, x1, x2, sq_sampson_threshold, inliers);
+        break;
+    }
+}
+
+void get_monodepth_relative_pose_inliers(const MonoDepthImagePair *model, const std::vector<Point2D> &x1,
+                                         const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                         const std::vector<double> &d2, const MonoDepthRelativePoseOptions &opt,
+                                         std::vector<char> *inliers) {
+    const double sq_reproj_threshold = opt.max_errors[0] * opt.max_errors[0];
+    const double sq_sampson_threshold = opt.max_errors[1] * opt.max_errors[1];
+
+    Eigen::Matrix3d E;
+    essential_from_motion(model->geometry.pose, &E);
+    Eigen::Matrix3d F;
+    if (std::abs(model->camera1.focal() - model->camera2.focal()) < 1e-12) {
+        Eigen::DiagonalMatrix<double, 3> K_inv(1.0, 1.0, model->camera1.focal());
+        F = K_inv * (E * K_inv);
+    } else {
+        Eigen::DiagonalMatrix<double, 3> K1_inv(1.0, 1.0, model->camera1.focal());
+        Eigen::DiagonalMatrix<double, 3> K2_inv(1.0, 1.0, model->camera2.focal());
+        F = K2_inv * (E * K1_inv);
+    }
+
+    switch (opt.scoring_type) {
+    case MonoDepthRelativePoseOptions::ErrorType::REPROJECTION:
+        get_inliers_reprojection_error(model, x1, x2, d1, d2, sq_reproj_threshold, inliers);
+        break;
+    case MonoDepthRelativePoseOptions::ErrorType::SYMMETRIC_REPROJECTION:
+        get_inliers_symmetric_reprojection_error(model, x1, x2, d1, d2, sq_reproj_threshold, inliers);
+        break;
+    case MonoDepthRelativePoseOptions::ErrorType::HYBRID: {
+        std::vector<char> sampson_inliers, reproj_inliers;
+        get_inliers(F, x1, x2, sq_sampson_threshold, &sampson_inliers);
+        get_inliers_symmetric_reprojection_error(model, x1, x2, d1, d2, sq_reproj_threshold, &reproj_inliers);
+        inliers->resize(x1.size());
+        for (size_t i = 0; i < x1.size(); ++i) {
+            (*inliers)[i] = sampson_inliers[i] && reproj_inliers[i];
+        }
+        break;
+    }
+    default:
+    case MonoDepthRelativePoseOptions::ErrorType::SAMPSON:
+        get_inliers(F, x1, x2, sq_sampson_threshold, inliers);
+        break;
     }
 }
 

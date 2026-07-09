@@ -358,7 +358,7 @@ RansacStats estimate_monodepth_relative_pose(const std::vector<Point2D> &points2
         scaled_bundle_opt.loss_scale = 0.25 * opt.max_errors[1] * (1.0 / camera1.focal() + 1.0 / camera2.focal());
 
         refine_monodepth_relpose(x1_inliers, x2_inliers, d1_inliers, d2_inliers, geometry, scale_reproj, weight_sampson,
-                                 scaled_bundle_opt, opt.estimate_shift);
+                                 scaled_bundle_opt, opt.estimate_shift, opt.refinement_type);
     }
     return stats;
 }
@@ -529,9 +529,12 @@ RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Poin
             d2_inliers.push_back(depth_2[k]);
         }
 
-        double scale_reproj = (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0]);
+        double scale_reproj = (opt.max_errors[0] > 0.0)
+                                  ? (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0])
+                                  : 0.0;
         refine_monodepth_shared_focal_relpose(x1_inliers, x2_inliers, d1_inliers, d2_inliers, image_pair, scale_reproj,
-                                              opt.weight_sampson, opt_scaled.bundle, opt.estimate_shift);
+                                              opt.weight_sampson, opt_scaled.bundle, opt.estimate_shift,
+                                              opt.refinement_type);
     }
 
     // rescale back
@@ -588,9 +591,12 @@ RansacStats estimate_varying_focal_monodepth_relative_pose(const std::vector<Poi
             d2_inliers.push_back(depth_2[k]);
         }
 
-        double scale_reproj = (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0]);
+        double scale_reproj = (opt.max_errors[0] > 0.0)
+                                  ? (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0])
+                                  : 0.0;
         refine_monodepth_varying_focal_relpose(x1_inliers, x2_inliers, d1_inliers, d2_inliers, image_pair, scale_reproj,
-                                               opt.weight_sampson, opt_scaled.bundle, opt.estimate_shift);
+                                               opt.weight_sampson, opt_scaled.bundle, opt.estimate_shift,
+                                               opt.refinement_type);
     }
 
     // rescale back

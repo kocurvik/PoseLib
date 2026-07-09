@@ -142,10 +142,7 @@ void RelativePoseMonoDepthEstimator::generate_models(std::vector<MonoDepthTwoVie
     }
 }
 double RelativePoseMonoDepthEstimator::score_model(const MonoDepthTwoViewGeometry &model, size_t *inlier_count) const {
-    if (opt.weight_sampson > 0.0) {
-        return compute_sampson_msac_score(model.pose, x1, x2, opt.max_errors[1] * opt.max_errors[1], inlier_count);
-    }
-    return compute_symmetric_reprojection_error(model, x1, x2, d1, d2, opt.max_errors[0] * opt.max_errors[0], inlier_count);
+    return compute_monodepth_relative_pose_error(model, x1, x2, d1, d2, opt, inlier_count);
 }
 
 void RelativePoseMonoDepthEstimator::refine_model(MonoDepthTwoViewGeometry *model) const {
@@ -154,7 +151,8 @@ void RelativePoseMonoDepthEstimator::refine_model(MonoDepthTwoViewGeometry *mode
     bundle_opt.max_iterations = 25;
     bundle_opt.loss_scale = opt.max_errors[1];
 
-    refine_monodepth_relpose(x1, x2, d1, d2, model, scale_reproj, opt.weight_sampson, bundle_opt, opt.estimate_shift);
+    refine_monodepth_relpose(x1, x2, d1, d2, model, scale_reproj, opt.weight_sampson, bundle_opt, opt.estimate_shift,
+                             opt.refinement_type);
 }
 
 void SharedFocalRelativePoseEstimator::generate_models(ImagePairVector *models) {
@@ -311,17 +309,7 @@ void SharedFocalMonodepthPoseEstimator::generate_models(std::vector<MonoDepthIma
 
 double SharedFocalMonodepthPoseEstimator::score_model(const MonoDepthImagePair &image_pair,
                                                       size_t *inlier_count) const {
-    if (opt.weight_sampson > 0.0) {
-        Eigen::DiagonalMatrix<double, 3> K_inv(1.0, 1.0, image_pair.camera1.focal());
-        Eigen::Matrix3d E;
-        essential_from_motion(image_pair.geometry.pose, &E);
-        Eigen::Matrix3d F = K_inv * (E * K_inv);
-
-        return compute_sampson_msac_score(F, x1, x2, opt.max_errors[1] * opt.max_errors[1], inlier_count);
-    }
-
-    return compute_symmetric_reprojection_error(image_pair, x1, x2, d1, d2, opt.max_errors[0] * opt.max_errors[0],
-                                                inlier_count);
+    return compute_monodepth_relative_pose_error(image_pair, x1, x2, d1, d2, opt, inlier_count);
 }
 
 void SharedFocalMonodepthPoseEstimator::refine_model(MonoDepthImagePair *image_pair) const {
@@ -331,7 +319,7 @@ void SharedFocalMonodepthPoseEstimator::refine_model(MonoDepthImagePair *image_p
     bundle_opt.max_iterations = 25;
 
     refine_monodepth_shared_focal_relpose(x1, x2, d1, d2, image_pair, scale_reproj, opt.weight_sampson, bundle_opt,
-                                          opt.estimate_shift);
+                                          opt.estimate_shift, opt.refinement_type);
 }
 
 void VaryingFocalMonodepthPoseEstimator::generate_models(std::vector<MonoDepthImagePair> *models) {
@@ -354,18 +342,7 @@ void VaryingFocalMonodepthPoseEstimator::generate_models(std::vector<MonoDepthIm
 
 double VaryingFocalMonodepthPoseEstimator::score_model(const MonoDepthImagePair &image_pair,
                                                        size_t *inlier_count) const {
-    if (opt.weight_sampson > 0.0) {
-        Eigen::DiagonalMatrix<double, 3> K1_inv(1.0, 1.0, image_pair.camera1.focal());
-        Eigen::DiagonalMatrix<double, 3> K2_inv(1.0, 1.0, image_pair.camera2.focal());
-        Eigen::Matrix3d E;
-        essential_from_motion(image_pair.geometry.pose, &E);
-        Eigen::Matrix3d F = K2_inv * (E * K1_inv);
-
-        return compute_sampson_msac_score(F, x1, x2, opt.max_errors[1] * opt.max_errors[1], inlier_count);
-    }
-
-    return compute_symmetric_reprojection_error(image_pair, x1, x2, d1, d2, opt.max_errors[0] * opt.max_errors[0],
-                                                inlier_count);
+    return compute_monodepth_relative_pose_error(image_pair, x1, x2, d1, d2, opt, inlier_count);
 }
 
 void VaryingFocalMonodepthPoseEstimator::refine_model(MonoDepthImagePair *image_pair) const {
@@ -374,7 +351,7 @@ void VaryingFocalMonodepthPoseEstimator::refine_model(MonoDepthImagePair *image_
     bundle_opt.max_iterations = 25;
 
     refine_monodepth_varying_focal_relpose(x1, x2, d1, d2, image_pair, scale_reproj, opt.weight_sampson, bundle_opt,
-                                           opt.estimate_shift);
+                                           opt.estimate_shift, opt.refinement_type);
 }
 
 void GeneralizedRelativePoseEstimator::generate_models(std::vector<CameraPose> *models) {

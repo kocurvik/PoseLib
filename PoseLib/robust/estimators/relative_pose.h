@@ -225,7 +225,9 @@ class SharedFocalMonodepthPoseEstimator {
         }
 
         // max_errors[0] is reproj error, max_errors[1] is epipolar error
-        scale_reproj = (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0]);
+        scale_reproj = (opt.max_errors[0] > 0.0)
+                           ? (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0])
+                           : 0.0;
     }
 
     void generate_models(std::vector<MonoDepthImagePair> *models);
@@ -272,7 +274,9 @@ class VaryingFocalMonodepthPoseEstimator {
             x2h[i] = x2[i].homogeneous();
         }
         // max_errors[0] is reproj error, max_errors[1] is epipolar error
-        scale_reproj = (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0]);
+        scale_reproj = (opt.max_errors[0] > 0.0)
+                           ? (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0])
+                           : 0.0;
     }
 
     void generate_models(std::vector<MonoDepthImagePair> *models);

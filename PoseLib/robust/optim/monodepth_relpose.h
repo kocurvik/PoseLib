@@ -113,6 +113,26 @@ inline double compute_sampson_residual(const Eigen::Vector2d &x1, const Eigen::V
     return C / std::sqrt(nJc_sq);
 }
 
+inline bool monodepth_uses_sampson_error(MonoDepthRelativePoseOptions::ErrorType error_type) {
+    return error_type == MonoDepthRelativePoseOptions::ErrorType::SAMPSON ||
+           error_type == MonoDepthRelativePoseOptions::ErrorType::HYBRID;
+}
+
+inline bool monodepth_uses_reprojection_error(MonoDepthRelativePoseOptions::ErrorType error_type) {
+    return error_type == MonoDepthRelativePoseOptions::ErrorType::REPROJECTION ||
+           error_type == MonoDepthRelativePoseOptions::ErrorType::SYMMETRIC_REPROJECTION ||
+           error_type == MonoDepthRelativePoseOptions::ErrorType::HYBRID;
+}
+
+inline bool monodepth_uses_backward_reprojection_error(MonoDepthRelativePoseOptions::ErrorType error_type) {
+    return error_type == MonoDepthRelativePoseOptions::ErrorType::SYMMETRIC_REPROJECTION ||
+           error_type == MonoDepthRelativePoseOptions::ErrorType::HYBRID;
+}
+
+inline double monodepth_sampson_weight(MonoDepthRelativePoseOptions::ErrorType error_type, double weight_sampson) {
+    return error_type == MonoDepthRelativePoseOptions::ErrorType::HYBRID ? weight_sampson : 1.0;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 // Calibrated monodepth relative pose refinement
 // Combines Sampson error + symmetric reprojection error using monodepth estimates.
@@ -124,9 +144,11 @@ class MonoDepthRelPoseRefiner : public RefinerBase<MonoDepthTwoViewGeometry, Acc
     MonoDepthRelPoseRefiner(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
                             const std::vector<double> &d1, const std::vector<double> &d2, const double scale_reproj,
                             const double weight_sampson, const bool refine_shift,
+                            const MonoDepthRelativePoseOptions::ErrorType error_type =
+                                MonoDepthRelativePoseOptions::ErrorType::HYBRID,
                             const ResidualWeightVector &w = ResidualWeightVector())
         : x1(points2D_1), x2(points2D_2), d1(d1), d2(d2), scale_reproj(scale_reproj), weight_sampson(weight_sampson),
-          refine_shift(refine_shift), weights(w) {
+          refine_shift(refine_shift), error_type(error_type), weights(w) {
         this->num_params = refine_shift ? 9 : 7;
     }
 
@@ -142,12 +164,12 @@ class MonoDepthRelPoseRefiner : public RefinerBase<MonoDepthTwoViewGeometry, Acc
         essential_from_motion(geometry.pose, &E);
 
         for (size_t i = 0; i < x1.size(); ++i) {
-            if (weight_sampson > 0.0) {
+            if (monodepth_uses_sampson_error(error_type)) {
                 const double r = compute_sampson_residual(x1[i], x2[i], E);
-                acc.add_residual(r, weight_sampson * weights[i]);
+                acc.add_residual(r, monodepth_sampson_weight(error_type, weight_sampson) * weights[i]);
             }
 
-            if (scale_reproj > 0.0) {
+            if (scale_reproj > 0.0 && monodepth_uses_reprojection_error(error_type)) {
                 const Eigen::Vector3d Z1 = R * ((d1[i] + shift_1) * x1[i].homogeneous().eval()) + t;
                 const Eigen::Vector3d Z2 = R.transpose() * (scale * (d2[i] + shift_2) * x2[i].homogeneous().eval() - t);
 
@@ -159,7 +181,7 @@ class MonoDepthRelPoseRefiner : public RefinerBase<MonoDepthTwoViewGeometry, Acc
                     acc.add_residual(res, weights[i]);
                 }
 
-                if (Z2(2) > 0) {
+                if (monodepth_uses_backward_reprojection_error(error_type) && Z2(2) > 0) {
                     const double inv_z = 1.0 / Z2(2);
                     Eigen::Vector2d res;
                     res << Z2(0) * inv_z - x1[i](0), Z2(1) * inv_z - x1[i](1);
@@ -193,7 +215,7 @@ class MonoDepthRelPoseRefiner : public RefinerBase<MonoDepthTwoViewGeometry, Acc
 
         for (size_t i = 0; i < x1.size(); ++i) {
             // Reprojection error
-            if (scale_reproj > 0.0) {
+            if (scale_reproj > 0.0 && monodepth_uses_reprojection_error(error_type)) {
                 const Eigen::Vector3d X1o = x1[i].homogeneous();
                 const Eigen::Vector3d X1i = (d1[i] + shift_1) * X1o;
                 const Eigen::Vector3d Z1 = R * X1i + geometry.pose.t;
@@ -238,7 +260,7 @@ class MonoDepthRelPoseRefiner : public RefinerBase<MonoDepthTwoViewGeometry, Acc
                 }
 
                 // Backward reprojection (cam2 -> cam1)
-                if (Z2(2) > 0) {
+                if (monodepth_uses_backward_reprojection_error(error_type) && Z2(2) > 0) {
                     const double inv_z = 1.0 / Z2(2);
                     Eigen::Vector2d res;
                     res << Z2(0) * inv_z - x1[i](0), Z2(1) * inv_z - x1[i](1);
@@ -279,7 +301,7 @@ class MonoDepthRelPoseRefiner : public RefinerBase<MonoDepthTwoViewGeometry, Acc
             }
 
             // Sampson error
-            if (weight_sampson > 0.0) {
+            if (monodepth_uses_sampson_error(error_type)) {
                 Eigen::Matrix<double, 1, 9> dF;
                 const double r = compute_sampson_jacobian(x1[i], x2[i], E, dF);
 
@@ -289,7 +311,7 @@ class MonoDepthRelPoseRefiner : public RefinerBase<MonoDepthTwoViewGeometry, Acc
                 J_sam.block<1, 3>(0, 3) = dF * dt;
                 // Sampson doesn't depend on scale, shift1, shift2
 
-                acc.add_jacobian(r, J_sam, weight_sampson * weights[i]);
+                acc.add_jacobian(r, J_sam, monodepth_sampson_weight(error_type, weight_sampson) * weights[i]);
             }
         }
     }
@@ -316,6 +338,7 @@ class MonoDepthRelPoseRefiner : public RefinerBase<MonoDepthTwoViewGeometry, Acc
     const std::vector<double> &d2;
     const double scale_reproj, weight_sampson;
     const bool refine_shift;
+    const MonoDepthRelativePoseOptions::ErrorType error_type;
     const ResidualWeightVector &weights;
 };
 
@@ -331,9 +354,11 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
                                        const std::vector<double> &d1, const std::vector<double> &d2,
                                        const double scale_reproj, const double weight_sampson,
                                        const bool refine_shift,
+                                       const MonoDepthRelativePoseOptions::ErrorType error_type =
+                                           MonoDepthRelativePoseOptions::ErrorType::HYBRID,
                                        const ResidualWeightVector &w = ResidualWeightVector())
         : x1(points2D_1), x2(points2D_2), d1(d1), d2(d2), scale_reproj(scale_reproj), weight_sampson(weight_sampson),
-          refine_shift(refine_shift), weights(w) {
+          refine_shift(refine_shift), error_type(error_type), weights(w) {
         this->num_params = refine_shift ? 10 : 8;
     }
 
@@ -353,12 +378,12 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
         Eigen::Matrix3d F = K_inv * E * K_inv;
 
         for (size_t i = 0; i < x1.size(); ++i) {
-            if (weight_sampson > 0.0) {
+            if (monodepth_uses_sampson_error(error_type)) {
                 const double r = compute_sampson_residual(x1[i], x2[i], F);
-                acc.add_residual(r, weight_sampson * weights[i]);
+                acc.add_residual(r, monodepth_sampson_weight(error_type, weight_sampson) * weights[i]);
             }
 
-            if (scale_reproj > 0.0) {
+            if (scale_reproj > 0.0 && monodepth_uses_reprojection_error(error_type)) {
                 // Unproject to bearing direction using focal
                 const Eigen::Vector3d b1(x1[i](0) / f, x1[i](1) / f, 1.0);
                 const Eigen::Vector3d b2(x2[i](0) / f, x2[i](1) / f, 1.0);
@@ -374,7 +399,7 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
                     acc.add_residual(res, weights[i]);
                 }
 
-                if (Z2(2) > 0) {
+                if (monodepth_uses_backward_reprojection_error(error_type) && Z2(2) > 0) {
                     const double inv_z = 1.0 / Z2(2);
                     Eigen::Vector2d res;
                     res << f * Z2(0) * inv_z - x1[i](0), f * Z2(1) * inv_z - x1[i](1);
@@ -430,7 +455,7 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
 
         for (size_t i = 0; i < x1.size(); ++i) {
             // Reprojection error
-            if (scale_reproj > 0.0) {
+            if (scale_reproj > 0.0 && monodepth_uses_reprojection_error(error_type)) {
                 const Eigen::Vector3d b1(x1[i](0) / f, x1[i](1) / f, 1.0);
                 const Eigen::Vector3d b2(x2[i](0) / f, x2[i](1) / f, 1.0);
                 const Eigen::Vector3d X1i = (d1[i] + shift_1) * b1;
@@ -481,7 +506,7 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
                 }
 
                 // Backward reprojection (cam2 -> cam1)
-                if (Z2(2) > 0) {
+                if (monodepth_uses_backward_reprojection_error(error_type) && Z2(2) > 0) {
                     const double inv_z = 1.0 / Z2(2);
                     const Eigen::Vector2d xp_cal(Z2(0) * inv_z, Z2(1) * inv_z);
                     Eigen::Vector2d res = f * xp_cal - x1[i].template head<2>();
@@ -527,7 +552,7 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
             }
 
             // Sampson error (uses F = K_inv * E * K_inv)
-            if (weight_sampson > 0.0) {
+            if (monodepth_uses_sampson_error(error_type)) {
                 Eigen::Matrix<double, 1, 9> dF_mat;
                 const double r = compute_sampson_jacobian(x1[i], x2[i], F, dF_mat);
 
@@ -539,7 +564,7 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
                 J_sam(0, 7) = (dF_mat * df_F)(0, 0);
                 // Sampson doesn't depend on shift1, shift2
 
-                acc.add_jacobian(r, J_sam, weight_sampson * weights[i]);
+                acc.add_jacobian(r, J_sam, monodepth_sampson_weight(error_type, weight_sampson) * weights[i]);
             }
         }
     }
@@ -569,6 +594,7 @@ class MonoDepthSharedFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePair
     const std::vector<double> &d2;
     const double scale_reproj, weight_sampson;
     const bool refine_shift;
+    const MonoDepthRelativePoseOptions::ErrorType error_type;
     const ResidualWeightVector &weights;
 
   private:
@@ -590,9 +616,11 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
                                         const std::vector<double> &d1, const std::vector<double> &d2,
                                         const double scale_reproj, const double weight_sampson,
                                         const bool refine_shift,
+                                        const MonoDepthRelativePoseOptions::ErrorType error_type =
+                                            MonoDepthRelativePoseOptions::ErrorType::HYBRID,
                                         const ResidualWeightVector &w = ResidualWeightVector())
         : x1(points2D_1), x2(points2D_2), d1(d1), d2(d2), scale_reproj(scale_reproj), weight_sampson(weight_sampson),
-          refine_shift(refine_shift), weights(w) {
+          refine_shift(refine_shift), error_type(error_type), weights(w) {
         this->num_params = refine_shift ? 11 : 9;
     }
 
@@ -614,12 +642,12 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
         Eigen::Matrix3d F = K2_inv * E * K1_inv;
 
         for (size_t i = 0; i < x1.size(); ++i) {
-            if (weight_sampson > 0.0) {
+            if (monodepth_uses_sampson_error(error_type)) {
                 const double r = compute_sampson_residual(x1[i], x2[i], F);
-                acc.add_residual(r, weight_sampson * weights[i]);
+                acc.add_residual(r, monodepth_sampson_weight(error_type, weight_sampson) * weights[i]);
             }
 
-            if (scale_reproj > 0.0) {
+            if (scale_reproj > 0.0 && monodepth_uses_reprojection_error(error_type)) {
                 const Eigen::Vector3d b1(x1[i](0) / f1, x1[i](1) / f1, 1.0);
                 const Eigen::Vector3d b2(x2[i](0) / f2, x2[i](1) / f2, 1.0);
 
@@ -634,7 +662,7 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
                     acc.add_residual(res, weights[i]);
                 }
 
-                if (Z2(2) > 0) {
+                if (monodepth_uses_backward_reprojection_error(error_type) && Z2(2) > 0) {
                     const double inv_z = 1.0 / Z2(2);
                     Eigen::Vector2d res;
                     res << f1 * Z2(0) * inv_z - x1[i](0), f1 * Z2(1) * inv_z - x1[i](1);
@@ -696,7 +724,7 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
 
         for (size_t i = 0; i < x1.size(); ++i) {
             // Reprojection error
-            if (scale_reproj > 0.0) {
+            if (scale_reproj > 0.0 && monodepth_uses_reprojection_error(error_type)) {
                 const Eigen::Vector3d b1(x1[i](0) / f1, x1[i](1) / f1, 1.0);
                 const Eigen::Vector3d b2(x2[i](0) / f2, x2[i](1) / f2, 1.0);
                 const Eigen::Vector3d X1i = (d1[i] + shift_1) * b1;
@@ -746,7 +774,7 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
                 }
 
                 // Backward reprojection (cam2 -> cam1, project with f1)
-                if (Z2(2) > 0) {
+                if (monodepth_uses_backward_reprojection_error(error_type) && Z2(2) > 0) {
                     const double inv_z = 1.0 / Z2(2);
                     const Eigen::Vector2d xp_cal(Z2(0) * inv_z, Z2(1) * inv_z);
                     Eigen::Vector2d res = f1 * xp_cal - x1[i].template head<2>();
@@ -793,7 +821,7 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
             }
 
             // Sampson error (uses F = K2_inv * E * K1_inv)
-            if (weight_sampson > 0.0) {
+            if (monodepth_uses_sampson_error(error_type)) {
                 Eigen::Matrix<double, 1, 9> dF_mat;
                 const double r = compute_sampson_jacobian(x1[i], x2[i], F, dF_mat);
 
@@ -806,7 +834,7 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
                 J_sam(0, 8) = (dF_mat * df2_F)(0, 0);
                 // Sampson doesn't depend on shift1, shift2
 
-                acc.add_jacobian(r, J_sam, weight_sampson * weights[i]);
+                acc.add_jacobian(r, J_sam, monodepth_sampson_weight(error_type, weight_sampson) * weights[i]);
             }
         }
     }
@@ -835,6 +863,7 @@ class MonoDepthVaryingFocalRelPoseRefiner : public RefinerBase<MonoDepthImagePai
     const std::vector<double> &d2;
     const double scale_reproj, weight_sampson;
     const bool refine_shift;
+    const MonoDepthRelativePoseOptions::ErrorType error_type;
     const ResidualWeightVector &weights;
 };
 

@@ -31,6 +31,7 @@
 #include "alignment.h"
 
 #include <Eigen/Dense>
+#include <array>
 #include <limits>
 #include <vector>
 
@@ -153,6 +154,13 @@ struct HybridPoseOptions {
 };
 
 struct MonoDepthRelativePoseOptions {
+    enum class ErrorType {
+        SAMPSON,
+        REPROJECTION,
+        SYMMETRIC_REPROJECTION,
+        HYBRID,
+    };
+
     RansacOptions ransac;
     BundleOptions bundle;
 
@@ -162,8 +170,11 @@ struct MonoDepthRelativePoseOptions {
 
     // Whether to estimate the shifts in the calibrated relative pose with monodepth.
     bool estimate_shift = false;
-    // The weight of the Sampson error compared to the reprojection error used by the monodepth estimators, which use
-    // hybrid errors for LO.
+    // Error used for RANSAC model scoring and final inlier extraction.
+    ErrorType scoring_type = ErrorType::SAMPSON;
+    // Error used for local optimization and final nonlinear refinement.
+    ErrorType refinement_type = ErrorType::HYBRID;
+    // The weight of the Sampson error compared to the reprojection error when using HYBRID refinement/scoring.
     float weight_sampson = 1.0;
 };
 

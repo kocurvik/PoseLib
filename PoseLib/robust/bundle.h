@@ -102,6 +102,8 @@ BundleStats refine_monodepth_relpose(const std::vector<Point2D> &x1, const std::
                                      MonoDepthTwoViewGeometry *pose, const double scale_reproj,
                                      const double weight_sampson, const BundleOptions &opt = BundleOptions(),
                                      bool refine_shift = false,
+                                     MonoDepthRelativePoseOptions::ErrorType error_type =
+                                         MonoDepthRelativePoseOptions::ErrorType::HYBRID,
                                      const std::vector<double> &weights = std::vector<double>());
 
 // Relative pose with single unknown focal refinement. Minimizes Sampson error error.
@@ -119,6 +121,8 @@ BundleStats refine_monodepth_shared_focal_relpose(const std::vector<Point2D> &x1
                                                   const std::vector<double> &d1, const std::vector<double> &d2,
                                                   MonoDepthImagePair *image_pair, double scale_reproj,
                                                   double weight_alpha, const BundleOptions &opt, bool refine_shift,
+                                                  MonoDepthRelativePoseOptions::ErrorType error_type =
+                                                      MonoDepthRelativePoseOptions::ErrorType::HYBRID,
                                                   const std::vector<double> &weights = std::vector<double>());
 
 // Relative pose with single unknown focal refinement. Minimizes Reprojection error using monodepth estimates.
@@ -126,6 +130,8 @@ BundleStats refine_monodepth_varying_focal_relpose(const std::vector<Point2D> &x
                                                    const std::vector<double> &d1, const std::vector<double> &d2,
                                                    MonoDepthImagePair *image_pair, double scale_reproj,
                                                    double weight_alpha, const BundleOptions &opt, bool refine_shift,
+                                                   MonoDepthRelativePoseOptions::ErrorType error_type =
+                                                       MonoDepthRelativePoseOptions::ErrorType::HYBRID,
                                                    const std::vector<double> &weights = std::vector<double>());
 
 // Fundamental matrix refinement. Minimizes Sampson error error.
