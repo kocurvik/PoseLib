@@ -258,7 +258,8 @@ class VaryingFocalMonodepthPoseEstimator {
     VaryingFocalMonodepthPoseEstimator(const MonoDepthRelativePoseOptions &options,
                                        const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
                                        const std::vector<double> &d1, const std::vector<double> &d2)
-        : sample_sz(options.estimate_shift ? 4 : 3), num_data(points2D_1.size()), opt(options), x1(points2D_1),
+        : sample_sz((options.estimate_shift || options.solver_4p4d) ? 4 : 3), num_data(points2D_1.size()),
+          opt(options), x1(points2D_1),
           x2(points2D_2), d1(d1), d2(d2),
           sampler(num_data, sample_sz, opt.ransac.seed, opt.ransac.progressive_sampling,
                   opt.ransac.max_prosac_iterations) {

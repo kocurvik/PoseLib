@@ -39,6 +39,8 @@ set(SOURCES
     solvers/relpose_monodepth_4pt_shared_focal_shift.cc
     solvers/relpose_monodepth_3pt_varying_focal.cc
     solvers/relpose_monodepth_4pt_varying_focal_shift.cc
+    solvers/relpose_reldepth_3pt.cc
+    solvers/shared_focal_reldepth_relpose.cc
     solvers/gen_relpose_upright_4pt.cc
     solvers/gen_relpose_5p1pt.cc
     solvers/gen_relpose_6pt.cc
@@ -108,6 +110,8 @@ set(HEADERS_PUBLIC
     solvers/relpose_monodepth_4pt_shared_focal_shift.h
     solvers/relpose_monodepth_3pt_varying_focal.h
     solvers/relpose_monodepth_4pt_varying_focal_shift.h
+    solvers/relpose_reldepth_3pt.h
+    solvers/shared_focal_reldepth_relpose.h
     solvers/gen_relpose_upright_4pt.h
     solvers/gen_relpose_5p1pt.h
     solvers/gen_relpose_6pt.h

@@ -170,6 +170,10 @@ struct MonoDepthRelativePoseOptions {
 
     // Whether to estimate the shifts in the calibrated relative pose with monodepth.
     bool estimate_shift = false;
+    // Use the relative-depth minimal solver for calibrated or shared-focal monodepth relative pose.
+    bool solver_reldepth = false;
+    // Use the 4-point, 4-depth varying-focal monodepth relative pose solver.
+    bool solver_4p4d = false;
     // Error used for RANSAC model scoring and final inlier extraction.
     ErrorType scoring_type = ErrorType::SAMPSON;
     // Error used for local optimization and final nonlinear refinement.

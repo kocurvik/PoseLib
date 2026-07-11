@@ -43,6 +43,8 @@
 #include "PoseLib/solvers/relpose_monodepth_3pt_varying_focal.h"
 #include "PoseLib/solvers/relpose_monodepth_4pt_shared_focal_shift.h"
 #include "PoseLib/solvers/relpose_monodepth_4pt_varying_focal_shift.h"
+#include "PoseLib/solvers/relpose_reldepth_3pt.h"
+#include "PoseLib/solvers/shared_focal_reldepth_relpose.h"
 
 #include <iostream>
 
@@ -113,7 +115,7 @@ void CameraRelativePoseEstimator::refine_model(CameraPose *pose) const {
 void RelativePoseMonoDepthEstimator::generate_models(std::vector<MonoDepthTwoViewGeometry> *models) {
     sampler.generate_sample(&sample);
     models->clear();
-    if (opt.estimate_shift) {
+    if (opt.estimate_shift or opt.solver_reldepth) {
         for (size_t k = 0; k < sample_sz; ++k) {
             x1s[k] = x1[sample[k]].homogeneous();
             x2s[k] = x2[sample[k]].homogeneous();
@@ -121,10 +123,16 @@ void RelativePoseMonoDepthEstimator::generate_models(std::vector<MonoDepthTwoVie
             d2s[k] = d2[sample[k]];
         }
 
+        if (opt.solver_reldepth) {
+            essential_3pt_relative_depth(x1s, x2s, d1s, d2s, models, false);
+            return;
+        }
+
         relpose_monodepth_3pt(x1s, x2s, d1s, d2s, models);
 
         return;
     }
+
 
     CameraPoseVector p3p_poses;
     for (size_t k = 0; k < sample_sz; ++k) {
@@ -299,8 +307,13 @@ void SharedFocalMonodepthPoseEstimator::generate_models(std::vector<MonoDepthIma
         d2s[k] = d2[sample[k]];
     }
 
+    if (opt.solver_reldepth) {
+        shared_focal_reldepth_relpose(x1s, x2s, d1s, d2s, models);
+        return;
+    }
+
     if (opt.estimate_shift) {
-        relpose_monodepth_4pt_shared_focal_shift(x1s, x2s, d1, d2, models);
+        relpose_monodepth_4pt_shared_focal_shift(x1s, x2s, d1s, d2s, models);
         return;
     }
 
@@ -330,6 +343,11 @@ void VaryingFocalMonodepthPoseEstimator::generate_models(std::vector<MonoDepthIm
         x2s[k] = x2h[sample[k]];
         d1s[k] = d1[sample[k]];
         d2s[k] = d2[sample[k]];
+    }
+
+    if (opt.solver_4p4d) {
+        relpose_monodepth_varying_focal_4p4d(x1s, x2s, d1s, d2s, models);
+        return;
     }
 
     if (opt.estimate_shift){

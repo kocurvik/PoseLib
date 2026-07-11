@@ -387,6 +387,53 @@ struct SolverMonodepthRel3pt {
     static std::string name() { return "MonodepthRel3pt"; }
 };
 
+struct SolverRelativeDepthRel3pt {
+    static inline int solve(const RelativePoseProblemInstance &instance,
+                            std::vector<MonoDepthTwoViewGeometry> *solutions) {
+        std::vector<Point3D> x1(3), x2(3);
+        for (int i = 0; i < 3; ++i) {
+            x1[i] = instance.x1_[i] / instance.x1_[i](2);
+            x2[i] = instance.x2_[i] / instance.x2_[i](2);
+        }
+        return essential_3pt_relative_depth(x1, x2, instance.d1_, instance.d2_, solutions, false);
+    }
+    typedef CalibPoseValidator validator;
+    typedef MonoDepthTwoViewGeometry Solution;
+    static std::string name() { return "RelativeDepthRel3pt"; }
+};
+
+struct SolverRelativeDepthSharedFocalRel3pt {
+    static inline int solve(const RelativePoseProblemInstance &instance,
+                            std::vector<MonoDepthImagePair> *solutions) {
+        std::vector<Point3D> x1(3), x2(3);
+        for (int i = 0; i < 3; ++i) {
+            x1[i] = instance.x1_[i] / instance.x1_[i](2);
+            x2[i] = instance.x2_[i] / instance.x2_[i](2);
+        }
+        shared_focal_reldepth_relpose(x1, x2, instance.d1_, instance.d2_, solutions);
+        return static_cast<int>(solutions->size());
+    }
+    typedef CalibPoseValidator validator;
+    typedef MonoDepthImagePair Solution;
+    static std::string name() { return "RelativeDepthSharedFocalRel3pt"; }
+};
+
+struct SolverMonodepthVaryingFocalRel4p4d {
+    static inline int solve(const RelativePoseProblemInstance &instance,
+                            std::vector<MonoDepthImagePair> *solutions) {
+        std::vector<Point3D> x1(4), x2(4);
+        for (int i = 0; i < 4; ++i) {
+            x1[i] = instance.x1_[i] / instance.x1_[i](2);
+            x2[i] = instance.x2_[i] / instance.x2_[i](2);
+        }
+        relpose_monodepth_varying_focal_4p4d(x1, x2, instance.d1_, instance.d2_, solutions);
+        return static_cast<int>(solutions->size());
+    }
+    typedef CalibPoseValidator validator;
+    typedef MonoDepthImagePair Solution;
+    static std::string name() { return "MonodepthVaryingFocalRel4p4d"; }
+};
+
 struct SolverGenRel5p1pt {
     static inline int solve(const RelativePoseProblemInstance &instance, poselib::CameraPoseVector *solutions) {
         return gen_relpose_5p1pt(instance.p1_, instance.x1_, instance.p2_, instance.x2_, solutions);

@@ -543,6 +543,13 @@ int main() {
     monodepth_rel3pt_opt.unknown_shift_ = true;
     results.push_back(poselib::benchmark_relative<poselib::SolverMonodepthRel3pt>(1e4, monodepth_rel3pt_opt, tol));
 
+    // Calibrated relative pose 3pt using relative depths
+    poselib::ProblemOptions relative_depth_rel3pt_opt = options;
+    relative_depth_rel3pt_opt.n_point_point_ = 3;
+    relative_depth_rel3pt_opt.use_monodepth_ = true;
+    results.push_back(
+        poselib::benchmark_relative<poselib::SolverRelativeDepthRel3pt>(1e4, relative_depth_rel3pt_opt, tol));
+
     // Relative Pose With Single Unknown Focal 6pt
     poselib::ProblemOptions rel_focal_6pt_opt = options;
     rel_focal_6pt_opt.n_point_point_ = 6;
@@ -560,6 +567,16 @@ int main() {
     rel_monodepth_shared_focal_3pt_opt.use_monodepth_ = true;
     results.push_back(poselib::benchmark_relative<poselib::SolverMonodepthSharedFocalRel3pt>(
         1e4, rel_monodepth_shared_focal_3pt_opt, tol));
+
+    // Relative pose with shared unknown focal 3pt using relative depths
+    poselib::ProblemOptions rel_reldepth_shared_focal_3pt_opt = options;
+    rel_reldepth_shared_focal_3pt_opt.n_point_point_ = 3;
+    rel_reldepth_shared_focal_3pt_opt.min_focal_ = 0.1;
+    rel_reldepth_shared_focal_3pt_opt.max_focal_ = 5.0;
+    rel_reldepth_shared_focal_3pt_opt.unknown_focal_ = true;
+    rel_reldepth_shared_focal_3pt_opt.use_monodepth_ = true;
+    results.push_back(poselib::benchmark_relative<poselib::SolverRelativeDepthSharedFocalRel3pt>(
+        1e4, rel_reldepth_shared_focal_3pt_opt, tol));
 
     // Relative Pose With Single Unknown Focal And Shift 4pt Using Monodepth
     poselib::ProblemOptions rel_monodepth_shared_focal_shift_4pt_opt = options;
@@ -582,6 +599,17 @@ int main() {
     rel_monodepth_varying_focal_3pt_opt.use_monodepth_ = true;
     results.push_back(poselib::benchmark_relative<poselib::SolverMonodepthVaryingFocalRel3pt>(
         1e4, rel_monodepth_varying_focal_3pt_opt, tol));
+
+    // Relative pose with different unknown focals 4p4d using monodepth
+    poselib::ProblemOptions rel_monodepth_varying_focal_4p4d_opt = options;
+    rel_monodepth_varying_focal_4p4d_opt.n_point_point_ = 4;
+    rel_monodepth_varying_focal_4p4d_opt.min_focal_ = 0.1;
+    rel_monodepth_varying_focal_4p4d_opt.max_focal_ = 5.0;
+    rel_monodepth_varying_focal_4p4d_opt.unknown_focal_ = true;
+    rel_monodepth_varying_focal_4p4d_opt.varying_focal_ = true;
+    rel_monodepth_varying_focal_4p4d_opt.use_monodepth_ = true;
+    results.push_back(poselib::benchmark_relative<poselib::SolverMonodepthVaryingFocalRel4p4d>(
+        1e4, rel_monodepth_varying_focal_4p4d_opt, tol));
 
     // Relative Pose With Different Unknown Focals And Shift 3pt Using Monodepth
     poselib::ProblemOptions rel_monodepth_varying_focal_shift_4pt_opt = options;

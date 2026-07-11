@@ -207,6 +207,8 @@ inline void update_monodepth_relative_pose_options(const py::dict &input, MonoDe
     }
 
     update(input, "estimate_shift", opt.estimate_shift);
+    update(input, "solver_reldepth", opt.solver_reldepth);
+    update(input, "solver_4p4d", opt.solver_4p4d);
     update_monodepth_error_type(input, "scoring_type", opt.scoring_type);
     update_monodepth_error_type(input, "scoring", opt.scoring_type);
     update_monodepth_error_type(input, "refinement_type", opt.refinement_type);
