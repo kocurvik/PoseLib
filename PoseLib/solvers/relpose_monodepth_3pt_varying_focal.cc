@@ -5,6 +5,7 @@
 #include "PoseLib/types.h"
 
 #include <cmath>
+#include <limits>
 
 namespace poselib {
 int relpose_monodepth_3pt_varying_focal(const std::vector<Eigen::Vector3d> &x1h,
@@ -107,13 +108,6 @@ void relpose_monodepth_varying_focal_4p4d(const std::vector<Eigen::Vector3d> &x1
                                               const std::vector<double> &d1, const std::vector<double> &d2,
                                               std::vector<MonoDepthImagePair> *models) {
     models->clear();
-    std::vector<Eigen::Vector3d> x1h(4);
-    std::vector<Eigen::Vector3d> x2h(4);
-    for (int i = 0; i < 4; ++i) {
-        x1h[i] = x1[i].normalized();
-        x2h[i] = x2[i].normalized();
-    }
-
     Eigen::MatrixXd coefficients(12, 12);
     int i;
 
@@ -189,9 +183,7 @@ void relpose_monodepth_varying_focal_4p4d(const std::vector<Eigen::Vector3d> &x1
     const double focal1 = camera1.focal();
     const double focal2 = camera2.focal();
 
-    if (std::isnan(focal1))
-        return;
-    if (std::isnan(focal2))
+    if (!std::isfinite(focal1) || !std::isfinite(focal2) || focal1 <= 0.0 || focal2 <= 0.0)
         return;
 
     //    if (focal1 < opt.max_focal_1 or focal1 > opt.max_focal_1 or
@@ -203,13 +195,48 @@ void relpose_monodepth_varying_focal_4p4d(const std::vector<Eigen::Vector3d> &x1
 
     Eigen::Matrix3d E = K2 * F * K1;
 
+    std::vector<Eigen::Vector3d> x1h(4);
+    std::vector<Eigen::Vector3d> x2h(4);
+    for (int i = 0; i < 4; ++i) {
+        x1h[i] = Eigen::Vector3d(x1[i](0) / focal1, x1[i](1) / focal1, 1.0).normalized();
+        x2h[i] = Eigen::Vector3d(x2[i](0) / focal2, x2[i](1) / focal2, 1.0).normalized();
+    }
+
     std::vector<CameraPose> poses;
     motion_from_essential(E, x1h, x2h, &poses);
 
     models->reserve(poses.size());
 
     for (const CameraPose &pose : poses) {
-        models->emplace_back(MonoDepthTwoViewGeometry(pose), camera1, camera2);
+        double scale_numerator = 0.0;
+        double scale_denominator = 0.0;
+        double scale_reference = 0.0;
+        const Eigen::Vector3d bearing1_0(x1[0](0) / focal1, x1[0](1) / focal1, 1.0);
+        const Eigen::Vector3d bearing2_0(x2[0](0) / focal2, x2[0](1) / focal2, 1.0);
+        const Eigen::Vector3d point2_0 = d2[0] * bearing2_0;
+        for (int i = 1; i < 4; ++i) {
+            const Eigen::Vector3d bearing1_i(x1[i](0) / focal1, x1[i](1) / focal1, 1.0);
+            const Eigen::Vector3d bearing2_i(x2[i](0) / focal2, x2[i](1) / focal2, 1.0);
+            const Eigen::Vector3d point2_i = d2[i] * bearing2_i;
+            const Eigen::Vector3d lhs = point2_i - point2_0;
+            const Eigen::Vector3d rhs = pose.rotate(d1[i] * bearing1_i - d1[0] * bearing1_0);
+            scale_numerator += lhs.dot(rhs);
+            scale_denominator += lhs.squaredNorm();
+            scale_reference += point2_i.squaredNorm() + point2_0.squaredNorm();
+        }
+        constexpr double kScaleDegeneracyTolerance = 64.0 * std::numeric_limits<double>::epsilon();
+        if (!std::isfinite(scale_denominator) || !std::isfinite(scale_reference) ||
+            scale_denominator <= kScaleDegeneracyTolerance * scale_reference)
+            continue;
+        const double scale = scale_numerator / scale_denominator;
+        if (!std::isfinite(scale) || scale <= 0.0)
+            continue;
+
+        CameraPose scaled_pose = pose;
+        scaled_pose.t = scale * d2[0] * bearing2_0 - pose.rotate(d1[0] * bearing1_0);
+        if (!scaled_pose.t.allFinite())
+            continue;
+        models->emplace_back(MonoDepthTwoViewGeometry(scaled_pose, scale), camera1, camera2);
     }
 }
 } // namespace poselib
