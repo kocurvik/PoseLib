@@ -544,9 +544,11 @@ int main() {
     results.push_back(poselib::benchmark_relative<poselib::SolverMonodepthRel3pt>(1e4, monodepth_rel3pt_opt, tol));
 
     // Calibrated relative pose 3pt using relative depths
+    // (solver assumes scale-consistent relative depths, so gt monodepth scale must be 1)
     poselib::ProblemOptions relative_depth_rel3pt_opt = options;
     relative_depth_rel3pt_opt.n_point_point_ = 3;
     relative_depth_rel3pt_opt.use_monodepth_ = true;
+    relative_depth_rel3pt_opt.consistent_monodepth_scale_ = true;
     results.push_back(
         poselib::benchmark_relative<poselib::SolverRelativeDepthRel3pt>(1e4, relative_depth_rel3pt_opt, tol));
 
@@ -569,12 +571,14 @@ int main() {
         1e4, rel_monodepth_shared_focal_3pt_opt, tol));
 
     // Relative pose with shared unknown focal 3pt using relative depths
+    // (solver assumes scale-consistent relative depths, so gt monodepth scale must be 1)
     poselib::ProblemOptions rel_reldepth_shared_focal_3pt_opt = options;
     rel_reldepth_shared_focal_3pt_opt.n_point_point_ = 3;
     rel_reldepth_shared_focal_3pt_opt.min_focal_ = 0.1;
     rel_reldepth_shared_focal_3pt_opt.max_focal_ = 5.0;
     rel_reldepth_shared_focal_3pt_opt.unknown_focal_ = true;
     rel_reldepth_shared_focal_3pt_opt.use_monodepth_ = true;
+    rel_reldepth_shared_focal_3pt_opt.consistent_monodepth_scale_ = true;
     results.push_back(poselib::benchmark_relative<poselib::SolverRelativeDepthSharedFocalRel3pt>(
         1e4, rel_reldepth_shared_focal_3pt_opt, tol));
 

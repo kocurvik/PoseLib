@@ -565,7 +565,7 @@ void generate_relpose_problems(int n_problems, std::vector<RelativePoseProblemIn
         }
 
         if (options.use_monodepth_) {
-            instance.monodepth_scale_gt = scale_gen(random_engine);
+            instance.monodepth_scale_gt = options.consistent_monodepth_scale_ ? 1.0 : scale_gen(random_engine);
         }
 
         if (options.unknown_shift_) {

@@ -125,6 +125,7 @@ struct ProblemOptions {
     bool unknown_dist_ = false;
     bool varying_focal_ = false;
     bool use_monodepth_ = false;
+    bool consistent_monodepth_scale_ = false;
     bool radial_lines_ = false;
     double min_scale_ = 0.1;
     double max_scale_ = 10.0;
