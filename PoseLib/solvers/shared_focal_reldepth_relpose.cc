@@ -3,6 +3,7 @@
 //
 
 #include "shared_focal_reldepth_relpose.h"
+#include "PoseLib/misc/essential.h"
 
 #include <cmath>
 
@@ -142,15 +143,30 @@ void shared_focal_reldepth_relpose(const std::vector<Eigen::Vector3d> &x1, const
                 // plane-dependent magnitude and sign, so emit unit translations of both signs.
                 Camera camera = Camera("SIMPLE_PINHOLE", std::vector<double>{focal, 0.0, 0.0}, -1, -1);
 
+                // Unproject the correspondences to unit bearing rays for the cheirality check.
+                std::vector<Eigen::Vector3d> bearing1(3), bearing2(3);
+                for (size_t k = 0; k < 3; ++k) {
+                    camera.unproject(Eigen::Vector2d(x1[k](0), x1[k](1)), &bearing1[k]);
+                    camera.unproject(Eigen::Vector2d(x2[k](0), x2[k](1)), &bearing2[k]);
+                }
+
+                auto passes_cheirality = [&](const CameraPose &pose) {
+                    return check_cheirality(pose, bearing1, bearing2);
+                };
+
                 Eigen::Vector3d n1 = v2.cross(u1);
                 Eigen::Vector3d t1 = ((H2 - R1) * n1).normalized();
-                models->emplace_back(MonoDepthTwoViewGeometry(CameraPose(R1, t1)), camera, camera);
-                models->emplace_back(MonoDepthTwoViewGeometry(CameraPose(R1, -t1)), camera, camera);
+                if (passes_cheirality(CameraPose(R1, t1)))
+                    models->emplace_back(MonoDepthTwoViewGeometry(CameraPose(R1, t1)), camera, camera);
+                if (passes_cheirality(CameraPose(R1, -t1)))
+                    models->emplace_back(MonoDepthTwoViewGeometry(CameraPose(R1, -t1)), camera, camera);
 
                 Eigen::Vector3d n2 = v2.cross(u2);
                 Eigen::Vector3d t2 = ((H2 - R2) * n2).normalized();
-                models->emplace_back(MonoDepthTwoViewGeometry(CameraPose(R2, t2)), camera, camera);
-                models->emplace_back(MonoDepthTwoViewGeometry(CameraPose(R2, -t2)), camera, camera);
+                if (passes_cheirality(CameraPose(R2, t2)))
+                    models->emplace_back(MonoDepthTwoViewGeometry(CameraPose(R2, t2)), camera, camera);
+                if (passes_cheirality(CameraPose(R2, -t2)))
+                    models->emplace_back(MonoDepthTwoViewGeometry(CameraPose(R2, -t2)), camera, camera);
             }
         }
     }

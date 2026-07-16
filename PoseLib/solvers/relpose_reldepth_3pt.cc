@@ -1,4 +1,5 @@
 #include "relpose_reldepth_3pt.h"
+#include "PoseLib/misc/essential.h"
 #include "PoseLib/misc/univariate.h"
 
 #include <cmath>
@@ -21,11 +22,11 @@ int essential_3pt_rel_depth_impl(const std::vector<Eigen::Vector3d> &x1h, const 
                  b3 = 2 * x1h[1].transpose() * x1h[2], b4 = x1h[2].squaredNorm(),
                  b5 = x2h[2].squaredNorm();
 
-    
+
     std::complex<double> lambda1[2];
     univariate::solve_quadratic(c5 - c3, c7 - c6, c4 - c2, lambda1);
 
-    
+
     size_t num_sols = 0;
     for (int k = 0; k < 2; ++k) {
         if(std::abs(lambda1[k].imag()) >= TOL_IMAG)
@@ -73,6 +74,17 @@ int essential_3pt_rel_depth_impl(const std::vector<Eigen::Vector3d> &x1h, const 
             pose.q << q_flip.w(), q_flip.x(), q_flip.y(), q_flip.z();
             pose.t = sigma[0] * x2h[0] - pose.rotate(x1h[0]);
             pose.t.normalize();
+
+            bool cheiral_ok = true;
+            for (size_t pt_k = 0; pt_k < 3; ++pt_k) {
+                if (!check_cheirality(pose, x1h[pt_k].normalized(), x2h[pt_k].normalized())) {
+                    cheiral_ok = false;
+                    break;
+                }
+            }
+            if (!cheiral_ok)
+                continue;
+
             models->emplace_back(pose);
 
             num_sols++;
