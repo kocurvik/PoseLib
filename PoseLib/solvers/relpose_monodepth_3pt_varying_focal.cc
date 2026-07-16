@@ -208,22 +208,20 @@ void relpose_monodepth_varying_focal_4p4d(const std::vector<Eigen::Vector3d> &x1
     models->reserve(poses.size());
 
     for (const CameraPose &pose : poses) {
-        double scale_numerator = 0.0;
-        double scale_denominator = 0.0;
-        double scale_reference = 0.0;
         const Eigen::Vector3d bearing1_0(x1[0](0) / focal1, x1[0](1) / focal1, 1.0);
         const Eigen::Vector3d bearing2_0(x2[0](0) / focal2, x2[0](1) / focal2, 1.0);
         const Eigen::Vector3d point2_0 = d2[0] * bearing2_0;
-        for (int i = 1; i < 4; ++i) {
-            const Eigen::Vector3d bearing1_i(x1[i](0) / focal1, x1[i](1) / focal1, 1.0);
-            const Eigen::Vector3d bearing2_i(x2[i](0) / focal2, x2[i](1) / focal2, 1.0);
-            const Eigen::Vector3d point2_i = d2[i] * bearing2_i;
-            const Eigen::Vector3d lhs = point2_i - point2_0;
-            const Eigen::Vector3d rhs = pose.rotate(d1[i] * bearing1_i - d1[0] * bearing1_0);
-            scale_numerator += lhs.dot(rhs);
-            scale_denominator += lhs.squaredNorm();
-            scale_reference += point2_i.squaredNorm() + point2_0.squaredNorm();
-        }
+
+        const Eigen::Vector3d bearing1_1(x1[1](0) / focal1, x1[1](1) / focal1, 1.0);
+        const Eigen::Vector3d bearing2_1(x2[1](0) / focal2, x2[1](1) / focal2, 1.0);
+        const Eigen::Vector3d point2_1 = d2[1] * bearing2_1;
+
+        const Eigen::Vector3d lhs = point2_1 - point2_0;
+        const Eigen::Vector3d rhs = pose.rotate(d1[1] * bearing1_1 - d1[0] * bearing1_0);
+        const double scale_numerator = lhs.dot(rhs);
+        const double scale_denominator = lhs.squaredNorm();
+        const double scale_reference = point2_1.squaredNorm() + point2_0.squaredNorm();
+
         constexpr double kScaleDegeneracyTolerance = 64.0 * std::numeric_limits<double>::epsilon();
         if (!std::isfinite(scale_denominator) || !std::isfinite(scale_reference) ||
             scale_denominator <= kScaleDegeneracyTolerance * scale_reference)
