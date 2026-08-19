@@ -101,8 +101,8 @@ void varying_focal_relpose_from_projective_pair(const std::vector<ProjectiveImag
         if (std::isnan(focal2))
             continue;
 
-        Camera camera1 = Camera("SIMPLE_DIVISION", {focal1, 0, 0, proj_pair.camera1.params[3]}, -1, -1);
-        Camera camera2 = Camera("SIMPLE_DIVISION", {focal2, 0, 0, proj_pair.camera2.params[3]}, -1, -1);
+        Camera camera1 = Camera("SIMPLE_DIVISION", {focal1, 0, 0, focal1 * focal1 * proj_pair.camera1.params[3]}, -1, -1);
+        Camera camera2 = Camera("SIMPLE_DIVISION", {focal2, 0, 0, focal2 * focal2 * proj_pair.camera2.params[3]}, -1, -1);
 
         Eigen::DiagonalMatrix<double, 3> K1(focal1, focal1, 1.0);
         Eigen::DiagonalMatrix<double, 3> K2(focal2, focal2, 1.0);
@@ -138,7 +138,7 @@ void shared_focal_relpose_from_projective_pair(const std::vector<ProjectiveImage
         if (std::isnan(focal))
             continue;
 
-        Camera camera = Camera("SIMPLE_DIVISION", {focal, 0, 0, proj_pair.camera1.params[3]}, -1, -1);
+        Camera camera = Camera("SIMPLE_DIVISION", {focal, 0, 0, proj_pair.camera1.params[3] * focal * focal}, -1, -1);
 
         Eigen::DiagonalMatrix<double, 3> K(focal, focal, 1.0);
 
