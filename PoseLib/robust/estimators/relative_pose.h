@@ -232,7 +232,7 @@ class SharedFocalMonodepthPoseEstimator {
     double score_model(const MonoDepthImagePair &image_pair, size_t *inlier_count) const;
     void refine_model(MonoDepthImagePair *image_pair) const;
 
-    const size_t sample_sz = 3;
+    const size_t sample_sz;
     const size_t num_data;
 
   private:

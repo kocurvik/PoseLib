@@ -302,7 +302,7 @@ void SharedFocalMonodepthPoseEstimator::generate_models(std::vector<MonoDepthIma
     }
 
     if (opt.estimate_shift) {
-        relpose_monodepth_4pt_shared_focal_shift(x1s, x2s, d1, d2, models);
+        relpose_monodepth_4pt_shared_focal_shift(x1s, x2s, d1s, d2s, models);
         return;
     }
 
