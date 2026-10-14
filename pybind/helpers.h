@@ -59,6 +59,8 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "line_solver", ransac_opt.line_solver);
     update(input, "max_line_error", ransac_opt.max_line_error);
     update(input, "line_weight", ransac_opt.line_weight);
+    update(input, "hybrid_solver", ransac_opt.hybrid_solver);
+    update(input, "upright_solver", ransac_opt.upright_solver);
     update(input, "line_sampson", ransac_opt.line_sampson);
 }
 

@@ -446,6 +446,39 @@ RansacStats estimate_3v_relative_pose_hybrid(
     return stats;
 }
 
+RansacStats estimate_relative_pose_line_direction(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                                  const std::vector<Line2D> &l1, const std::vector<Line2D> &l2,
+                                                  const std::vector<Eigen::Vector2d> &ld1,
+                                                  const std::vector<Eigen::Vector2d> &ld2, const Camera &camera1,
+                                                  const Camera &camera2, const RansacOptions &ransac_opt,
+                                                  const BundleOptions &bundle_opt, CameraPose *pose,
+                                                  std::vector<char> *inliers) {
+    const size_t num_pts = x1.size();
+    std::vector<Point2D> x1_calib(num_pts), x2_calib(num_pts);
+    for (size_t k = 0; k < num_pts; ++k) {
+        camera1.unproject(x1[k], &x1_calib[k]);
+        camera2.unproject(x2[k], &x2_calib[k]);
+    }
+    std::vector<Line2D> l1_calib, l2_calib;
+    std::vector<Line3D> L1, L2;
+    calibrate_lines(l1, ld1, camera1, &l1_calib, &L1);
+    calibrate_lines(l2, ld2, camera2, &l2_calib, &L2);
+
+    const double focal_scale = 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
+    RansacOptions ransac_opt_scaled = ransac_opt;
+    ransac_opt_scaled.max_epipolar_error = ransac_opt.max_epipolar_error * focal_scale;
+
+    RansacStats stats = ransac_relpose_line_direction(x1_calib, x2_calib, L1, L2, ransac_opt_scaled, pose, inliers);
+
+    if (stats.num_inliers > 5) {
+        BundleOptions scaled_bundle_opt = bundle_opt;
+        scaled_bundle_opt.loss_scale = bundle_opt.loss_scale * focal_scale;
+        refine_relpose(select_inliers(x1_calib, *inliers), select_inliers(x2_calib, *inliers), pose,
+                       scaled_bundle_opt);
+    }
+    return stats;
+}
+
 RansacStats estimate_3v_shared_focal_relative_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                                    const std::vector<Point2D> &x3, const RansacOptions &ransac_opt,
                                                    const BundleOptions &bundle_opt, ImageTriplet *image_triplet,

@@ -1,5 +1,10 @@
 #include "threeview_lines.h"
 
+#include "PoseLib/solvers/relpose_upright_3pt.h"
+#include "PoseLib/solvers/up2p.h"
+
+#include <limits>
+
 namespace poselib {
 
 namespace {
@@ -169,7 +174,89 @@ void combine(const std::vector<CameraPose> &poses12, const std::vector<CameraPos
             output->emplace_back(p12, p13);
 }
 
+// Depths of the point with bearings x1, x2 (view 1 and view 2 frames) given the pose: lambda2 x2 = R lambda1 x1 + t
+inline bool triangulate_depths(const Eigen::Matrix3d &R, const Eigen::Vector3d &t, const Eigen::Vector3d &x1,
+                               const Eigen::Vector3d &x2, double *lambda1, double *lambda2) {
+    Eigen::Matrix<double, 3, 2> A;
+    A.col(0) = R * x1;
+    A.col(1) = -x2;
+    const Eigen::Matrix2d AtA = A.transpose() * A;
+    if (std::abs(AtA.determinant()) < 1e-12 * AtA.trace() * AtA.trace())
+        return false;
+    const Eigen::Vector2d lambda = AtA.inverse() * (A.transpose() * -t);
+    *lambda1 = lambda(0);
+    *lambda2 = lambda(1);
+    return true;
+}
+
 } // namespace
+
+int threeview_1l3p(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2,
+                   const std::vector<Eigen::Vector3d> &x3, const Eigen::Vector3d &d1, const Eigen::Vector3d &d2,
+                   const Eigen::Vector3d &d3, std::vector<ThreeViewCameraPose> *output) {
+    output->clear();
+
+    // Rotate views 1, 2 so that the line direction is the y axis, the remaining rotation is about y
+    const Eigen::Matrix3d Rc1 = Eigen::Quaterniond::FromTwoVectors(d1, Eigen::Vector3d::UnitY()).toRotationMatrix();
+    std::vector<Eigen::Vector3d> x1u(3), x2u(3);
+    for (int i = 0; i < 3; ++i)
+        x1u[i] = Rc1 * x1[i].normalized();
+
+    std::vector<Eigen::Vector3d> x3_up2p = {x3[0], x3[1]};
+    std::vector<Eigen::Vector3d> X_up2p(2);
+    const Eigen::Vector3d x3_check = x3[2].normalized();
+
+    for (int s2 : {1, -1}) {
+        const Eigen::Matrix3d Rc2 =
+            Eigen::Quaterniond::FromTwoVectors(s2 * d2, Eigen::Vector3d::UnitY()).toRotationMatrix();
+        for (int i = 0; i < 3; ++i)
+            x2u[i] = Rc2 * x2[i].normalized();
+
+        CameraPoseVector poses12_upright;
+        relpose_upright_3pt(x1u, x2u, &poses12_upright);
+
+        for (const CameraPose &pu : poses12_upright) {
+            const Eigen::Matrix3d R12 = Rc2.transpose() * pu.R() * Rc1;
+            const Eigen::Vector3d t12 = Rc2.transpose() * pu.t;
+
+            // all three points in front of cameras 1, 2
+            Eigen::Vector3d X[3];
+            bool valid = true;
+            for (int i = 0; i < 3 && valid; ++i) {
+                double l1, l2;
+                const Eigen::Vector3d b1 = x1[i].normalized();
+                valid = triangulate_depths(R12, t12, b1, x2[i].normalized(), &l1, &l2) && l1 > 0 && l2 > 0;
+                X[i] = l1 * b1;
+            }
+            if (!valid)
+                continue;
+            X_up2p[0] = X[0];
+            X_up2p[1] = X[1];
+
+            // view 3: absolute pose with known direction, keep the solution best explaining point 2
+            double best_err = std::numeric_limits<double>::max();
+            CameraPose best13;
+            for (int s3 : {1, -1}) {
+                CameraPoseVector poses13;
+                up2p(x3_up2p, X_up2p, s3 * d3, d1, &poses13);
+                for (const CameraPose &p13 : poses13) {
+                    const Eigen::Vector3d Y = p13.R() * X[2] + p13.t;
+                    if (Y(2) <= 0)
+                        continue;
+                    const double err = 1.0 - Y.normalized().dot(x3_check);
+                    if (err < best_err) {
+                        best_err = err;
+                        best13 = p13;
+                    }
+                }
+            }
+            if (best_err == std::numeric_limits<double>::max())
+                continue;
+            output->emplace_back(CameraPose(R12, t12), best13);
+        }
+    }
+    return output->size();
+}
 
 int threeview_2p1l(const std::vector<Eigen::Vector3d> &X1, const std::vector<Eigen::Vector3d> &X2,
                    const std::vector<Eigen::Vector3d> &X3, const Eigen::Vector3d &d1, const Eigen::Vector3d &d2,

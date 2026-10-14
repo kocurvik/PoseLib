@@ -894,6 +894,43 @@ std::pair<ThreeViewCameraPose, py::dict> estimate_three_view_relative_pose_hybri
     return std::make_pair(three_view_pose, output_dict);
 }
 
+std::pair<CameraPose, py::dict> estimate_relative_pose_line_direction_wrapper(
+    const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
+    const std::vector<Eigen::Vector4d> &lines2D_1, const std::vector<Eigen::Vector4d> &lines2D_2,
+    const std::vector<Eigen::Vector2d> &line_depths_1, const std::vector<Eigen::Vector2d> &line_depths_2,
+    const py::dict &camera1_dict, const py::dict &camera2_dict, const py::dict &ransac_opt_dict,
+    const py::dict &bundle_opt_dict) {
+
+    Camera camera1 = camera_from_dict(camera1_dict);
+    Camera camera2 = camera_from_dict(camera2_dict);
+
+    RansacOptions ransac_opt;
+    update_ransac_options(ransac_opt_dict, ransac_opt);
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_scale = 0.5 * ransac_opt.max_epipolar_error;
+    update_bundle_options(bundle_opt_dict, bundle_opt);
+
+    CameraPose pose;
+    std::vector<char> inliers;
+    RansacStats stats = estimate_relative_pose_line_direction(
+        points2D_1, points2D_2, lines_from_vectors(lines2D_1), lines_from_vectors(lines2D_2), line_depths_1,
+        line_depths_2, camera1, camera2, ransac_opt, bundle_opt, &pose, &inliers);
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inliers);
+    return std::make_pair(pose, output_dict);
+}
+
+std::vector<CameraPose> relpose_upright_3pt_ding_wrapper(const std::vector<Eigen::Vector3d> &x1,
+                                                         const std::vector<Eigen::Vector3d> &x2,
+                                                         const Eigen::Vector3d &g_cam1, const Eigen::Vector3d &g_cam2) {
+    std::vector<CameraPose> output;
+    relpose_upright_3pt_ding(x1, x2, g_cam1, g_cam2, &output);
+    return output;
+}
+
 std::pair<ThreeViewCameraPose, py::dict>
 refine_three_view_lines_wrapper(const std::vector<Eigen::Vector4d> &lines2D_1,
                                 const std::vector<Eigen::Vector4d> &lines2D_2,
@@ -934,6 +971,16 @@ std::vector<ThreeViewCameraPose> threeview_2p1l_wrapper(const std::vector<Eigen:
                                                         const Eigen::Vector3d &d3) {
     std::vector<ThreeViewCameraPose> models;
     threeview_2p1l(X1, X2, X3, d1, d2, d3, &models);
+    return models;
+}
+
+std::vector<ThreeViewCameraPose> threeview_1l3p_wrapper(const std::vector<Eigen::Vector3d> &x1,
+                                                        const std::vector<Eigen::Vector3d> &x2,
+                                                        const std::vector<Eigen::Vector3d> &x3,
+                                                        const Eigen::Vector3d &d1, const Eigen::Vector3d &d2,
+                                                        const Eigen::Vector3d &d3) {
+    std::vector<ThreeViewCameraPose> models;
+    threeview_1l3p(x1, x2, x3, d1, d2, d3, &models);
     return models;
 }
 
@@ -1115,6 +1162,16 @@ PYBIND11_MODULE(poselib, m) {
           "Refines three view pose from calibrated points and line tracks.");
     m.def("threeview_2p1l", &poselib::threeview_2p1l_wrapper, py::arg("X1"), py::arg("X2"), py::arg("X3"),
           py::arg("d1"), py::arg("d2"), py::arg("d3"), "Minimal solver: 2 points with depth + 1 line direction.");
+    m.def("estimate_relative_pose_line_direction", &poselib::estimate_relative_pose_line_direction_wrapper,
+          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("lines2D_1"), py::arg("lines2D_2"),
+          py::arg("line_depths_1"), py::arg("line_depths_2"), py::arg("camera1_dict"), py::arg("camera2_dict"),
+          py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
+          "Two view relative pose from points and line directions (upright 3 point solver) with refinement.");
+    m.def("relpose_upright_3pt_ding", &poselib::relpose_upright_3pt_ding_wrapper, py::arg("x1"), py::arg("x2"),
+          py::arg("g_cam1"), py::arg("g_cam2"),
+          "Upright 3 point relative pose (Ding et al. CVPR 2023) with known common direction g_cam2 = R g_cam1.");
+    m.def("threeview_1l3p", &poselib::threeview_1l3p_wrapper, py::arg("x1"), py::arg("x2"), py::arg("x3"),
+          py::arg("d1"), py::arg("d2"), py::arg("d3"), "Minimal solver: 1 line direction + 3 points (bearings).");
     m.def("threeview_2l", &poselib::threeview_2l_wrapper, py::arg("L1"), py::arg("L2"), py::arg("L3"),
           "Minimal solver: 2 lines with depth (common perpendicular). Lines are 6-vectors of endpoints.");
     m.def("threeview_2l_planes", &poselib::threeview_2l_planes_wrapper, py::arg("L1"), py::arg("L2"),

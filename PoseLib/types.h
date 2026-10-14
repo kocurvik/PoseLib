@@ -73,6 +73,8 @@ struct RansacOptions {
     int line_solver = 0;          // 0 - 2 lines, common perpendicular, 1 - 2 lines, planes
     double max_line_error = 1.0;  // threshold for line transfer error (pixels)
     double line_weight = 1.0;     // weight of the line score and residuals in the hybrid estimator
+    int hybrid_solver = 0;        // hybrid estimator minimal solver: 0 - 2p1l, 1 - 1l3p
+    int upright_solver = 0;       // two view relpose with line direction: 0 - Ding et al. CVPR23, 1 - QEP
     bool line_sampson = false;    // Sampson-normalized line transfer error instead of transfer distance
 };
 

@@ -152,7 +152,8 @@ RansacStats ransac_3v_hybrid(const std::vector<Point2D> &x1, const std::vector<P
     *three_view_pose = ThreeViewCameraPose();
     RansacStats stats;
 
-    if (x1.size() >= 2 && !l1.empty()) {
+    const size_t min_points = opt.hybrid_solver == 1 ? 3 : 2;
+    if (x1.size() >= min_points && !l1.empty()) {
         ThreeViewHybridEstimator estimator(opt, x1, x2, x3, X1, X2, X3, l1, l2, l3, L1, L2, L3);
         stats = ransac<ThreeViewHybridEstimator>(estimator, opt, three_view_pose);
     }
@@ -162,6 +163,20 @@ RansacStats ransac_3v_hybrid(const std::vector<Point2D> &x1, const std::vector<P
     compute_threeview_line_msac_score(*three_view_pose, make_line_tracks(l1, l2, l3),
                                       opt.max_line_error * opt.max_line_error, &num_inl, line_inliers,
                                       opt.line_sampson);
+    return stats;
+}
+
+RansacStats ransac_relpose_line_direction(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                          const std::vector<Line3D> &L1, const std::vector<Line3D> &L2,
+                                          const RansacOptions &opt, CameraPose *best_model,
+                                          std::vector<char> *best_inliers) {
+    *best_model = CameraPose();
+    RansacStats stats;
+    if (x1.size() >= 3 && !L1.empty()) {
+        RelativePoseLineDirectionEstimator estimator(opt, x1, x2, L1, L2);
+        stats = ransac<RelativePoseLineDirectionEstimator>(estimator, opt, best_model);
+    }
+    get_inliers(*best_model, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
     return stats;
 }
 

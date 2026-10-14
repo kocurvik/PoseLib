@@ -77,6 +77,12 @@ RansacStats ransac_3v_hybrid(const std::vector<Point2D> &x1, const std::vector<P
                              ThreeViewCameraPose *three_view_pose, std::vector<char> *point_inliers,
                              std::vector<char> *line_inliers);
 
+// Two view relative pose from points and line directions (calibrated), see RelativePoseLineDirectionEstimator
+RansacStats ransac_relpose_line_direction(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                          const std::vector<Line3D> &L1, const std::vector<Line3D> &L2,
+                                          const RansacOptions &opt, CameraPose *best_model,
+                                          std::vector<char> *best_inliers);
+
 RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         const RansacOptions &opt, ImagePair *best_model,
                                         std::vector<char> *best_inliers);

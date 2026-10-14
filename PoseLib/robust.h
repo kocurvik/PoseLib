@@ -109,6 +109,19 @@ RansacStats estimate_3v_relative_pose_hybrid(
     const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, ThreeViewCameraPose *three_view_pose,
     std::vector<char> *point_inliers, std::vector<char> *line_inliers);
 
+// Estimates two view relative pose from points and line directions (line segments with endpoint depths) using
+// LO-RANSAC with the upright 3 point solver (the line direction is the common direction) followed by non-linear
+// refinement of the Sampson error over the point inliers. Threshold is set by RansacOptions.max_epipolar_error.
+//   x1, x2   - points in pixels
+//   l*, ld*  - line segments in pixels and depths of their endpoints (arbitrary scale per view)
+RansacStats estimate_relative_pose_line_direction(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                                  const std::vector<Line2D> &l1, const std::vector<Line2D> &l2,
+                                                  const std::vector<Eigen::Vector2d> &ld1,
+                                                  const std::vector<Eigen::Vector2d> &ld2, const Camera &camera1,
+                                                  const Camera &camera2, const RansacOptions &ransac_opt,
+                                                  const BundleOptions &bundle_opt, CameraPose *pose,
+                                                  std::vector<char> *inliers);
+
 // Estimates shared focal relative pose in three views using LO-RANSAC jointly for 6p for first two cameras
 // and P4Pf for the third camera followed by non-linear refinement
 // Threshold for Sampson error is set by RansacOptions.max_epipolar_error

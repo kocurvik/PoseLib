@@ -24,6 +24,16 @@ int threeview_2p1l(const std::vector<Eigen::Vector3d> &X1, const std::vector<Eig
                    const std::vector<Eigen::Vector3d> &X3, const Eigen::Vector3d &d1, const Eigen::Vector3d &d2,
                    const Eigen::Vector3d &d3, std::vector<ThreeViewCameraPose> *output);
 
+// 1 line direction + 3 points without depth. The line direction acts as a known vertical direction: views 1-2 are
+// solved with the upright 3 point relative pose solver, view 3 with the upright 2 point absolute pose solver
+// (points 0, 1 triangulated from views 1-2). For each pose of views 1-2 only the view 3 solution (over the
+// direction sign and the up2p solutions) with the smallest angular error of point 2 is kept.
+//   x1, x2, x3 - three bearing vectors in each view
+//   d1, d2, d3 - direction of the line in each view
+int threeview_1l3p(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2,
+                   const std::vector<Eigen::Vector3d> &x3, const Eigen::Vector3d &d1, const Eigen::Vector3d &d2,
+                   const Eigen::Vector3d &d3, std::vector<ThreeViewCameraPose> *output);
+
 // 2 lines with depth. Rotation from line directions, scale and translation from the common perpendicular.
 //   L1, L2, L3 - two 3D line segments in each view
 int threeview_2l(const std::vector<Line3D> &L1, const std::vector<Line3D> &L2, const std::vector<Line3D> &L3,

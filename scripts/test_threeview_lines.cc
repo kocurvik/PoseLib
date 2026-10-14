@@ -1,9 +1,13 @@
 // Standalone checks for the three view line solvers and the line Jacobian accumulator.
 // Build (from repo root):
-//   g++ -O2 -std=c++17 -I. -I<eigen include> scripts/test_threeview_lines.cc PoseLib/solvers/threeview_lines.cc
+//   g++ -O2 -std=c++17 -I. -I<generated headers> -I<eigen include> scripts/test_threeview_lines.cc
+//       PoseLib/solvers/threeview_lines.cc PoseLib/solvers/relpose_upright_3pt.cc PoseLib/solvers/up2p.cc
+//       PoseLib/solvers/relpose_upright_3pt_ding.cc
+//       PoseLib/misc/*.cc
 #include "PoseLib/robust/lm_impl.h"
 #include "PoseLib/robust/robust_loss.h"
 #include "PoseLib/robust/threeview_lines_jacobian.h"
+#include "PoseLib/solvers/relpose_upright_3pt_ding.h"
 #include "PoseLib/solvers/threeview_lines.h"
 
 #include <iostream>
@@ -116,6 +120,62 @@ static int test_solvers() {
         if (best_error(models, sc) > 1e-6)
             fail_2lp++;
     }
+    // 1l3p (translation scale is arbitrary, normalized by |t12|)
+    int fail_1l3p = 0;
+    double max_models_1l3p = 0;
+    for (int trial = 0; trial < trials; ++trial) {
+        Scene sc = random_scene();
+        const Eigen::Matrix3d R[3] = {Eigen::Matrix3d::Identity(), sc.R2, sc.R3};
+        const Eigen::Vector3d t[3] = {Eigen::Vector3d::Zero(), sc.t2, sc.t3};
+        std::vector<Eigen::Vector3d> x[3];
+        for (int i = 0; i < 3; ++i) {
+            const Eigen::Vector3d P = random_point();
+            for (int k = 0; k < 3; ++k)
+                x[k].push_back((R[k] * P + t[k]).normalized());
+        }
+        Line3D L[3];
+        Line2D l[3];
+        random_line(sc, L, l);
+        std::vector<ThreeViewCameraPose> models;
+        threeview_1l3p(x[0], x[1], x[2], L[0].X2 - L[0].X1, L[1].X2 - L[1].X1, L[2].X2 - L[2].X1, &models);
+        max_models_1l3p = std::max<double>(max_models_1l3p, models.size());
+        double best = 1e10;
+        for (const ThreeViewCameraPose &m : models) {
+            const double s = sc.t2.norm() / m.pose12.t.norm();
+            best = std::min(best, std::max({rot_err(m.pose12.R(), sc.R2), rot_err(m.pose13.R(), sc.R3),
+                                            trans_err(sc.t2, s * m.pose12.t), trans_err(sc.t3, s * m.pose13.t)}));
+        }
+        if (best > 1e-6)
+            fail_1l3p++;
+    }
+    std::cout << "1l3p failures: " << fail_1l3p << "/" << trials << " (max models " << max_models_1l3p << ")\n";
+    fails += fail_1l3p > trials / 100;
+
+    // two view upright 3pt (Ding et al.) with a common direction
+    int fail_ding = 0;
+    double max_models_ding = 0;
+    for (int trial = 0; trial < trials; ++trial) {
+        Scene sc = random_scene();
+        std::vector<Eigen::Vector3d> x1, x2;
+        for (int i = 0; i < 3; ++i) {
+            const Eigen::Vector3d P = random_point();
+            x1.push_back(P.normalized());
+            x2.push_back((sc.R2 * P + sc.t2).normalized());
+        }
+        const Eigen::Vector3d d1 = randv().normalized();
+        CameraPoseVector poses;
+        relpose_upright_3pt_ding(x1, x2, d1, sc.R2 * d1, &poses);
+        max_models_ding = std::max<double>(max_models_ding, poses.size());
+        double best = 1e10;
+        for (const CameraPose &p : poses)
+            best = std::min(best, std::max(rot_err(p.R(), sc.R2), trans_err(sc.t2.normalized(), p.t.normalized())));
+        if (best > 1e-6)
+            fail_ding++;
+    }
+    std::cout << "upright 3pt (Ding) failures: " << fail_ding << "/" << trials << " (max models " << max_models_ding
+              << ")\n";
+    fails += fail_ding > trials / 100;
+
     std::cout << "2p1l failures: " << fail_2p1l << "/" << trials << " (max models " << max_models[0] << ")\n";
     std::cout << "2l failures: " << fail_2l << "/" << trials << " (max models " << max_models[1] << ")\n";
     std::cout << "2l_planes failures: " << fail_2lp << "/" << trials << " (max models " << max_models[2] << ")\n";
