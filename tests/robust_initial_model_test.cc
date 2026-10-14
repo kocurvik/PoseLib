@@ -27,10 +27,11 @@ CameraPose random_relative_pose(test_rng::Rng &rng) {
 }
 
 // 3D points in front of camera 1 (identity) and camera 2 (pose)
-std::vector<Point3D> random_points(test_rng::Rng &rng, const CameraPose &pose, size_t N) {
+std::vector<Point3D> random_points(test_rng::Rng &rng, const CameraPose &pose, size_t N, double spread = 1.0) {
     std::vector<Point3D> X;
     while (X.size() < N) {
         Eigen::Vector3d Xi = test_rng::symmetric_vec3(rng);
+        Xi.head<2>() *= spread;
         Xi(2) += 4.0;
         if (pose.apply(Xi)(2) > 0.5) {
             X.push_back(Xi);
@@ -244,9 +245,10 @@ bool test_varying_focal_monodepth_relative_pose() {
 bool check_rd_fundamental(bool shared) {
     test_rng::Rng rng = test_rng::make_rng(shared ? "shared_rd_fundamental" : "rd_fundamental");
     const double f1 = 1000.0, f2 = shared ? 1000.0 : 1500.0;
-    const double k1 = -0.2, k2 = shared ? -0.2 : -0.1;
+    // Strong distortion and wide field of view, so a wrongly scaled initial distortion is not recovered by refinement
+    const double k1 = -0.6, k2 = shared ? -0.6 : -0.4;
     CameraPose pose_gt = random_relative_pose(rng);
-    std::vector<Point3D> X = random_points(rng, pose_gt, 50);
+    std::vector<Point3D> X = random_points(rng, pose_gt, 50, 3.0);
 
     // Distorted image points
     Camera camera1("DIVISION", {f1, f1, 0.0, 0.0, k1}, -1, -1);
