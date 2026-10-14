@@ -727,7 +727,7 @@ bool calculate_RFC(const Eigen::Matrix3d &F) {
     return true;
 }
 
-void canonicalize_rd_initial_model(ProjectiveImagePair *F_cam_pair) {
+void check_rd_initial_model(ProjectiveImagePair *F_cam_pair) {
     for (Camera *cam : {&F_cam_pair->camera1, &F_cam_pair->camera2}) {
         if ((cam->model_id != DivisionCameraModel::model_id && cam->model_id != SimpleDivisionCameraModel::model_id) ||
             cam->focal_x() != 1.0 || cam->focal_y() != 1.0 || !cam->principal_point().isZero(0.0)) {

@@ -778,7 +778,7 @@ RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::v
     double max_limit = 0.5 * scale * scale;
 
     if (opt.ransac.score_initial_model) {
-        canonicalize_rd_initial_model(F_cam_pair);
+        check_rd_initial_model(F_cam_pair);
         F_cam_pair->F = T2.transpose().inverse() * (F_cam_pair->F) * T1.inverse();
         F_cam_pair->F /= F_cam_pair->F.norm();
         F_cam_pair->camera1.params[4] *= scale * scale;
@@ -844,7 +844,7 @@ RansacStats estimate_shared_rd_fundamental(const std::vector<Point2D> &x1, const
     double max_limit = 0.5 * scale * scale;
 
     if (opt.ransac.score_initial_model) {
-        canonicalize_rd_initial_model(F_cam_pair);
+        check_rd_initial_model(F_cam_pair);
         F_cam_pair->F = T2.transpose().inverse() * (F_cam_pair->F) * T1.inverse();
         F_cam_pair->F /= F_cam_pair->F.norm();
         F_cam_pair->camera1.params[4] *= scale * scale;
