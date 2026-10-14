@@ -118,4 +118,9 @@ double normalize_points(std::vector<Eigen::Vector2d> &x1, std::vector<Eigen::Vec
 // Calculate whether F would yield real focals, assumes both pp at [0, 0]
 bool calculate_RFC(const Eigen::Matrix3d &F);
 
+// Converts the initial model of the (shared) rd fundamental estimators to the canonical DIVISION {1, 1, 0, 0, k}
+// cameras used by them. Throws std::invalid_argument unless both cameras are DIVISION or SIMPLE_DIVISION with
+// fx == fy and zero principal point.
+void canonicalize_rd_initial_model(ProjectiveImagePair *F_cam_pair);
+
 } // namespace poselib
