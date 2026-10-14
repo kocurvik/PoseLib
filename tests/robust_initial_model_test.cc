@@ -101,44 +101,6 @@ bool test_absolute_pose_focal() {
     return true;
 }
 
-bool test_absolute_pose_pnplf() {
-    test_rng::Rng rng = test_rng::make_rng("absolute_pose_pnplf");
-    const double focal = 1200.0;
-    CameraPose pose_gt = random_relative_pose(rng);
-    Camera camera(SimplePinholeCameraModel::model_id, {focal, 0.0, 0.0}, 0, 0);
-
-    auto random_world_point = [&]() {
-        Eigen::Vector3d Xi = test_rng::symmetric_vec3(rng);
-        Xi(2) += 4.0;
-        return Eigen::Vector3d(pose_gt.inverse().apply(Xi));
-    };
-    std::vector<Point3D> X;
-    std::vector<Point2D> x;
-    for (size_t i = 0; i < 30; ++i) {
-        X.push_back(random_world_point());
-        x.emplace_back();
-        camera.project(pose_gt.apply(X.back()), &x.back());
-    }
-    std::vector<Line3D> L;
-    std::vector<Line2D> l;
-    for (size_t i = 0; i < 20; ++i) {
-        L.emplace_back(random_world_point(), random_world_point());
-        l.emplace_back();
-        camera.project(pose_gt.apply(L.back().X1), &l.back().x1);
-        camera.project(pose_gt.apply(L.back().X2), &l.back().x2);
-    }
-
-    AbsolutePoseOptions opt;
-    opt.ransac = initial_model_only_ransac();
-    Image image(pose_gt, camera);
-    std::vector<char> inliers_points, inliers_lines;
-    estimate_absolute_pose_pnplf(x, X, l, L, camera, opt, &image, &inliers_points, &inliers_lines);
-
-    REQUIRE(pose_close(image.pose, pose_gt));
-    REQUIRE_SMALL(image.camera.focal() / focal - 1.0, kTol);
-    return true;
-}
-
 bool test_relative_pose_tangent_sampson() {
     test_rng::Rng rng = test_rng::make_rng("relative_pose_tangent_sampson");
     CameraPose pose_gt = random_relative_pose(rng);
@@ -337,7 +299,6 @@ bool test_rd_fundamental_invalid_initial_model() {
 using namespace test::robust_initial_model;
 std::vector<Test> register_robust_initial_model_test() {
     return {TEST(test_absolute_pose_focal),
-            TEST(test_absolute_pose_pnplf),
             TEST(test_relative_pose_tangent_sampson),
             TEST(test_monodepth_relative_pose),
             TEST(test_shared_focal_monodepth_relative_pose),

@@ -148,14 +148,12 @@ RansacStats ransac_pnplf(const std::vector<Point2D> &points2D, const std::vector
                          const AbsolutePoseOptions &opt, Image *best_model, std::vector<char> *inliers_points,
                          std::vector<char> *inliers_lines) {
 
-    if (!opt.ransac.score_initial_model) {
-        best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
-        best_model->pose.t.setZero();
-        best_model->camera.model_id = CameraModelId::SIMPLE_PINHOLE;
-        best_model->camera.width = 0;
-        best_model->camera.height = 0;
-        best_model->camera.params = {1.0, 0.0, 0.0};
-    }
+    best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
+    best_model->pose.t.setZero();
+    best_model->camera.model_id = CameraModelId::SIMPLE_PINHOLE;
+    best_model->camera.width = 0;
+    best_model->camera.height = 0;
+    best_model->camera.params = {1.0, 0.0, 0.0};
 
     FocalAbsolutePosePointLineEstimator estimator(opt, points2D, points3D, lines2D, lines3D);
     RansacStats stats = ransac<FocalAbsolutePosePointLineEstimator>(estimator, opt.ransac, best_model);

@@ -283,12 +283,6 @@ RansacStats estimate_absolute_pose_pnplf(const std::vector<Point2D> &points2D, c
 
     // RANSAC works in the normalized frame; img is SIMPLE_PINHOLE (pp = 0) with a focal correction.
     Image img;
-    if (opt.ransac.score_initial_model) {
-        // Points are unprojected with camera, so the initial focal is the correction relative to camera.focal()
-        img.pose = image->pose;
-        img.camera = Camera(SimplePinholeCameraModel::model_id,
-                            std::vector<double>{image->camera.focal() * scale, 0.0, 0.0}, 0, 0);
-    }
     RansacStats stats =
         ransac_pnplf(points2D_norm, points3D, lines2D_norm, lines3D, opt_scaled, &img, inliers_points, inliers_lines);
 
