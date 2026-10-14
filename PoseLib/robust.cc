@@ -31,6 +31,8 @@
 #include "PoseLib/robust/utils.h"
 #include "robust/recalibrator.h"
 
+#include <stdexcept>
+
 namespace poselib {
 
 RansacStats estimate_absolute_pose(const std::vector<Point2D> &points2D, const std::vector<Point3D> &points3D,
@@ -763,6 +765,47 @@ RansacStats estimate_fundamental(const std::vector<Point2D> &x1, const std::vect
     return stats;
 }
 
+namespace {
+// Converts a camera of an initial model for the radial distortion fundamental estimators to the canonical
+// DIVISION camera {1, 1, 0, 0, k} used internally, returning its focal length. Both DIVISION and SIMPLE_DIVISION
+// cameras are accepted, but they must have equal focal lengths along both axes and the principal point at the
+// origin, since the estimators assume the distortion center is at the origin of the image coordinates.
+Camera canonical_rd_camera(const Camera &camera, double *focal) {
+    double fx, fy, k;
+    if (camera.model_id == DivisionCameraModel::model_id) {
+        fx = camera.params[0];
+        fy = camera.params[1];
+        k = camera.params[4];
+    } else if (camera.model_id == SimpleDivisionCameraModel::model_id) {
+        fx = fy = camera.params[0];
+        k = camera.params[3];
+    } else {
+        throw std::invalid_argument("Initial model for radial distortion fundamental matrix estimation must use "
+                                    "DIVISION or SIMPLE_DIVISION cameras, got " +
+                                    camera.model_name() + ".");
+    }
+    if (fx != fy) {
+        throw std::invalid_argument("Initial model for radial distortion fundamental matrix estimation must have "
+                                    "equal focal lengths in both axes.");
+    }
+    if (!camera.principal_point().isZero(0.0)) {
+        throw std::invalid_argument("Initial model for radial distortion fundamental matrix estimation must have the "
+                                    "principal point at the origin. Subtract it from the image points instead.");
+    }
+    *focal = fx;
+    return Camera(DivisionCameraModel::model_id, std::vector<double>{1.0, 1.0, 0.0, 0.0, k / (fx * fx)}, -1, -1);
+}
+
+// Converts the initial model to the canonical form with unit focal lengths (F acts on the unprojected points).
+void canonicalize_rd_initial_model(ProjectiveImagePair *F_cam_pair) {
+    double f1, f2;
+    F_cam_pair->camera1 = canonical_rd_camera(F_cam_pair->camera1, &f1);
+    F_cam_pair->camera2 = canonical_rd_camera(F_cam_pair->camera2, &f2);
+    Eigen::DiagonalMatrix<double, 3> K1_inv(1.0 / f1, 1.0 / f1, 1.0), K2_inv(1.0 / f2, 1.0 / f2, 1.0);
+    F_cam_pair->F = K2_inv * F_cam_pair->F * K1_inv;
+}
+} // namespace
+
 RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                     std::vector<double> ks, const RelativePoseOptions &opt,
                                     ProjectiveImagePair *F_cam_pair, std::vector<char> *inliers) {
@@ -794,6 +837,7 @@ RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::v
     double max_limit = 0.5 * scale * scale;
 
     if (opt.ransac.score_initial_model) {
+        canonicalize_rd_initial_model(F_cam_pair);
         F_cam_pair->F = T2.transpose().inverse() * (F_cam_pair->F) * T1.inverse();
         F_cam_pair->F /= F_cam_pair->F.norm();
         F_cam_pair->camera1.params[4] *= scale * scale;
@@ -859,6 +903,7 @@ RansacStats estimate_shared_rd_fundamental(const std::vector<Point2D> &x1, const
     double max_limit = 0.5 * scale * scale;
 
     if (opt.ransac.score_initial_model) {
+        canonicalize_rd_initial_model(F_cam_pair);
         F_cam_pair->F = T2.transpose().inverse() * (F_cam_pair->F) * T1.inverse();
         F_cam_pair->F /= F_cam_pair->F.norm();
         F_cam_pair->camera1.params[4] *= scale * scale;

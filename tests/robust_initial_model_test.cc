@@ -5,6 +5,7 @@
 #include <PoseLib/misc/essential.h>
 #include <PoseLib/robust.h>
 #include <cmath>
+#include <stdexcept>
 #include <vector>
 
 using namespace poselib;
@@ -265,27 +266,71 @@ bool check_rd_fundamental(bool shared) {
     Eigen::DiagonalMatrix<double, 3> K1_inv(1.0, 1.0, f1), K2_inv(1.0, 1.0, f2);
     Eigen::Matrix3d F_gt = K2_inv * E * K1_inv;
     const double k1_px = k1 / (f1 * f1), k2_px = k2 / (f2 * f2);
-    ProjectiveImagePair model(F_gt, Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, k1_px}, -1, -1),
-                              Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, k2_px}, -1, -1));
 
-    RelativePoseOptions opt;
-    opt.ransac = initial_model_only_ransac();
-    std::vector<char> inliers;
-    if (shared) {
-        estimate_shared_rd_fundamental(x1, x2, {}, opt, &model, &inliers);
-    } else {
-        estimate_rd_fundamental(x1, x2, {}, opt, &model, &inliers);
+    // The same initial model expressed with canonical DIVISION, calibrated DIVISION and SIMPLE_DIVISION cameras
+    std::vector<ProjectiveImagePair> initial_models = {
+        ProjectiveImagePair(F_gt, Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, k1_px}, -1, -1),
+                            Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, k2_px}, -1, -1)),
+        ProjectiveImagePair(E, camera1, camera2),
+        ProjectiveImagePair(E, Camera("SIMPLE_DIVISION", {f1, 0.0, 0.0, k1}, -1, -1),
+                            Camera("SIMPLE_DIVISION", {f2, 0.0, 0.0, k2}, -1, -1))};
+
+    for (ProjectiveImagePair model : initial_models) {
+        RelativePoseOptions opt;
+        opt.ransac = initial_model_only_ransac();
+        std::vector<char> inliers;
+        if (shared) {
+            estimate_shared_rd_fundamental(x1, x2, {}, opt, &model, &inliers);
+        } else {
+            estimate_rd_fundamental(x1, x2, {}, opt, &model, &inliers);
+        }
+
+        REQUIRE_EQ(model.camera1.model_id, DivisionCameraModel::model_id);
+        REQUIRE_EQ(model.camera2.model_id, DivisionCameraModel::model_id);
+        REQUIRE(fundamental_close(model.F, F_gt));
+        REQUIRE_SMALL(model.camera1.params[4] / k1_px - 1.0, kTol);
+        REQUIRE_SMALL(model.camera2.params[4] / k2_px - 1.0, kTol);
     }
-
-    REQUIRE(fundamental_close(model.F, F_gt));
-    REQUIRE_SMALL(model.camera1.params[4] / k1_px - 1.0, kTol);
-    REQUIRE_SMALL(model.camera2.params[4] / k2_px - 1.0, kTol);
     return true;
 }
 
 bool test_rd_fundamental() { return check_rd_fundamental(false); }
 
 bool test_shared_rd_fundamental() { return check_rd_fundamental(true); }
+
+bool test_rd_fundamental_invalid_initial_model() {
+    test_rng::Rng rng = test_rng::make_rng("rd_fundamental_invalid_initial_model");
+    std::vector<Point2D> x1, x2;
+    for (size_t i = 0; i < 20; ++i) {
+        x1.push_back(test_rng::symmetric_vec2(rng));
+        x2.push_back(test_rng::symmetric_vec2(rng));
+    }
+    const Camera valid("DIVISION", {1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
+    const std::vector<Camera> invalid_cameras = {Camera("SIMPLE_PINHOLE", {1.0, 0.0, 0.0}, -1, -1),
+                                                 Camera("DIVISION", {1.0, 2.0, 0.0, 0.0, 0.0}, -1, -1),
+                                                 Camera("SIMPLE_DIVISION", {1.0, 0.5, 0.0, 0.0}, -1, -1)};
+
+    RelativePoseOptions opt;
+    opt.ransac = initial_model_only_ransac();
+    std::vector<char> inliers;
+    for (const Camera &invalid : invalid_cameras) {
+        for (bool shared : {false, true}) {
+            ProjectiveImagePair model(Eigen::Matrix3d::Identity(), valid, invalid);
+            bool thrown = false;
+            try {
+                if (shared) {
+                    estimate_shared_rd_fundamental(x1, x2, {}, opt, &model, &inliers);
+                } else {
+                    estimate_rd_fundamental(x1, x2, {}, opt, &model, &inliers);
+                }
+            } catch (const std::invalid_argument &) {
+                thrown = true;
+            }
+            REQUIRE(thrown);
+        }
+    }
+    return true;
+}
 
 } // namespace test::robust_initial_model
 
@@ -298,5 +343,6 @@ std::vector<Test> register_robust_initial_model_test() {
             TEST(test_shared_focal_monodepth_relative_pose),
             TEST(test_varying_focal_monodepth_relative_pose),
             TEST(test_rd_fundamental),
-            TEST(test_shared_rd_fundamental)};
+            TEST(test_shared_rd_fundamental),
+            TEST(test_rd_fundamental_invalid_initial_model)};
 }
