@@ -750,43 +750,22 @@ RansacStats estimate_fundamental(const std::vector<Point2D> &x1, const std::vect
 }
 
 namespace {
-// Converts a camera of an initial model for the radial distortion fundamental estimators to the canonical
-// DIVISION camera {1, 1, 0, 0, k} used internally, returning its focal length. Both DIVISION and SIMPLE_DIVISION
-// cameras are accepted, but they must have equal focal lengths along both axes and the principal point at the
-// origin, since the estimators assume the distortion center is at the origin of the image coordinates.
-Camera canonical_rd_camera(const Camera &camera, double *focal) {
-    double fx, fy, k;
-    if (camera.model_id == DivisionCameraModel::model_id) {
-        fx = camera.params[0];
-        fy = camera.params[1];
-        k = camera.params[4];
-    } else if (camera.model_id == SimpleDivisionCameraModel::model_id) {
-        fx = fy = camera.params[0];
-        k = camera.params[3];
-    } else {
-        throw std::invalid_argument("Initial model for radial distortion fundamental matrix estimation must use "
-                                    "DIVISION or SIMPLE_DIVISION cameras, got " +
-                                    camera.model_name() + ".");
-    }
-    if (fx != fy) {
-        throw std::invalid_argument("Initial model for radial distortion fundamental matrix estimation must have "
-                                    "equal focal lengths in both axes.");
-    }
-    if (!camera.principal_point().isZero(0.0)) {
-        throw std::invalid_argument("Initial model for radial distortion fundamental matrix estimation must have the "
-                                    "principal point at the origin. Subtract it from the image points instead.");
-    }
-    *focal = fx;
-    return Camera(DivisionCameraModel::model_id, std::vector<double>{1.0, 1.0, 0.0, 0.0, k / (fx * fx)}, -1, -1);
-}
-
-// Converts the initial model to the canonical form with unit focal lengths (F acts on the unprojected points).
+// Converts the initial model to the canonical DIVISION {1, 1, 0, 0, k} cameras used by the rd estimators.
 void canonicalize_rd_initial_model(ProjectiveImagePair *F_cam_pair) {
-    double f1, f2;
-    F_cam_pair->camera1 = canonical_rd_camera(F_cam_pair->camera1, &f1);
-    F_cam_pair->camera2 = canonical_rd_camera(F_cam_pair->camera2, &f2);
-    Eigen::DiagonalMatrix<double, 3> K1_inv(1.0 / f1, 1.0 / f1, 1.0), K2_inv(1.0 / f2, 1.0 / f2, 1.0);
-    F_cam_pair->F = K2_inv * F_cam_pair->F * K1_inv;
+    Camera *cams[2] = {&F_cam_pair->camera1, &F_cam_pair->camera2};
+    double f[2];
+    for (int i = 0; i < 2; ++i) {
+        Camera &cam = *cams[i];
+        if ((cam.model_id != DivisionCameraModel::model_id && cam.model_id != SimpleDivisionCameraModel::model_id) ||
+            cam.focal_x() != cam.focal_y() || !cam.principal_point().isZero(0.0)) {
+            throw std::invalid_argument("Initial rd fundamental model requires DIVISION or SIMPLE_DIVISION cameras "
+                                        "with fx == fy and zero principal point.");
+        }
+        f[i] = cam.focal();
+        cam = Camera(DivisionCameraModel::model_id, {1.0, 1.0, 0.0, 0.0, cam.params.back() / (f[i] * f[i])}, -1, -1);
+    }
+    F_cam_pair->F =
+        Eigen::Vector3d(1.0, 1.0, f[1]).asDiagonal() * F_cam_pair->F * Eigen::Vector3d(1.0, 1.0, f[0]).asDiagonal();
 }
 } // namespace
 
