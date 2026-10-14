@@ -193,13 +193,12 @@ bool check_rd_fundamental(bool shared) {
     Eigen::Matrix3d F_gt = K2_inv * E * K1_inv;
     const double k1_px = k1 / (f1 * f1), k2_px = k2 / (f2 * f2);
 
-    // The same initial model expressed with canonical DIVISION, calibrated DIVISION and SIMPLE_DIVISION cameras
+    // The same initial model expressed with DIVISION and SIMPLE_DIVISION cameras
     std::vector<ProjectiveImagePair> initial_models = {
         ProjectiveImagePair(F_gt, Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, k1_px}, -1, -1),
                             Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, k2_px}, -1, -1)),
-        ProjectiveImagePair(E, camera1, camera2),
-        ProjectiveImagePair(E, Camera("SIMPLE_DIVISION", {f1, 0.0, 0.0, k1}, -1, -1),
-                            Camera("SIMPLE_DIVISION", {f2, 0.0, 0.0, k2}, -1, -1))};
+        ProjectiveImagePair(F_gt, Camera("SIMPLE_DIVISION", {1.0, 0.0, 0.0, k1_px}, -1, -1),
+                            Camera("SIMPLE_DIVISION", {1.0, 0.0, 0.0, k2_px}, -1, -1))};
 
     for (ProjectiveImagePair model : initial_models) {
         RelativePoseOptions opt;
@@ -211,8 +210,14 @@ bool check_rd_fundamental(bool shared) {
             estimate_rd_fundamental(x1, x2, {}, opt, &model, &inliers);
         }
 
-        REQUIRE_EQ(model.camera1.model_id, DivisionCameraModel::model_id);
-        REQUIRE_EQ(model.camera2.model_id, DivisionCameraModel::model_id);
+        // The estimators assume canonical DIVISION cameras {1, 1, 0, 0, k}
+        for (const Camera &cam : {model.camera1, model.camera2}) {
+            REQUIRE_EQ(cam.model_id, DivisionCameraModel::model_id);
+            REQUIRE_EQ(cam.params[0], 1.0);
+            REQUIRE_EQ(cam.params[1], 1.0);
+            REQUIRE_EQ(cam.params[2], 0.0);
+            REQUIRE_EQ(cam.params[3], 0.0);
+        }
         REQUIRE(fundamental_close(model.F, F_gt));
         REQUIRE_SMALL(model.camera1.params[4] / k1_px - 1.0, kTol);
         REQUIRE_SMALL(model.camera2.params[4] / k2_px - 1.0, kTol);
@@ -234,6 +239,8 @@ bool test_rd_fundamental_invalid_initial_model() {
     const Camera valid("DIVISION", {1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
     const std::vector<Camera> invalid_cameras = {Camera("SIMPLE_PINHOLE", {1.0, 0.0, 0.0}, -1, -1),
                                                  Camera("DIVISION", {1.0, 2.0, 0.0, 0.0, 0.0}, -1, -1),
+                                                 Camera("DIVISION", {1000.0, 1000.0, 0.0, 0.0, 0.0}, -1, -1),
+                                                 Camera("SIMPLE_DIVISION", {1000.0, 0.0, 0.0, 0.0}, -1, -1),
                                                  Camera("SIMPLE_DIVISION", {1.0, 0.5, 0.0, 0.0}, -1, -1)};
 
     RelativePoseOptions opt;
