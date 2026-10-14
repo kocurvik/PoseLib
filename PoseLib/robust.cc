@@ -50,22 +50,12 @@ RansacStats estimate_absolute_pose(const std::vector<Point2D> &points2D, const s
     RansacStats stats;
     if (opt.estimate_focal_length && !opt.estimate_extra_params) {
         Image img; // estimated with SIMPLE_PINHOLE model
-        if (opt.ransac.score_initial_model) {
-            // Points are unprojected with image->camera, so the initial focal is 1 in the normalized frame
-            img.pose = image->pose;
-            img.camera = Camera(SimplePinholeCameraModel::model_id, std::vector<double>{1.0, 0.0, 0.0}, 0, 0);
-        }
         stats = ransac_pnpf(points2D_norm, points3D, opt_scaled, &img, inliers);
         image->pose = img.pose;
         image->camera.set_focal(img.camera.focal() / scale);
         opt_scaled.bundle.refine_focal_length = true; // force refinement of focal in this case
     } else if (opt.estimate_focal_length && opt.estimate_extra_params) {
         Image img; // estimated with SIMPLE_DIVISION model
-        if (opt.ransac.score_initial_model) {
-            // Points are unprojected with image->camera, so the initial focal is 1 in the normalized frame
-            img.pose = image->pose;
-            img.camera = Camera(SimpleDivisionCameraModel::model_id, std::vector<double>{1.0, 0.0, 0.0, 0.0}, 0, 0);
-        }
         stats = ransac_pnpfr(points2D_norm, points3D, opt_scaled, &img, inliers);
         image->pose = img.pose;
         opt_scaled.bundle.refine_focal_length = true; // force refinement of focal in this case
