@@ -69,6 +69,11 @@ struct RansacOptions {
     bool use_para = false;
     int use_nister = 0;
     double nister_scale = 1.0;
+    // Three view line / hybrid estimators (threeview_lines.h)
+    int line_solver = 0;          // 0 - 2 lines, common perpendicular, 1 - 2 lines, planes
+    double max_line_error = 1.0;  // threshold for line transfer error (pixels)
+    double line_weight = 1.0;     // weight of the line score and residuals in the hybrid estimator
+    bool line_sampson = false;    // Sampson-normalized line transfer error instead of transfer distance
 };
 
 struct RansacStats {

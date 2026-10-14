@@ -93,6 +93,22 @@ BundleStats refine_3v_relpose(const std::vector<Point2D> &x1, const std::vector<
                               const BundleOptions &opt = BundleOptions(),
                               const std::vector<double> &weights = std::vector<double>());
 
+// Three view relative pose refinement from line tracks. Minimizes the line transfer error
+// (see robust/threeview_lines_jacobian.h). Assumes identity intrinsics (calibrated camera)
+BundleStats refine_3v_lines(const std::vector<Line2D> &l1, const std::vector<Line2D> &l2,
+                            const std::vector<Line2D> &l3, ThreeViewCameraPose *pose,
+                            const BundleOptions &opt = BundleOptions(), bool line_sampson = false);
+
+// Three view relative pose refinement from points (Sampson error) and line tracks (line transfer error)
+// The line residuals are multiplied by line_residual_scale (e.g. point threshold / line threshold) and the line
+// cost is weighted by line_weight.
+BundleStats refine_3v_hybrid(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                             const std::vector<Point2D> &x3, const std::vector<Line2D> &l1,
+                             const std::vector<Line2D> &l2, const std::vector<Line2D> &l3,
+                             ThreeViewCameraPose *pose, const BundleOptions &opt = BundleOptions(),
+                             double line_weight = 1.0, double line_residual_scale = 1.0,
+                             bool line_sampson = false);
+
 BundleStats refine_3v_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                            const std::vector<Point2D> &x3, ImageTriplet *pose,
                                            const BundleOptions &opt,

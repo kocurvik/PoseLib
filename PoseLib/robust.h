@@ -81,6 +81,34 @@ RansacStats estimate_3v_relative_pose(const std::vector<Point2D> &x1, const std:
                                       const BundleOptions &bundle_opt, ThreeViewCameraPose *three_view_pose,
                                       std::vector<char> *inliers);
 
+// Estimates relative pose in three views from line tracks with (scale-invariant) depth of the line endpoints
+// using LO-RANSAC with a 2 line minimal solver (RansacOptions.line_solver) followed by non-linear refinement
+// of the line transfer error. Threshold for the line transfer error is set by RansacOptions.max_line_error.
+//   l1, l2, l3    - line segments in pixels
+//   ld1, ld2, ld3 - depths of the two endpoints of each segment (arbitrary scale per view)
+RansacStats estimate_3v_relative_pose_lines(const std::vector<Line2D> &l1, const std::vector<Line2D> &l2,
+                                            const std::vector<Line2D> &l3, const std::vector<Eigen::Vector2d> &ld1,
+                                            const std::vector<Eigen::Vector2d> &ld2,
+                                            const std::vector<Eigen::Vector2d> &ld3, const Camera &camera1,
+                                            const Camera &camera2, const Camera &camera3,
+                                            const RansacOptions &ransac_opt, const BundleOptions &bundle_opt,
+                                            ThreeViewCameraPose *three_view_pose, std::vector<char> *inliers);
+
+// Estimates relative pose in three views from points and line tracks with (scale-invariant) depth using LO-RANSAC
+// with the 2p1l minimal solver followed by joint non-linear refinement of the Sampson error (points) and the line
+// transfer error (lines). Thresholds are set by RansacOptions.max_epipolar_error and RansacOptions.max_line_error.
+//   x1, x2, x3    - points in pixels
+//   d1, d2, d3    - depths of the points (arbitrary scale per view)
+//   l*, ld*       - see estimate_3v_relative_pose_lines
+RansacStats estimate_3v_relative_pose_hybrid(
+    const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const std::vector<Point2D> &x3,
+    const std::vector<double> &d1, const std::vector<double> &d2, const std::vector<double> &d3,
+    const std::vector<Line2D> &l1, const std::vector<Line2D> &l2, const std::vector<Line2D> &l3,
+    const std::vector<Eigen::Vector2d> &ld1, const std::vector<Eigen::Vector2d> &ld2,
+    const std::vector<Eigen::Vector2d> &ld3, const Camera &camera1, const Camera &camera2, const Camera &camera3,
+    const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, ThreeViewCameraPose *three_view_pose,
+    std::vector<char> *point_inliers, std::vector<char> *line_inliers);
+
 // Estimates shared focal relative pose in three views using LO-RANSAC jointly for 6p for first two cameras
 // and P4Pf for the third camera followed by non-linear refinement
 // Threshold for Sampson error is set by RansacOptions.max_epipolar_error

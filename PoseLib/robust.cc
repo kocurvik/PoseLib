@@ -345,6 +345,107 @@ RansacStats estimate_3v_relative_pose(const std::vector<Point2D> &x1, const std:
     return stats;
 }
 
+namespace {
+// Unprojects line segments and lifts their endpoints to 3D using the endpoint depths
+void calibrate_lines(const std::vector<Line2D> &lines, const std::vector<Eigen::Vector2d> &depths,
+                     const Camera &camera, std::vector<Line2D> *lines_calib, std::vector<Line3D> *lines3D) {
+    lines_calib->resize(lines.size());
+    lines3D->resize(lines.size());
+    for (size_t k = 0; k < lines.size(); ++k) {
+        camera.unproject(lines[k].x1, &(*lines_calib)[k].x1);
+        camera.unproject(lines[k].x2, &(*lines_calib)[k].x2);
+        (*lines3D)[k].X1 = depths[k](0) * (*lines_calib)[k].x1.homogeneous();
+        (*lines3D)[k].X2 = depths[k](1) * (*lines_calib)[k].x2.homogeneous();
+    }
+}
+
+template <typename T> std::vector<T> select_inliers(const std::vector<T> &x, const std::vector<char> &inliers) {
+    std::vector<T> out;
+    for (size_t k = 0; k < x.size(); ++k)
+        if (inliers[k])
+            out.push_back(x[k]);
+    return out;
+}
+} // namespace
+
+RansacStats estimate_3v_relative_pose_lines(const std::vector<Line2D> &l1, const std::vector<Line2D> &l2,
+                                            const std::vector<Line2D> &l3, const std::vector<Eigen::Vector2d> &ld1,
+                                            const std::vector<Eigen::Vector2d> &ld2,
+                                            const std::vector<Eigen::Vector2d> &ld3, const Camera &camera1,
+                                            const Camera &camera2, const Camera &camera3,
+                                            const RansacOptions &ransac_opt, const BundleOptions &bundle_opt,
+                                            ThreeViewCameraPose *three_view_pose, std::vector<char> *inliers) {
+    std::vector<Line2D> l1_calib, l2_calib, l3_calib;
+    std::vector<Line3D> L1, L2, L3;
+    calibrate_lines(l1, ld1, camera1, &l1_calib, &L1);
+    calibrate_lines(l2, ld2, camera2, &l2_calib, &L2);
+    calibrate_lines(l3, ld3, camera3, &l3_calib, &L3);
+
+    const double focal_scale = 3.0 / (camera1.focal() + camera2.focal() + camera3.focal());
+    RansacOptions ransac_opt_scaled = ransac_opt;
+    ransac_opt_scaled.max_epipolar_error = ransac_opt.max_epipolar_error * focal_scale;
+    ransac_opt_scaled.max_line_error = ransac_opt.max_line_error * focal_scale;
+
+    RansacStats stats =
+        ransac_3v_lines(l1_calib, l2_calib, l3_calib, L1, L2, L3, ransac_opt_scaled, three_view_pose, inliers);
+
+    if (stats.num_inliers > 3) {
+        BundleOptions scaled_bundle_opt = bundle_opt;
+        scaled_bundle_opt.loss_scale = bundle_opt.loss_scale * focal_scale;
+        refine_3v_lines(select_inliers(l1_calib, *inliers), select_inliers(l2_calib, *inliers),
+                        select_inliers(l3_calib, *inliers), three_view_pose, scaled_bundle_opt, ransac_opt.line_sampson);
+    }
+
+    return stats;
+}
+
+RansacStats estimate_3v_relative_pose_hybrid(
+    const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const std::vector<Point2D> &x3,
+    const std::vector<double> &d1, const std::vector<double> &d2, const std::vector<double> &d3,
+    const std::vector<Line2D> &l1, const std::vector<Line2D> &l2, const std::vector<Line2D> &l3,
+    const std::vector<Eigen::Vector2d> &ld1, const std::vector<Eigen::Vector2d> &ld2,
+    const std::vector<Eigen::Vector2d> &ld3, const Camera &camera1, const Camera &camera2, const Camera &camera3,
+    const RansacOptions &ransac_opt, const BundleOptions &bundle_opt, ThreeViewCameraPose *three_view_pose,
+    std::vector<char> *point_inliers, std::vector<char> *line_inliers) {
+    const size_t num_pts = x1.size();
+    std::vector<Point2D> x1_calib(num_pts), x2_calib(num_pts), x3_calib(num_pts);
+    std::vector<Point3D> X1(num_pts), X2(num_pts), X3(num_pts);
+    for (size_t k = 0; k < num_pts; ++k) {
+        camera1.unproject(x1[k], &x1_calib[k]);
+        camera2.unproject(x2[k], &x2_calib[k]);
+        camera3.unproject(x3[k], &x3_calib[k]);
+        X1[k] = d1[k] * x1_calib[k].homogeneous();
+        X2[k] = d2[k] * x2_calib[k].homogeneous();
+        X3[k] = d3[k] * x3_calib[k].homogeneous();
+    }
+
+    std::vector<Line2D> l1_calib, l2_calib, l3_calib;
+    std::vector<Line3D> L1, L2, L3;
+    calibrate_lines(l1, ld1, camera1, &l1_calib, &L1);
+    calibrate_lines(l2, ld2, camera2, &l2_calib, &L2);
+    calibrate_lines(l3, ld3, camera3, &l3_calib, &L3);
+
+    const double focal_scale = 3.0 / (camera1.focal() + camera2.focal() + camera3.focal());
+    RansacOptions ransac_opt_scaled = ransac_opt;
+    ransac_opt_scaled.max_epipolar_error = ransac_opt.max_epipolar_error * focal_scale;
+    ransac_opt_scaled.max_line_error = ransac_opt.max_line_error * focal_scale;
+
+    RansacStats stats = ransac_3v_hybrid(x1_calib, x2_calib, x3_calib, X1, X2, X3, l1_calib, l2_calib, l3_calib, L1,
+                                         L2, L3, ransac_opt_scaled, three_view_pose, point_inliers, line_inliers);
+
+    if (stats.num_inliers > 4) {
+        BundleOptions scaled_bundle_opt = bundle_opt;
+        scaled_bundle_opt.loss_scale = bundle_opt.loss_scale * focal_scale;
+        refine_3v_hybrid(select_inliers(x1_calib, *point_inliers), select_inliers(x2_calib, *point_inliers),
+                         select_inliers(x3_calib, *point_inliers), select_inliers(l1_calib, *line_inliers),
+                         select_inliers(l2_calib, *line_inliers), select_inliers(l3_calib, *line_inliers),
+                         three_view_pose, scaled_bundle_opt, ransac_opt.line_weight,
+                         ransac_opt.max_epipolar_error / ransac_opt.max_line_error, ransac_opt.line_sampson);
+    }
+
+    return stats;
+}
+
 RansacStats estimate_3v_shared_focal_relative_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                                    const std::vector<Point2D> &x3, const RansacOptions &ransac_opt,
                                                    const BundleOptions &bundle_opt, ImageTriplet *image_triplet,

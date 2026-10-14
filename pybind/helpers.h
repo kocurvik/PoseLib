@@ -56,6 +56,10 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "use_homography", ransac_opt.use_homography);
     update(input, "use_para", ransac_opt.use_para);
     update(input, "use_nister", ransac_opt.use_nister);
+    update(input, "line_solver", ransac_opt.line_solver);
+    update(input, "max_line_error", ransac_opt.max_line_error);
+    update(input, "line_weight", ransac_opt.line_weight);
+    update(input, "line_sampson", ransac_opt.line_sampson);
 }
 
 void update_bundle_options(const py::dict &input, BundleOptions &bundle_opt) {

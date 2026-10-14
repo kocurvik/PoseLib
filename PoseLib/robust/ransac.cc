@@ -34,6 +34,7 @@
 #include "PoseLib/robust/estimators/homography.h"
 #include "PoseLib/robust/estimators/hybrid_pose.h"
 #include "PoseLib/robust/estimators/relative_pose.h"
+#include "PoseLib/robust/estimators/threeview_lines.h"
 #include "PoseLib/solvers/gen_relpose_5p1pt.h"
 #include "PoseLib/solvers/p3p.h"
 #include "PoseLib/solvers/relpose_5pt.h"
@@ -122,6 +123,45 @@ ransac_3v_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2
 
     get_inliers(*three_view_pose, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, best_inliers);
 
+    return stats;
+}
+
+RansacStats ransac_3v_lines(const std::vector<Line2D> &l1, const std::vector<Line2D> &l2,
+                            const std::vector<Line2D> &l3, const std::vector<Line3D> &L1,
+                            const std::vector<Line3D> &L2, const std::vector<Line3D> &L3, const RansacOptions &opt,
+                            ThreeViewCameraPose *three_view_pose, std::vector<char> *inliers) {
+    *three_view_pose = ThreeViewCameraPose();
+
+    ThreeViewLineEstimator estimator(opt, l1, l2, l3, L1, L2, L3);
+    RansacStats stats = ransac<ThreeViewLineEstimator>(estimator, opt, three_view_pose);
+
+    size_t num_inl;
+    compute_threeview_line_msac_score(*three_view_pose, make_line_tracks(l1, l2, l3),
+                                      opt.max_line_error * opt.max_line_error, &num_inl, inliers, opt.line_sampson);
+    return stats;
+}
+
+RansacStats ransac_3v_hybrid(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                             const std::vector<Point2D> &x3, const std::vector<Point3D> &X1,
+                             const std::vector<Point3D> &X2, const std::vector<Point3D> &X3,
+                             const std::vector<Line2D> &l1, const std::vector<Line2D> &l2,
+                             const std::vector<Line2D> &l3, const std::vector<Line3D> &L1,
+                             const std::vector<Line3D> &L2, const std::vector<Line3D> &L3, const RansacOptions &opt,
+                             ThreeViewCameraPose *three_view_pose, std::vector<char> *point_inliers,
+                             std::vector<char> *line_inliers) {
+    *three_view_pose = ThreeViewCameraPose();
+    RansacStats stats;
+
+    if (x1.size() >= 2 && !l1.empty()) {
+        ThreeViewHybridEstimator estimator(opt, x1, x2, x3, X1, X2, X3, l1, l2, l3, L1, L2, L3);
+        stats = ransac<ThreeViewHybridEstimator>(estimator, opt, three_view_pose);
+    }
+
+    get_inliers(*three_view_pose, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, point_inliers);
+    size_t num_inl;
+    compute_threeview_line_msac_score(*three_view_pose, make_line_tracks(l1, l2, l3),
+                                      opt.max_line_error * opt.max_line_error, &num_inl, line_inliers,
+                                      opt.line_sampson);
     return stats;
 }
 

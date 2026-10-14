@@ -810,6 +810,152 @@ std::pair<CameraPose, py::dict> estimate_1D_radial_absolute_pose_wrapper(const s
     return std::make_pair(pose, output_dict);
 }
 
+std::vector<Line2D> lines_from_vectors(const std::vector<Eigen::Vector4d> &lines) {
+    std::vector<Line2D> out;
+    out.reserve(lines.size());
+    for (const Eigen::Vector4d &l : lines)
+        out.emplace_back(l.head<2>(), l.tail<2>());
+    return out;
+}
+
+std::vector<Line3D> lines3D_from_vectors(const std::vector<Eigen::Matrix<double, 6, 1>> &lines) {
+    std::vector<Line3D> out;
+    out.reserve(lines.size());
+    for (const Eigen::Matrix<double, 6, 1> &l : lines)
+        out.emplace_back(l.head<3>(), l.tail<3>());
+    return out;
+}
+
+std::pair<ThreeViewCameraPose, py::dict> estimate_three_view_relative_pose_lines_wrapper(
+    const std::vector<Eigen::Vector4d> &lines2D_1, const std::vector<Eigen::Vector4d> &lines2D_2,
+    const std::vector<Eigen::Vector4d> &lines2D_3, const std::vector<Eigen::Vector2d> &depths_1,
+    const std::vector<Eigen::Vector2d> &depths_2, const std::vector<Eigen::Vector2d> &depths_3,
+    const py::dict &camera1_dict, const py::dict &camera2_dict, const py::dict &camera3_dict,
+    const py::dict &ransac_opt_dict, const py::dict &bundle_opt_dict) {
+
+    Camera camera1 = camera_from_dict(camera1_dict);
+    Camera camera2 = camera_from_dict(camera2_dict);
+    Camera camera3 = camera_from_dict(camera3_dict);
+
+    RansacOptions ransac_opt;
+    update_ransac_options(ransac_opt_dict, ransac_opt);
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_scale = 0.5 * ransac_opt.max_line_error;
+    update_bundle_options(bundle_opt_dict, bundle_opt);
+
+    ThreeViewCameraPose three_view_pose;
+    std::vector<char> inlier_mask;
+
+    RansacStats stats = estimate_3v_relative_pose_lines(
+        lines_from_vectors(lines2D_1), lines_from_vectors(lines2D_2), lines_from_vectors(lines2D_3), depths_1,
+        depths_2, depths_3, camera1, camera2, camera3, ransac_opt, bundle_opt, &three_view_pose, &inlier_mask);
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(three_view_pose, output_dict);
+}
+
+std::pair<ThreeViewCameraPose, py::dict> estimate_three_view_relative_pose_hybrid_wrapper(
+    const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
+    const std::vector<Eigen::Vector2d> &points2D_3, const std::vector<double> &point_depths_1,
+    const std::vector<double> &point_depths_2, const std::vector<double> &point_depths_3,
+    const std::vector<Eigen::Vector4d> &lines2D_1, const std::vector<Eigen::Vector4d> &lines2D_2,
+    const std::vector<Eigen::Vector4d> &lines2D_3, const std::vector<Eigen::Vector2d> &line_depths_1,
+    const std::vector<Eigen::Vector2d> &line_depths_2, const std::vector<Eigen::Vector2d> &line_depths_3,
+    const py::dict &camera1_dict, const py::dict &camera2_dict, const py::dict &camera3_dict,
+    const py::dict &ransac_opt_dict, const py::dict &bundle_opt_dict) {
+
+    Camera camera1 = camera_from_dict(camera1_dict);
+    Camera camera2 = camera_from_dict(camera2_dict);
+    Camera camera3 = camera_from_dict(camera3_dict);
+
+    RansacOptions ransac_opt;
+    update_ransac_options(ransac_opt_dict, ransac_opt);
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_scale = 0.5 * ransac_opt.max_epipolar_error;
+    update_bundle_options(bundle_opt_dict, bundle_opt);
+
+    ThreeViewCameraPose three_view_pose;
+    std::vector<char> point_inliers, line_inliers;
+
+    RansacStats stats = estimate_3v_relative_pose_hybrid(
+        points2D_1, points2D_2, points2D_3, point_depths_1, point_depths_2, point_depths_3,
+        lines_from_vectors(lines2D_1), lines_from_vectors(lines2D_2), lines_from_vectors(lines2D_3), line_depths_1,
+        line_depths_2, line_depths_3, camera1, camera2, camera3, ransac_opt, bundle_opt, &three_view_pose,
+        &point_inliers, &line_inliers);
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(point_inliers);
+    output_dict["line_inliers"] = convert_inlier_vector(line_inliers);
+    return std::make_pair(three_view_pose, output_dict);
+}
+
+std::pair<ThreeViewCameraPose, py::dict>
+refine_three_view_lines_wrapper(const std::vector<Eigen::Vector4d> &lines2D_1,
+                                const std::vector<Eigen::Vector4d> &lines2D_2,
+                                const std::vector<Eigen::Vector4d> &lines2D_3,
+                                const ThreeViewCameraPose &initial_pose, const py::dict &bundle_opt_dict,
+                                bool line_sampson) {
+    BundleOptions bundle_opt;
+    update_bundle_options(bundle_opt_dict, bundle_opt);
+    ThreeViewCameraPose pose = initial_pose;
+    BundleStats stats = refine_3v_lines(lines_from_vectors(lines2D_1), lines_from_vectors(lines2D_2),
+                                        lines_from_vectors(lines2D_3), &pose, bundle_opt, line_sampson);
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    return std::make_pair(pose, output_dict);
+}
+
+std::pair<ThreeViewCameraPose, py::dict> refine_three_view_hybrid_wrapper(
+    const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
+    const std::vector<Eigen::Vector2d> &points2D_3, const std::vector<Eigen::Vector4d> &lines2D_1,
+    const std::vector<Eigen::Vector4d> &lines2D_2, const std::vector<Eigen::Vector4d> &lines2D_3,
+    const ThreeViewCameraPose &initial_pose, const py::dict &bundle_opt_dict, double line_weight,
+    double line_residual_scale, bool line_sampson) {
+    BundleOptions bundle_opt;
+    update_bundle_options(bundle_opt_dict, bundle_opt);
+    ThreeViewCameraPose pose = initial_pose;
+    BundleStats stats = refine_3v_hybrid(points2D_1, points2D_2, points2D_3, lines_from_vectors(lines2D_1),
+                                         lines_from_vectors(lines2D_2), lines_from_vectors(lines2D_3), &pose,
+                                         bundle_opt, line_weight, line_residual_scale, line_sampson);
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    return std::make_pair(pose, output_dict);
+}
+
+std::vector<ThreeViewCameraPose> threeview_2p1l_wrapper(const std::vector<Eigen::Vector3d> &X1,
+                                                        const std::vector<Eigen::Vector3d> &X2,
+                                                        const std::vector<Eigen::Vector3d> &X3,
+                                                        const Eigen::Vector3d &d1, const Eigen::Vector3d &d2,
+                                                        const Eigen::Vector3d &d3) {
+    std::vector<ThreeViewCameraPose> models;
+    threeview_2p1l(X1, X2, X3, d1, d2, d3, &models);
+    return models;
+}
+
+std::vector<ThreeViewCameraPose> threeview_2l_wrapper(const std::vector<Eigen::Matrix<double, 6, 1>> &L1,
+                                                      const std::vector<Eigen::Matrix<double, 6, 1>> &L2,
+                                                      const std::vector<Eigen::Matrix<double, 6, 1>> &L3) {
+    std::vector<ThreeViewCameraPose> models;
+    threeview_2l(lines3D_from_vectors(L1), lines3D_from_vectors(L2), lines3D_from_vectors(L3), &models);
+    return models;
+}
+
+std::vector<ThreeViewCameraPose> threeview_2l_planes_wrapper(const std::vector<Eigen::Matrix<double, 6, 1>> &L1,
+                                                             const std::vector<Eigen::Matrix<double, 6, 1>> &L2,
+                                                             const std::vector<Eigen::Matrix<double, 6, 1>> &L3,
+                                                             const std::vector<Eigen::Vector3d> &l2,
+                                                             const std::vector<Eigen::Vector3d> &l3) {
+    std::vector<ThreeViewCameraPose> models;
+    threeview_2l_planes(lines3D_from_vectors(L1), lines3D_from_vectors(L2), lines3D_from_vectors(L3), l2, l3,
+                        &models);
+    return models;
+}
+
 std::vector<ThreeViewCameraPose> solver_4p3v_para_wrapper(const std::vector<Eigen::Vector2d> &x1,
                                                           const std::vector<Eigen::Vector2d> &x2,
                                                           const std::vector<Eigen::Vector2d> &x3,
@@ -946,7 +1092,35 @@ PYBIND11_MODULE(poselib, m) {
           py::arg("camera1_dict"), py::arg("camera2_dict"), py::arg("camera3_dict"),
           py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
           "Relative pose estimation with non-linear refinement.");
-    m.def("estimate_three_view_shared_focal_relative_pose", &poselib::estimate_three_view_shared_focal_relative_pose_wrapper,
+    m.def("estimate_three_view_relative_pose_lines", &poselib::estimate_three_view_relative_pose_lines_wrapper,
+          py::arg("lines2D_1"), py::arg("lines2D_2"), py::arg("lines2D_3"), py::arg("depths_1"), py::arg("depths_2"),
+          py::arg("depths_3"), py::arg("camera1_dict"), py::arg("camera2_dict"), py::arg("camera3_dict"),
+          py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
+          "Three view relative pose from line tracks (Nx4 pixel segments) with endpoint depths (Nx2).");
+    m.def("estimate_three_view_relative_pose_hybrid", &poselib::estimate_three_view_relative_pose_hybrid_wrapper,
+          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("points2D_3"), py::arg("point_depths_1"),
+          py::arg("point_depths_2"), py::arg("point_depths_3"), py::arg("lines2D_1"), py::arg("lines2D_2"),
+          py::arg("lines2D_3"), py::arg("line_depths_1"), py::arg("line_depths_2"), py::arg("line_depths_3"),
+          py::arg("camera1_dict"), py::arg("camera2_dict"), py::arg("camera3_dict"),
+          py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
+          "Three view relative pose from points and line tracks with depth (2p1l solver).");
+    m.def("refine_three_view_lines", &poselib::refine_three_view_lines_wrapper, py::arg("lines2D_1"),
+          py::arg("lines2D_2"), py::arg("lines2D_3"), py::arg("initial_pose"), py::arg("bundle_opt") = py::dict(),
+          py::arg("line_sampson") = false,
+          "Refines three view pose from calibrated line tracks.");
+    m.def("refine_three_view_hybrid", &poselib::refine_three_view_hybrid_wrapper, py::arg("points2D_1"),
+          py::arg("points2D_2"), py::arg("points2D_3"), py::arg("lines2D_1"), py::arg("lines2D_2"),
+          py::arg("lines2D_3"), py::arg("initial_pose"), py::arg("bundle_opt") = py::dict(),
+          py::arg("line_weight") = 1.0, py::arg("line_residual_scale") = 1.0, py::arg("line_sampson") = false,
+          "Refines three view pose from calibrated points and line tracks.");
+    m.def("threeview_2p1l", &poselib::threeview_2p1l_wrapper, py::arg("X1"), py::arg("X2"), py::arg("X3"),
+          py::arg("d1"), py::arg("d2"), py::arg("d3"), "Minimal solver: 2 points with depth + 1 line direction.");
+    m.def("threeview_2l", &poselib::threeview_2l_wrapper, py::arg("L1"), py::arg("L2"), py::arg("L3"),
+          "Minimal solver: 2 lines with depth (common perpendicular). Lines are 6-vectors of endpoints.");
+    m.def("threeview_2l_planes", &poselib::threeview_2l_planes_wrapper, py::arg("L1"), py::arg("L2"),
+          py::arg("L3"), py::arg("l2"), py::arg("l3"),
+          "Minimal solver: 2 lines with depth, translation from back-projected planes.");
+    m.def("estimate_three_view_shared_focal_relative_pose",&poselib::estimate_three_view_shared_focal_relative_pose_wrapper,
           py::arg("points2D_1"), py::arg("points2D_2"), py::arg("points2D_3"), py::arg("pp") = Eigen::Vector2d(0.0, 0.0),
           py::arg("ransac_opt") = py::dict(), py::arg("bundle_opt") = py::dict(),
           "Relative pose estimation with non-linear refinement.");

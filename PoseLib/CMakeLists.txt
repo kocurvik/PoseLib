@@ -33,6 +33,7 @@ set(SOURCES
     solvers/threeview_hc.cc
     solvers/threeview_para.cc
     solvers/threeview_nister.cc
+    solvers/threeview_lines.cc
     misc/qep.cc
     misc/univariate.cc
     misc/essential.cc
@@ -48,6 +49,7 @@ set(SOURCES
     robust/estimators/relative_pose.cc
     robust/estimators/hybrid_pose.cc
     robust/estimators/homography.cc
+    robust/estimators/threeview_lines.cc
 )
 
 # Set HEADERS_PUBLIC variable
@@ -86,6 +88,7 @@ set(HEADERS_PUBLIC
     solvers/threeview_hc.h
     solvers/threeview_para.h
     solvers/threeview_nister.h
+    solvers/threeview_lines.h
     misc/quaternion.h
     misc/colmap_models.h
     misc/qep.h
@@ -105,10 +108,12 @@ set(HEADERS_PUBLIC
     robust/sampling.h
     robust/lm_impl.h
     robust/jacobian_impl.h
+    robust/threeview_lines_jacobian.h
     robust/estimators/absolute_pose.h
     robust/estimators/relative_pose.h
     robust/estimators/hybrid_pose.h
     robust/estimators/homography.h
+    robust/estimators/threeview_lines.h
 )
 
 # Set HEADERS_PRIVATE variable

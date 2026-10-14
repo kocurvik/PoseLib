@@ -33,6 +33,7 @@
 #include "bundle.h"
 
 #include "PoseLib/robust/jacobian_impl.h"
+#include "PoseLib/robust/threeview_lines_jacobian.h"
 #include "PoseLib/robust/lm_impl.h"
 #include "PoseLib/robust/robust_loss.h"
 
@@ -356,6 +357,61 @@ BundleStats refine_3v_relpose(const std::vector<Point2D> &x1, const std::vector<
     } else {
         return refine_3v_relpose<UniformWeightVector>(x1, x2, x3, pose, opt, UniformWeightVector());
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+// 3 View relative pose refinement from lines and points + lines
+
+template <typename LossFunction>
+BundleStats refine_3v_lines(const std::vector<ThreeViewLineTrack> &tracks, ThreeViewCameraPose *pose,
+                            const BundleOptions &opt, bool line_sampson) {
+    LossFunction loss_fn(opt.loss_scale);
+    IterationCallback callback = setup_callback(opt, loss_fn);
+    UniformWeightVector weights;
+    ThreeViewLineJacobianAccumulator<LossFunction, UniformWeightVector> accum(tracks, loss_fn, weights, 1.0, 1.0,
+                                                                               line_sampson);
+    return lm_impl<decltype(accum)>(accum, pose, opt, callback);
+}
+
+BundleStats refine_3v_lines(const std::vector<Line2D> &l1, const std::vector<Line2D> &l2,
+                            const std::vector<Line2D> &l3, ThreeViewCameraPose *pose, const BundleOptions &opt,
+                            bool line_sampson) {
+    std::vector<ThreeViewLineTrack> tracks = make_line_tracks(l1, l2, l3);
+    switch (opt.loss_type) {
+#define SWITCH_LOSS_FUNCTION_CASE(LossFunction) return refine_3v_lines<LossFunction>(tracks, pose, opt, line_sampson);
+        SWITCH_LOSS_FUNCTIONS
+    default:
+        return BundleStats();
+    }
+#undef SWITCH_LOSS_FUNCTION_CASE
+}
+
+template <typename LossFunction>
+BundleStats refine_3v_hybrid(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                             const std::vector<Point2D> &x3, const std::vector<ThreeViewLineTrack> &tracks,
+                             ThreeViewCameraPose *pose, const BundleOptions &opt, double line_weight,
+                             double line_residual_scale, bool line_sampson) {
+    LossFunction loss_fn(opt.loss_scale);
+    IterationCallback callback = setup_callback(opt, loss_fn);
+    ThreeViewHybridJacobianAccumulator<LossFunction> accum(x1, x2, x3, tracks, loss_fn, line_weight,
+                                                           line_residual_scale, line_sampson);
+    return lm_impl<decltype(accum)>(accum, pose, opt, callback);
+}
+
+BundleStats refine_3v_hybrid(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                             const std::vector<Point2D> &x3, const std::vector<Line2D> &l1,
+                             const std::vector<Line2D> &l2, const std::vector<Line2D> &l3,
+                             ThreeViewCameraPose *pose, const BundleOptions &opt, double line_weight,
+                             double line_residual_scale, bool line_sampson) {
+    std::vector<ThreeViewLineTrack> tracks = make_line_tracks(l1, l2, l3);
+    switch (opt.loss_type) {
+#define SWITCH_LOSS_FUNCTION_CASE(LossFunction)                                                                        \
+    return refine_3v_hybrid<LossFunction>(x1, x2, x3, tracks, pose, opt, line_weight, line_residual_scale, line_sampson);
+        SWITCH_LOSS_FUNCTIONS
+    default:
+        return BundleStats();
+    }
+#undef SWITCH_LOSS_FUNCTION_CASE
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////

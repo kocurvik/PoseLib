@@ -61,6 +61,22 @@ RansacStats ransac_3v_shared_focal_relpose(const std::vector<Point2D> &x1, const
                                            const std::vector<Point2D> &x3, const RansacOptions &opt,
                                            ImageTriplet *image_triplet, std::vector<char> *inliers);
 
+// Three view relative pose from line tracks with depth (calibrated, see robust/estimators/threeview_lines.h)
+RansacStats ransac_3v_lines(const std::vector<Line2D> &l1, const std::vector<Line2D> &l2,
+                            const std::vector<Line2D> &l3, const std::vector<Line3D> &L1,
+                            const std::vector<Line3D> &L2, const std::vector<Line3D> &L3, const RansacOptions &opt,
+                            ThreeViewCameraPose *three_view_pose, std::vector<char> *inliers);
+
+// Three view relative pose from points and line tracks with depth (calibrated)
+RansacStats ransac_3v_hybrid(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                             const std::vector<Point2D> &x3, const std::vector<Point3D> &X1,
+                             const std::vector<Point3D> &X2, const std::vector<Point3D> &X3,
+                             const std::vector<Line2D> &l1, const std::vector<Line2D> &l2,
+                             const std::vector<Line2D> &l3, const std::vector<Line3D> &L1,
+                             const std::vector<Line3D> &L2, const std::vector<Line3D> &L3, const RansacOptions &opt,
+                             ThreeViewCameraPose *three_view_pose, std::vector<char> *point_inliers,
+                             std::vector<char> *line_inliers);
+
 RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         const RansacOptions &opt, ImagePair *best_model,
                                         std::vector<char> *best_inliers);
