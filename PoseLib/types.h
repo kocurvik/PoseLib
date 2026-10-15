@@ -75,7 +75,14 @@ struct RansacOptions {
     double line_weight = 1.0;     // weight of the line score and residuals in the hybrid estimator
     int hybrid_solver = 0;        // hybrid estimator minimal solver: 0 - 2p1l, 1 - 1l3p
     int upright_solver = 0;       // two view relpose with line direction: 0 - Ding et al. CVPR23, 1 - QEP
+    int twoview_solver = 0;       // two view relpose with line directions: 0 - 1L3P, 1 - 2L2P, 2 - 5pt
+    double line_check_angle = 0;  // two view relpose with line directions: direction check of hypotheses (deg, 0 off)
+    size_t line_check_num = 1;    // number of line tracks tested by the direction check
     bool line_sampson = false;    // Sampson-normalized line transfer error instead of transfer distance
+    bool twoview_line_refine = false; // two view relpose with line directions: lines also in scoring, LO, refinement
+    double max_line_angle = 2.0;  // two view relpose with line directions: line direction threshold (deg)
+    int line_residual = 0;        // two view line residual (twoview_line_refine): 0 - direction, 1 - plane, 2 - both,
+                                  // 3 - plane with separately robustified components
 };
 
 struct RansacStats {
@@ -94,7 +101,9 @@ struct BundleOptions {
         HUBER,
         CAUCHY,
         // This is the TR-IRLS scheme from Le and Zach, 3DV 2021
-        TRUNCATED_LE_ZACH
+        TRUNCATED_LE_ZACH,
+        // Cauchy truncated at loss_scale (upstream PoseLib, recommended for the monodepth relative pose estimators)
+        TRUNCATED_CAUCHY
     } loss_type = LossType::CAUCHY;
     double loss_scale = 1.0;
     double gradient_tol = 1e-10;

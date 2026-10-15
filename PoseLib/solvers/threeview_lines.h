@@ -34,6 +34,15 @@ int threeview_1l3p(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eig
                    const std::vector<Eigen::Vector3d> &x3, const Eigen::Vector3d &d1, const Eigen::Vector3d &d2,
                    const Eigen::Vector3d &d3, std::vector<ThreeViewCameraPose> *output);
 
+// Two view relative pose from 2 line directions + 2 points (2L2P). The rotation is fully determined by the two
+// line directions (frame from their bisectors, all consistent sign choices), the translation direction follows
+// linearly from the epipolar constraints of the two points (sign by cheirality). Unit length translation.
+//   x1, x2 - two bearing vectors in each view
+//   d1, d2 - directions of the two lines in each view
+int relpose_2l2p(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2,
+                 const std::vector<Eigen::Vector3d> &d1, const std::vector<Eigen::Vector3d> &d2,
+                 CameraPoseVector *output);
+
 // 2 lines with depth. Rotation from line directions, scale and translation from the common perpendicular.
 //   L1, L2, L3 - two 3D line segments in each view
 int threeview_2l(const std::vector<Line3D> &L1, const std::vector<Line3D> &L2, const std::vector<Line3D> &L3,

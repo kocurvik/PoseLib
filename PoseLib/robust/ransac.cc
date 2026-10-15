@@ -172,7 +172,10 @@ RansacStats ransac_relpose_line_direction(const std::vector<Point2D> &x1, const 
                                           std::vector<char> *best_inliers) {
     *best_model = CameraPose();
     RansacStats stats;
-    if (x1.size() >= 3 && !L1.empty()) {
+    const size_t min_points = opt.twoview_solver == 1 ? 2 : (opt.twoview_solver == 2 ? 5 : 3);
+    // 5pt needs lines only for the direction check
+    const size_t min_lines = opt.twoview_solver == 1 ? 2 : (opt.twoview_solver == 2 && opt.line_check_angle <= 0 ? 0 : 1);
+    if (x1.size() >= min_points && L1.size() >= min_lines) {
         RelativePoseLineDirectionEstimator estimator(opt, x1, x2, L1, L2);
         stats = ransac<RelativePoseLineDirectionEstimator>(estimator, opt, best_model);
     }

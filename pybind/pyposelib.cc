@@ -931,6 +931,15 @@ std::vector<CameraPose> relpose_upright_3pt_ding_wrapper(const std::vector<Eigen
     return output;
 }
 
+std::vector<CameraPose> relpose_2l2p_wrapper(const std::vector<Eigen::Vector3d> &x1,
+                                             const std::vector<Eigen::Vector3d> &x2,
+                                             const std::vector<Eigen::Vector3d> &d1,
+                                             const std::vector<Eigen::Vector3d> &d2) {
+    std::vector<CameraPose> output;
+    relpose_2l2p(x1, x2, d1, d2, &output);
+    return output;
+}
+
 std::pair<ThreeViewCameraPose, py::dict>
 refine_three_view_lines_wrapper(const std::vector<Eigen::Vector4d> &lines2D_1,
                                 const std::vector<Eigen::Vector4d> &lines2D_2,
@@ -1170,6 +1179,8 @@ PYBIND11_MODULE(poselib, m) {
     m.def("relpose_upright_3pt_ding", &poselib::relpose_upright_3pt_ding_wrapper, py::arg("x1"), py::arg("x2"),
           py::arg("g_cam1"), py::arg("g_cam2"),
           "Upright 3 point relative pose (Ding et al. CVPR 2023) with known common direction g_cam2 = R g_cam1.");
+    m.def("relpose_2l2p", &poselib::relpose_2l2p_wrapper, py::arg("x1"), py::arg("x2"), py::arg("d1"),
+          py::arg("d2"), "Two view relative pose from 2 line directions + 2 points (bearings).");
     m.def("threeview_1l3p", &poselib::threeview_1l3p_wrapper, py::arg("x1"), py::arg("x2"), py::arg("x3"),
           py::arg("d1"), py::arg("d2"), py::arg("d3"), "Minimal solver: 1 line direction + 3 points (bearings).");
     m.def("threeview_2l", &poselib::threeview_2l_wrapper, py::arg("L1"), py::arg("L2"), py::arg("L3"),

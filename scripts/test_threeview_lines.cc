@@ -176,6 +176,32 @@ static int test_solvers() {
               << ")\n";
     fails += fail_ding > trials / 100;
 
+    // two view 2l2p (random sign of the directions in view 2)
+    int fail_2l2p = 0;
+    double max_models_2l2p = 0;
+    for (int trial = 0; trial < trials; ++trial) {
+        Scene sc = random_scene();
+        std::vector<Eigen::Vector3d> x1, x2, d1, d2;
+        for (int i = 0; i < 2; ++i) {
+            const Eigen::Vector3d P = random_point();
+            x1.push_back(P.normalized());
+            x2.push_back((sc.R2 * P + sc.t2).normalized());
+            const Eigen::Vector3d d = randv().normalized();
+            d1.push_back(d);
+            d2.push_back((randu(0, 1) < 0.5 ? -1.0 : 1.0) * (sc.R2 * d));
+        }
+        CameraPoseVector poses;
+        relpose_2l2p(x1, x2, d1, d2, &poses);
+        max_models_2l2p = std::max<double>(max_models_2l2p, poses.size());
+        double best = 1e10;
+        for (const CameraPose &p : poses)
+            best = std::min(best, std::max(rot_err(p.R(), sc.R2), trans_err(sc.t2.normalized(), p.t)));
+        if (best > 1e-6)
+            fail_2l2p++;
+    }
+    std::cout << "2l2p failures: " << fail_2l2p << "/" << trials << " (max models " << max_models_2l2p << ")\n";
+    fails += fail_2l2p > trials / 100;
+
     std::cout << "2p1l failures: " << fail_2p1l << "/" << trials << " (max models " << max_models[0] << ")\n";
     std::cout << "2l failures: " << fail_2l << "/" << trials << " (max models " << max_models[1] << ")\n";
     std::cout << "2l_planes failures: " << fail_2lp << "/" << trials << " (max models " << max_models[2] << ")\n";

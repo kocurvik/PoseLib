@@ -407,6 +407,197 @@ class ThreeViewHybridJacobianAccumulator {
     ThreeViewLineJacobianAccumulator<LossFunction, UniformWeightVector> line_accum;
 };
 
+// Two view lines with depth
+// -------------------------
+// A line track with endpoint depths gives its 3D direction d1, d2 (unit) in both camera frames, d2 = +-R d1, and
+// the normals n1, n2 (unit) of the planes through the camera centers and the 2D lines (these do not depend on the
+// depths). Two residual terms per line, both depending on the rotation only (sines of angles):
+//   direction  r = (R d1) x d2                  (3-vector, invariant to the sign of d2, uses both depths)
+//   plane      r = (n2^T R d1, n1^T R^T d2)     (R d1 lies in the plane of l2 and R^T d2 in the plane of l1,
+//                                                each component uses the depth in one view only)
+// line_residual: 0 - direction, 1 - plane, 2 - both (two separately robustified terms per line), 3 - plane with
+// the two components robustified separately (a bad depth in one view does not discard the other component).
+// With the update R <- R * exp([w]_x), d(R d1) = -R [d1]_x w, so
+//   d(direction)/dw = [d2]_x R [d1]_x,  d(n2^T R d1)/dw = -n2^T R [d1]_x,  d(d2^T R n1)/dw = -d2^T R [n1]_x.
+// The residuals are multiplied by residual_scale (point threshold / sin(line threshold)) so that the same robust
+// loss as for the points can be used, and the cost is multiplied by weight_scale.
+
+struct TwoViewLine {
+    Eigen::Vector3d d1, d2, n1, n2;
+};
+
+inline std::vector<TwoViewLine> make_twoview_lines(const std::vector<Line3D> &L1, const std::vector<Line3D> &L2) {
+    std::vector<TwoViewLine> lines(L1.size());
+    for (size_t k = 0; k < L1.size(); ++k) {
+        lines[k].d1 = (L1[k].X2 - L1[k].X1).normalized();
+        lines[k].d2 = (L2[k].X2 - L2[k].X1).normalized();
+        lines[k].n1 = L1[k].X1.cross(L1[k].X2).normalized();
+        lines[k].n2 = L2[k].X1.cross(L2[k].X2).normalized();
+    }
+    return lines;
+}
+
+inline Eigen::Vector3d line_direction_residual(const Eigen::Matrix3d &R, const TwoViewLine &l) {
+    return (R * l.d1).cross(l.d2);
+}
+
+inline Eigen::Vector2d line_plane_residual(const Eigen::Matrix3d &R, const TwoViewLine &l) {
+    return Eigen::Vector2d(l.n2.dot(R * l.d1), l.d2.dot(R * l.n1));
+}
+
+inline bool uses_direction_residual(int line_residual) { return line_residual == 0 || line_residual == 2; }
+
+// MSAC score of the lines in the units of the point score: sum over lines and terms of min(s^2 |r|^2, sq_threshold).
+// A line is an inlier if all its terms are below the threshold (line_residual 3: if any plane component is).
+inline double compute_twoview_line_msac_score(const Eigen::Matrix3d &R, const std::vector<TwoViewLine> &lines,
+                                              int line_residual, double residual_scale, double sq_threshold,
+                                              std::vector<char> *inliers = nullptr) {
+    const double s_sq = residual_scale * residual_scale;
+    double score = 0.0;
+    if (inliers)
+        inliers->resize(lines.size());
+    for (size_t k = 0; k < lines.size(); ++k) {
+        bool inlier = true;
+        if (uses_direction_residual(line_residual)) {
+            const double r_sq = s_sq * line_direction_residual(R, lines[k]).squaredNorm();
+            score += std::min(r_sq, sq_threshold);
+            inlier &= r_sq < sq_threshold;
+        }
+        if (line_residual == 3) {
+            const Eigen::Vector2d r = line_plane_residual(R, lines[k]);
+            const double r0_sq = s_sq * r(0) * r(0), r1_sq = s_sq * r(1) * r(1);
+            score += std::min(r0_sq, sq_threshold) + std::min(r1_sq, sq_threshold);
+            inlier = r0_sq < sq_threshold || r1_sq < sq_threshold;
+        } else if (line_residual != 0) {
+            const double r_sq = s_sq * line_plane_residual(R, lines[k]).squaredNorm();
+            score += std::min(r_sq, sq_threshold);
+            inlier &= r_sq < sq_threshold;
+        }
+        if (inliers)
+            (*inliers)[k] = inlier;
+    }
+    return score;
+}
+
+template <typename LossFunction, typename ResidualWeightVector = UniformWeightVector>
+class RelativePoseLineJacobianAccumulator {
+  public:
+    RelativePoseLineJacobianAccumulator(const std::vector<TwoViewLine> &lines, int line_residual,
+                                        const LossFunction &l, const ResidualWeightVector &w = ResidualWeightVector(),
+                                        double weight_scale = 1.0, double residual_scale = 1.0)
+        : lines(lines), line_residual(line_residual), loss_fn(l), weights(w), weight_scale(weight_scale),
+          residual_scale_sq(residual_scale * residual_scale) {}
+
+    double residual(const CameraPose &pose) const {
+        const Eigen::Matrix3d R = pose.R();
+        double cost = 0.0;
+        for (size_t k = 0; k < lines.size(); ++k) {
+            if (uses_direction_residual(line_residual))
+                cost += weight_scale * weights[k] *
+                        loss_fn.loss(residual_scale_sq * line_direction_residual(R, lines[k]).squaredNorm());
+            if (line_residual == 3) {
+                const Eigen::Vector2d r = line_plane_residual(R, lines[k]);
+                cost += weight_scale * weights[k] *
+                        (loss_fn.loss(residual_scale_sq * r(0) * r(0)) + loss_fn.loss(residual_scale_sq * r(1) * r(1)));
+            } else if (line_residual != 0) {
+                cost += weight_scale * weights[k] *
+                        loss_fn.loss(residual_scale_sq * line_plane_residual(R, lines[k]).squaredNorm());
+            }
+        }
+        return cost;
+    }
+
+    // Accumulates into the rotation block of the relative pose update of RelativePoseJacobianAccumulator
+    size_t accumulate(const CameraPose &pose, Eigen::Matrix<double, 5, 5> &JtJ,
+                      Eigen::Matrix<double, 5, 1> &Jtr) const {
+        const Eigen::Matrix3d R = pose.R();
+        size_t num_residuals = 0;
+        for (size_t k = 0; k < lines.size(); ++k) {
+            const TwoViewLine &l = lines[k];
+            if (uses_direction_residual(line_residual)) {
+                const Eigen::Vector3d r = line_direction_residual(R, l);
+                const double weight = residual_scale_sq * weight_scale * weights[k] *
+                                      loss_fn.weight(residual_scale_sq * r.squaredNorm());
+                if (weight > 0.0) {
+                    num_residuals += 3;
+                    const Eigen::Matrix3d J = skew_mat(l.d2) * R * skew_mat(l.d1);
+                    Jtr.template head<3>() += weight * J.transpose() * r;
+                    JtJ.template topLeftCorner<3, 3>() += weight * J.transpose() * J;
+                }
+            }
+            if (line_residual == 3) {
+                const Eigen::Vector2d r = line_plane_residual(R, l);
+                Eigen::Matrix<double, 2, 3> J;
+                J.row(0) = -l.n2.transpose() * R * skew_mat(l.d1);
+                J.row(1) = -l.d2.transpose() * R * skew_mat(l.n1);
+                for (int i = 0; i < 2; ++i) {
+                    const double weight = residual_scale_sq * weight_scale * weights[k] *
+                                          loss_fn.weight(residual_scale_sq * r(i) * r(i));
+                    if (weight == 0.0)
+                        continue;
+                    num_residuals++;
+                    Jtr.template head<3>() += weight * r(i) * J.row(i).transpose();
+                    JtJ.template topLeftCorner<3, 3>() += weight * J.row(i).transpose() * J.row(i);
+                }
+            } else if (line_residual != 0) {
+                const Eigen::Vector2d r = line_plane_residual(R, l);
+                const double weight = residual_scale_sq * weight_scale * weights[k] *
+                                      loss_fn.weight(residual_scale_sq * r.squaredNorm());
+                if (weight > 0.0) {
+                    num_residuals += 2;
+                    Eigen::Matrix<double, 2, 3> J;
+                    J.row(0) = -l.n2.transpose() * R * skew_mat(l.d1);
+                    J.row(1) = -l.d2.transpose() * R * skew_mat(l.n1);
+                    Jtr.template head<3>() += weight * J.transpose() * r;
+                    JtJ.template topLeftCorner<3, 3>() += weight * J.transpose() * J;
+                }
+            }
+        }
+        return num_residuals;
+    }
+
+  private:
+    const std::vector<TwoViewLine> &lines;
+    const int line_residual;
+    const LossFunction &loss_fn;
+    const ResidualWeightVector &weights;
+    const double weight_scale;
+    const double residual_scale_sq;
+};
+
+// Joint refinement of points (Sampson error) and lines (see RelativePoseLineJacobianAccumulator). The update
+// parametrization (rotation + tangent basis of t) is the one of RelativePoseJacobianAccumulator, whose tangent basis
+// is set in accumulate.
+template <typename LossFunction>
+class RelativePoseHybridLineJacobianAccumulator {
+  public:
+    RelativePoseHybridLineJacobianAccumulator(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                              const std::vector<TwoViewLine> &lines, int line_residual,
+                                              const LossFunction &l, double line_weight, double line_residual_scale)
+        : point_accum(x1, x2, l, point_weights),
+          line_accum(lines, line_residual, l, line_weights, line_weight, line_residual_scale) {}
+
+    double residual(const CameraPose &pose) const { return point_accum.residual(pose) + line_accum.residual(pose); }
+
+    size_t accumulate(const CameraPose &pose, Eigen::Matrix<double, 5, 5> &JtJ, Eigen::Matrix<double, 5, 1> &Jtr) {
+        size_t n = point_accum.accumulate(pose, JtJ, Jtr);
+        n += line_accum.accumulate(pose, JtJ, Jtr);
+        return n;
+    }
+
+    CameraPose step(Eigen::Matrix<double, 5, 1> dp, const CameraPose &pose) const {
+        return point_accum.step(dp, pose);
+    }
+
+    typedef CameraPose param_t;
+    static constexpr size_t num_params = 5;
+
+  private:
+    UniformWeightVector point_weights, line_weights;
+    RelativePoseJacobianAccumulator<LossFunction, UniformWeightVector> point_accum;
+    RelativePoseLineJacobianAccumulator<LossFunction, UniformWeightVector> line_accum;
+};
+
 } // namespace poselib
 
 #endif

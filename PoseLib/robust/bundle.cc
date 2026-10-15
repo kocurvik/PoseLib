@@ -62,6 +62,9 @@ namespace poselib {
         break;                                                                                                         \
     case BundleOptions::LossType::TRUNCATED_LE_ZACH:                                                                   \
         SWITCH_LOSS_FUNCTION_CASE(TruncatedLossLeZach);                                                                \
+        break;                                                                                                         \
+    case BundleOptions::LossType::TRUNCATED_CAUCHY:                                                                    \
+        SWITCH_LOSS_FUNCTION_CASE(TruncatedCauchyLoss);                                                                \
         break;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -319,6 +322,30 @@ BundleStats refine_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
     } else {
         return refine_relpose<UniformWeightVector>(x1, x2, pose, opt, UniformWeightVector());
     }
+}
+
+template <typename LossFunction>
+BundleStats refine_relpose_lines(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                 const std::vector<TwoViewLine> &lines, int line_residual, CameraPose *pose,
+                                 const BundleOptions &opt, double line_weight, double line_residual_scale) {
+    LossFunction loss_fn(opt.loss_scale);
+    IterationCallback callback = setup_callback(opt, loss_fn);
+    RelativePoseHybridLineJacobianAccumulator<LossFunction> accum(x1, x2, lines, line_residual, loss_fn, line_weight,
+                                                                  line_residual_scale);
+    return lm_impl<decltype(accum)>(accum, pose, opt, callback);
+}
+
+BundleStats refine_relpose_lines(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                 const std::vector<TwoViewLine> &lines, int line_residual, CameraPose *pose,
+                                 const BundleOptions &opt, double line_weight, double line_residual_scale) {
+    switch (opt.loss_type) {
+#define SWITCH_LOSS_FUNCTION_CASE(LossFunction)                                                                        \
+    return refine_relpose_lines<LossFunction>(x1, x2, lines, line_residual, pose, opt, line_weight, line_residual_scale);
+        SWITCH_LOSS_FUNCTIONS
+    default:
+        return BundleStats();
+    }
+#undef SWITCH_LOSS_FUNCTION_CASE
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////

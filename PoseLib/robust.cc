@@ -28,6 +28,7 @@
 
 #include "robust.h"
 
+#include "PoseLib/robust/threeview_lines_jacobian.h"
 #include "PoseLib/robust/utils.h"
 
 namespace poselib {
@@ -473,8 +474,21 @@ RansacStats estimate_relative_pose_line_direction(const std::vector<Point2D> &x1
     if (stats.num_inliers > 5) {
         BundleOptions scaled_bundle_opt = bundle_opt;
         scaled_bundle_opt.loss_scale = bundle_opt.loss_scale * focal_scale;
-        refine_relpose(select_inliers(x1_calib, *inliers), select_inliers(x2_calib, *inliers), pose,
-                       scaled_bundle_opt);
+        if (ransac_opt.twoview_line_refine) {
+            const std::vector<TwoViewLine> lines = make_twoview_lines(L1, L2);
+            const double line_scale =
+                ransac_opt_scaled.max_epipolar_error / std::sin(ransac_opt.max_line_angle * M_PI / 180.0);
+            std::vector<char> line_inliers;
+            compute_twoview_line_msac_score(pose->R(), lines, ransac_opt.line_residual, line_scale,
+                                              ransac_opt_scaled.max_epipolar_error * ransac_opt_scaled.max_epipolar_error,
+                                              &line_inliers);
+            refine_relpose_lines(select_inliers(x1_calib, *inliers), select_inliers(x2_calib, *inliers),
+                                 select_inliers(lines, line_inliers), ransac_opt.line_residual, pose,
+                                 scaled_bundle_opt, ransac_opt.line_weight, line_scale);
+        } else {
+            refine_relpose(select_inliers(x1_calib, *inliers), select_inliers(x2_calib, *inliers), pose,
+                           scaled_bundle_opt);
+        }
     }
     return stats;
 }

@@ -109,6 +109,16 @@ BundleStats refine_3v_hybrid(const std::vector<Point2D> &x1, const std::vector<P
                              double line_weight = 1.0, double line_residual_scale = 1.0,
                              bool line_sampson = false);
 
+// Two view relative pose refinement from points (Sampson error) and lines with depth (direction and / or plane
+// residuals selected by line_residual, see TwoViewLine in robust/threeview_lines_jacobian.h). The line residuals are
+// multiplied by line_residual_scale (e.g. point threshold / sin(line threshold)), the line cost is weighted by
+// line_weight.
+struct TwoViewLine;
+BundleStats refine_relpose_lines(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                 const std::vector<TwoViewLine> &lines, int line_residual, CameraPose *pose,
+                                 const BundleOptions &opt = BundleOptions(), double line_weight = 1.0,
+                                 double line_residual_scale = 1.0);
+
 BundleStats refine_3v_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                            const std::vector<Point2D> &x3, ImageTriplet *pose,
                                            const BundleOptions &opt,

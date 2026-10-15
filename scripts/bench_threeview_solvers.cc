@@ -160,5 +160,10 @@ int main(int argc, char **argv) {
     oqep.upright_solver = 1;
     RelativePoseLineDirectionEstimator eqep(oqep, d.x[0], d.x[1], d.L[0], d.L[1]);
     bench<CameraPose>("1L3P-2v (QEP)", eqep, runs);
+
+    RansacOptions o2l2p = base;
+    o2l2p.twoview_solver = 1;
+    RelativePoseLineDirectionEstimator e2l2p(o2l2p, d.x[0], d.x[1], d.L[0], d.L[1]);
+    bench<CameraPose>("2L2P", e2l2p, runs);
     return 0;
 }

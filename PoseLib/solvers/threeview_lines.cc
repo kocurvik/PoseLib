@@ -55,15 +55,10 @@ inline bool common_perpendicular(const Line3D &La, const Line3D &Lb, Eigen::Vect
 }
 
 // Candidate rotations R such that R * frame(view 1) = frame(view k) for all consistent sign choices
-// of the line directions in view k.
-void line_pair_rotations(const std::vector<Line3D> &L1, const std::vector<Line3D> &Lk,
-                         std::vector<Eigen::Matrix3d> *rotations) {
+// of the line directions in view k. Directions must be unit vectors.
+void direction_pair_rotations(const Eigen::Vector3d &da1, const Eigen::Vector3d &db1, const Eigen::Vector3d &dak,
+                              const Eigen::Vector3d &dbk, std::vector<Eigen::Matrix3d> *rotations) {
     rotations->clear();
-    const Eigen::Vector3d da1 = (L1[0].X2 - L1[0].X1).normalized();
-    const Eigen::Vector3d db1 = (L1[1].X2 - L1[1].X1).normalized();
-    const Eigen::Vector3d dak = (Lk[0].X2 - Lk[0].X1).normalized();
-    const Eigen::Vector3d dbk = (Lk[1].X2 - Lk[1].X1).normalized();
-
     Eigen::Matrix3d F1;
     if (!frame_from_two_directions(da1, db1, &F1))
         return;
@@ -83,6 +78,12 @@ void line_pair_rotations(const std::vector<Line3D> &L1, const std::vector<Line3D
             rotations->push_back(Fk * F1.transpose());
         }
     }
+}
+
+void line_pair_rotations(const std::vector<Line3D> &L1, const std::vector<Line3D> &Lk,
+                         std::vector<Eigen::Matrix3d> *rotations) {
+    direction_pair_rotations((L1[0].X2 - L1[0].X1).normalized(), (L1[1].X2 - L1[1].X1).normalized(),
+                             (Lk[0].X2 - Lk[0].X1).normalized(), (Lk[1].X2 - Lk[1].X1).normalized(), rotations);
 }
 
 // Check that the midpoints of the view 1 segments are in front of camera k
@@ -253,6 +254,39 @@ int threeview_1l3p(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eig
             if (best_err == std::numeric_limits<double>::max())
                 continue;
             output->emplace_back(CameraPose(R12, t12), best13);
+        }
+    }
+    return output->size();
+}
+
+int relpose_2l2p(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2,
+                 const std::vector<Eigen::Vector3d> &d1, const std::vector<Eigen::Vector3d> &d2,
+                 CameraPoseVector *output) {
+    output->clear();
+    std::vector<Eigen::Matrix3d> rotations;
+    direction_pair_rotations(d1[0].normalized(), d1[1].normalized(), d2[0].normalized(), d2[1].normalized(),
+                             &rotations);
+
+    for (const Eigen::Matrix3d &R : rotations) {
+        // epipolar constraint x2^T [t]x R x1 = t^T (R x1 x x2) = 0 for both points
+        const Eigen::Vector3d n0 = (R * x1[0]).cross(x2[0]);
+        const Eigen::Vector3d n1 = (R * x1[1]).cross(x2[1]);
+        Eigen::Vector3d t = n0.cross(n1);
+        const double nt = t.norm();
+        if (nt < 1e-12 * n0.norm() * n1.norm())
+            continue;
+        t /= nt;
+        for (int sign : {1, -1}) {
+            const Eigen::Vector3d ts = sign * t;
+            bool valid = true;
+            for (int i = 0; i < 2 && valid; ++i) {
+                double l1, l2;
+                valid = triangulate_depths(R, ts, x1[i], x2[i], &l1, &l2) && l1 > 0 && l2 > 0;
+            }
+            if (valid) {
+                output->emplace_back(R, ts);
+                break;
+            }
         }
     }
     return output->size();

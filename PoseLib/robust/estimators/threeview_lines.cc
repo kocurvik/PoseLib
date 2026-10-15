@@ -5,6 +5,7 @@
 #include "PoseLib/robust/lm_impl.h"
 #include "PoseLib/robust/robust_loss.h"
 #include "PoseLib/robust/utils.h"
+#include "PoseLib/solvers/relpose_5pt.h"
 #include "PoseLib/solvers/relpose_upright_3pt.h"
 #include "PoseLib/solvers/relpose_upright_3pt_ding.h"
 #include "PoseLib/solvers/threeview_lines.h"
@@ -15,8 +16,8 @@ namespace {
 // Minimal number of tracks for local optimization (each line track gives 2 constraints on the 11 dof pose)
 constexpr size_t min_lo_line_tracks = 6;
 
-std::vector<Point2D> select_points(const std::vector<Point2D> &x, const std::vector<char> &inliers) {
-    std::vector<Point2D> out;
+template <typename T> std::vector<T> select_points(const std::vector<T> &x, const std::vector<char> &inliers) {
+    std::vector<T> out;
     for (size_t k = 0; k < x.size(); ++k)
         if (inliers[k])
             out.push_back(x[k]);
@@ -178,14 +179,63 @@ void ThreeViewHybridEstimator::refine_model(ThreeViewCameraPose *three_view_pose
 void RelativePoseLineDirectionEstimator::generate_models(std::vector<CameraPose> *models) {
     models->clear();
     draw_sample(sample_sz, x1.size(), &sample, rng);
-    const size_t line_idx = random_int(rng) % L1.size();
-    const Eigen::Vector3d d1 = (L1[line_idx].X2 - L1[line_idx].X1).normalized();
-    const Eigen::Vector3d d2 = (L2[line_idx].X2 - L2[line_idx].X1).normalized();
-
     for (size_t k = 0; k < sample_sz; ++k) {
         x1s[k] = x1[sample[k]].homogeneous().normalized();
         x2s[k] = x2[sample[k]].homogeneous().normalized();
     }
+    if (opt.twoview_solver == 2)
+        relpose_5pt(x1s, x2s, models);
+    else if (opt.twoview_solver == 1)
+        generate_models_2l2p(models);
+    else
+        generate_models_1l3p(models);
+
+    if (opt.line_check_angle > 0)
+        direction_check(models);
+}
+
+void RelativePoseLineDirectionEstimator::direction_check(std::vector<CameraPose> *models) {
+    const double min_cos = std::cos(opt.line_check_angle * M_PI / 180.0);
+    std::vector<size_t> idx(opt.line_check_num);
+    for (size_t &i : idx)
+        i = random_int(rng) % L1.size();
+
+    size_t num_valid = 0;
+    for (size_t m = 0; m < models->size(); ++m) {
+        const Eigen::Matrix3d R = (*models)[m].R();
+        bool valid = true;
+        for (size_t i : idx) {
+            const Eigen::Vector3d d1 = (L1[i].X2 - L1[i].X1).normalized();
+            const Eigen::Vector3d d2 = (L2[i].X2 - L2[i].X1).normalized();
+            if (std::abs((R * d1).dot(d2)) < min_cos) {
+                valid = false;
+                break;
+            }
+        }
+        if (valid)
+            (*models)[num_valid++] = (*models)[m];
+    }
+    models->resize(num_valid);
+}
+
+void RelativePoseLineDirectionEstimator::generate_models_2l2p(std::vector<CameraPose> *models) {
+    // cos(10 deg), nearly parallel lines do not determine the rotation
+    constexpr double max_cos = 0.98480775301;
+    draw_sample(2, L1.size(), &line_sample, rng);
+    std::vector<Eigen::Vector3d> d1(2), d2(2);
+    for (int k = 0; k < 2; ++k) {
+        d1[k] = (L1[line_sample[k]].X2 - L1[line_sample[k]].X1).normalized();
+        d2[k] = (L2[line_sample[k]].X2 - L2[line_sample[k]].X1).normalized();
+    }
+    if (std::abs(d1[0].dot(d1[1])) > max_cos || std::abs(d2[0].dot(d2[1])) > max_cos)
+        return;
+    relpose_2l2p(x1s, x2s, d1, d2, models);
+}
+
+void RelativePoseLineDirectionEstimator::generate_models_1l3p(std::vector<CameraPose> *models) {
+    const size_t line_idx = random_int(rng) % L1.size();
+    const Eigen::Vector3d d1 = (L1[line_idx].X2 - L1[line_idx].X1).normalized();
+    const Eigen::Vector3d d2 = (L2[line_idx].X2 - L2[line_idx].X1).normalized();
 
     CameraPoseVector poses;
     for (int sign : {1, -1}) {
@@ -212,7 +262,12 @@ void RelativePoseLineDirectionEstimator::generate_models(std::vector<CameraPose>
 }
 
 double RelativePoseLineDirectionEstimator::score_model(const CameraPose &pose, size_t *inlier_count) const {
-    return compute_sampson_msac_score(pose, x1, x2, opt.max_epipolar_error * opt.max_epipolar_error, inlier_count);
+    const double sq_threshold = opt.max_epipolar_error * opt.max_epipolar_error;
+    double score = compute_sampson_msac_score(pose, x1, x2, sq_threshold, inlier_count);
+    if (opt.twoview_line_refine)
+        score += opt.line_weight *
+                 compute_twoview_line_msac_score(pose.R(), lines, opt.line_residual, line_scale, sq_threshold);
+    return score;
 }
 
 void RelativePoseLineDirectionEstimator::refine_model(CameraPose *pose) const {
@@ -226,7 +281,15 @@ void RelativePoseLineDirectionEstimator::refine_model(CameraPose *pose) const {
     int num_inl = get_inliers(*pose, x1, x2, 5 * (opt.max_epipolar_error * opt.max_epipolar_error), &inliers);
     if (num_inl <= 5)
         return;
-    refine_relpose(select_points(x1, inliers), select_points(x2, inliers), pose, bundle_opt);
+    if (!opt.twoview_line_refine) {
+        refine_relpose(select_points(x1, inliers), select_points(x2, inliers), pose, bundle_opt);
+        return;
+    }
+    std::vector<char> line_inliers;
+    compute_twoview_line_msac_score(pose->R(), lines, opt.line_residual, line_scale,
+                                    5 * (opt.max_epipolar_error * opt.max_epipolar_error), &line_inliers);
+    refine_relpose_lines(select_points(x1, inliers), select_points(x2, inliers), select_points(lines, line_inliers),
+                         opt.line_residual, pose, bundle_opt, opt.line_weight, line_scale);
 }
 
 } // namespace poselib

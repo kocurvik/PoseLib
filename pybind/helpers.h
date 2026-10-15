@@ -61,6 +61,12 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "line_weight", ransac_opt.line_weight);
     update(input, "hybrid_solver", ransac_opt.hybrid_solver);
     update(input, "upright_solver", ransac_opt.upright_solver);
+    update(input, "twoview_solver", ransac_opt.twoview_solver);
+    update(input, "line_check_angle", ransac_opt.line_check_angle);
+    update(input, "line_check_num", ransac_opt.line_check_num);
+    update(input, "twoview_line_refine", ransac_opt.twoview_line_refine);
+    update(input, "max_line_angle", ransac_opt.max_line_angle);
+    update(input, "line_residual", ransac_opt.line_residual);
     update(input, "line_sampson", ransac_opt.line_sampson);
 }
 
@@ -87,6 +93,8 @@ void update_bundle_options(const py::dict &input, BundleOptions &bundle_opt) {
             bundle_opt.loss_type = BundleOptions::LossType::CAUCHY;
         } else if (loss_type == "TRUNCATED_LE_ZACH") {
             bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED_LE_ZACH;
+        } else if (loss_type == "TRUNCATED_CAUCHY") {
+            bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED_CAUCHY;
         }
     }
 }
@@ -134,6 +142,9 @@ void write_to_dict(const BundleOptions &bundle_opt, py::dict &dict) {
         break;
     case BundleOptions::LossType::TRUNCATED_LE_ZACH:
         dict["loss_type"] = "TRUNCATED_LE_ZACH";
+        break;
+    case BundleOptions::LossType::TRUNCATED_CAUCHY:
+        dict["loss_type"] = "TRUNCATED_CAUCHY";
         break;
     }
     dict["gradient_tol"] = bundle_opt.gradient_tol;
