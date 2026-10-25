@@ -65,6 +65,85 @@ RansacOptions initial_model_only_ransac() {
     return opt;
 }
 
+// Random world-to-camera pose and N world points in front of the camera
+CameraPose random_absolute_pose(test_rng::Rng &rng) {
+    Eigen::Vector3d aa = test_rng::symmetric_vec3(rng, 1.0);
+    Eigen::Matrix3d R = Eigen::AngleAxisd(aa.norm(), aa.normalized()).toRotationMatrix();
+    return CameraPose(R, 2.0 * test_rng::symmetric_vec3(rng));
+}
+
+std::vector<Point3D> random_world_points(test_rng::Rng &rng, const CameraPose &pose, size_t N) {
+    std::vector<Point3D> X;
+    for (size_t i = 0; i < N; ++i) {
+        Eigen::Vector3d Xc = test_rng::symmetric_vec3(rng);
+        Xc(2) += 4.0;
+        X.push_back(pose.R().transpose() * (Xc - pose.t));
+    }
+    return X;
+}
+
+bool check_absolute_pose_focal(bool estimate_distortion) {
+    test_rng::Rng rng =
+        test_rng::make_rng(estimate_distortion ? "absolute_pose_focal_distortion" : "absolute_pose_focal");
+    const double focal = 1200.0;
+    Camera camera = estimate_distortion ? Camera("SIMPLE_DIVISION", {focal, 320.0, 240.0, 0.0}, 640, 480)
+                                        : Camera("SIMPLE_PINHOLE", {focal, 320.0, 240.0}, 640, 480);
+    CameraPose pose_gt = random_absolute_pose(rng);
+    std::vector<Point3D> X = random_world_points(rng, pose_gt, 50);
+    std::vector<Point2D> x(X.size());
+    for (size_t i = 0; i < X.size(); ++i) {
+        camera.project(pose_gt.apply(X[i]), &x[i]);
+    }
+
+    AbsolutePoseOptions opt;
+    opt.ransac = initial_model_only_ransac();
+    opt.estimate_focal_length = true;
+    opt.estimate_extra_params = estimate_distortion;
+    Image image(pose_gt, camera);
+    std::vector<char> inliers;
+    estimate_absolute_pose(x, X, opt, &image, &inliers);
+
+    REQUIRE(pose_close(image.pose, pose_gt));
+    REQUIRE_SMALL(image.camera.focal() / focal - 1.0, kTol);
+    REQUIRE_SMALL((image.camera.principal_point() - camera.principal_point()).norm(), kTol);
+    return true;
+}
+
+bool test_absolute_pose_focal() { return check_absolute_pose_focal(false); }
+
+bool test_absolute_pose_focal_distortion() { return check_absolute_pose_focal(true); }
+
+bool test_absolute_pose_pnplf() {
+    test_rng::Rng rng = test_rng::make_rng("absolute_pose_pnplf");
+    const double focal = 1200.0;
+    Camera camera("SIMPLE_PINHOLE", {focal, 320.0, 240.0}, 640, 480);
+    CameraPose pose_gt = random_absolute_pose(rng);
+    std::vector<Point3D> X = random_world_points(rng, pose_gt, 30);
+    std::vector<Point3D> L1 = random_world_points(rng, pose_gt, 20);
+    std::vector<Point3D> L2 = random_world_points(rng, pose_gt, 20);
+    std::vector<Point2D> x(X.size());
+    for (size_t i = 0; i < X.size(); ++i) {
+        camera.project(pose_gt.apply(X[i]), &x[i]);
+    }
+    std::vector<Line2D> lines2D(L1.size());
+    std::vector<Line3D> lines3D(L1.size());
+    for (size_t i = 0; i < L1.size(); ++i) {
+        lines3D[i] = Line3D(L1[i], L2[i]);
+        camera.project(pose_gt.apply(L1[i]), &lines2D[i].x1);
+        camera.project(pose_gt.apply(L2[i]), &lines2D[i].x2);
+    }
+
+    AbsolutePoseOptions opt;
+    opt.ransac = initial_model_only_ransac();
+    Image image(pose_gt, camera);
+    std::vector<char> inliers_points, inliers_lines;
+    estimate_absolute_pose_pnplf(x, X, lines2D, lines3D, camera, opt, &image, &inliers_points, &inliers_lines);
+
+    REQUIRE(pose_close(image.pose, pose_gt));
+    REQUIRE_SMALL(image.camera.focal() / focal - 1.0, kTol);
+    return true;
+}
+
 bool test_relative_pose_tangent_sampson() {
     test_rng::Rng rng = test_rng::make_rng("relative_pose_tangent_sampson");
     CameraPose pose_gt = random_relative_pose(rng);
@@ -269,7 +348,10 @@ bool test_rd_fundamental_invalid_initial_model() {
 
 using namespace test::robust_initial_model;
 std::vector<Test> register_robust_initial_model_test() {
-    return {TEST(test_relative_pose_tangent_sampson),
+    return {TEST(test_absolute_pose_focal),
+            TEST(test_absolute_pose_focal_distortion),
+            TEST(test_absolute_pose_pnplf),
+            TEST(test_relative_pose_tangent_sampson),
             TEST(test_monodepth_relative_pose),
             TEST(test_shared_focal_monodepth_relative_pose),
             TEST(test_varying_focal_monodepth_relative_pose),

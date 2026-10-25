@@ -48,12 +48,23 @@ RansacStats estimate_absolute_pose(const std::vector<Point2D> &points2D, const s
     RansacStats stats;
     if (opt.estimate_focal_length && !opt.estimate_extra_params) {
         Image img; // estimated with SIMPLE_PINHOLE model
+        if (opt.ransac.score_initial_model) {
+            // The points are unprojected with image->camera, so the initial camera has unit focal here
+            img.pose = image->pose;
+            img.camera = Camera(SimplePinholeCameraModel::model_id, {1.0, 0.0, 0.0}, 0, 0);
+        }
         stats = ransac_pnpf(points2D_norm, points3D, opt_scaled, &img, inliers);
         image->pose = img.pose;
         image->camera.set_focal(img.camera.focal() / scale);
         opt_scaled.bundle.refine_focal_length = true; // force refinement of focal in this case
     } else if (opt.estimate_focal_length && opt.estimate_extra_params) {
         Image img; // estimated with SIMPLE_DIVISION model
+        if (opt.ransac.score_initial_model) {
+            // The points are unprojected (and undistorted) with image->camera, so the initial camera has unit focal
+            // and no distortion here
+            img.pose = image->pose;
+            img.camera = Camera(SimpleDivisionCameraModel::model_id, {1.0, 0.0, 0.0, 0.0}, 0, 0);
+        }
         stats = ransac_pnpfr(points2D_norm, points3D, opt_scaled, &img, inliers);
         image->pose = img.pose;
         opt_scaled.bundle.refine_focal_length = true; // force refinement of focal in this case
@@ -271,6 +282,11 @@ RansacStats estimate_absolute_pose_pnplf(const std::vector<Point2D> &points2D, c
 
     // RANSAC works in the normalized frame; img is SIMPLE_PINHOLE (pp = 0) with a focal correction.
     Image img;
+    if (opt.ransac.score_initial_model) {
+        // The initial model is image->pose with the input camera, which has unit focal in the normalized frame
+        img.pose = image->pose;
+        img.camera = Camera(SimplePinholeCameraModel::model_id, {1.0, 0.0, 0.0}, 0, 0);
+    }
     RansacStats stats =
         ransac_pnplf(points2D_norm, points3D, lines2D_norm, lines3D, opt_scaled, &img, inliers_points, inliers_lines);
 
