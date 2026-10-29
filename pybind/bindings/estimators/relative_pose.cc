@@ -89,6 +89,78 @@ std::pair<MonoDepthTwoViewGeometry, py::dict> estimate_monodepth_relative_pose_w
                                                     opt_dict, initial_pose);
 }
 
+std::vector<Line2D> lines_from_vectors(const std::vector<Eigen::Vector4d> &lines) {
+    std::vector<Line2D> out;
+    out.reserve(lines.size());
+    for (const Eigen::Vector4d &l : lines)
+        out.emplace_back(l.head<2>(), l.tail<2>());
+    return out;
+}
+
+std::pair<CameraPose, py::dict> estimate_relative_pose_lines_wrapper(
+    const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
+    const std::vector<Eigen::Vector4d> &lines2D_1, const std::vector<Eigen::Vector4d> &lines2D_2,
+    const std::vector<Eigen::Vector2d> &line_depths_1, const std::vector<Eigen::Vector2d> &line_depths_2,
+    const Camera &camera1, const Camera &camera2, const py::dict &opt_dict) {
+    RelativePoseOptions opt;
+    update_relative_pose_options(opt_dict, opt);
+    const std::vector<Line2D> l1 = lines_from_vectors(lines2D_1), l2 = lines_from_vectors(lines2D_2);
+    CameraPose pose;
+    std::vector<char> inlier_mask;
+    py::gil_scoped_release release;
+    RansacStats stats = estimate_relative_pose_lines(points2D_1, points2D_2, l1, l2, line_depths_1, line_depths_2,
+                                                     camera1, camera2, opt, &pose, &inlier_mask);
+    py::gil_scoped_acquire acquire;
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(pose, output_dict);
+}
+
+std::pair<CameraPose, py::dict> estimate_relative_pose_lines_wrapper(
+    const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
+    const std::vector<Eigen::Vector4d> &lines2D_1, const std::vector<Eigen::Vector4d> &lines2D_2,
+    const std::vector<Eigen::Vector2d> &line_depths_1, const std::vector<Eigen::Vector2d> &line_depths_2,
+    const py::dict &camera1_dict, const py::dict &camera2_dict, const py::dict &opt_dict) {
+    return estimate_relative_pose_lines_wrapper(points2D_1, points2D_2, lines2D_1, lines2D_2, line_depths_1,
+                                                line_depths_2, camera_from_dict(camera1_dict),
+                                                camera_from_dict(camera2_dict), opt_dict);
+}
+
+std::pair<MonoDepthTwoViewGeometry, py::dict> estimate_monodepth_relative_pose_lines_wrapper(
+    const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
+    const std::vector<double> &depth_1, const std::vector<double> &depth_2,
+    const std::vector<Eigen::Vector4d> &lines2D_1, const std::vector<Eigen::Vector4d> &lines2D_2,
+    const std::vector<Eigen::Vector2d> &line_depths_1, const std::vector<Eigen::Vector2d> &line_depths_2,
+    const Camera &camera1, const Camera &camera2, const py::dict &opt_dict) {
+    MonoDepthRelativePoseOptions opt;
+    update_monodepth_relative_pose_options(opt_dict, opt);
+    const std::vector<Line2D> l1 = lines_from_vectors(lines2D_1), l2 = lines_from_vectors(lines2D_2);
+    MonoDepthTwoViewGeometry geometry;
+    std::vector<char> inlier_mask;
+    py::gil_scoped_release release;
+    RansacStats stats =
+        estimate_monodepth_relative_pose_lines(points2D_1, points2D_2, depth_1, depth_2, l1, l2, line_depths_1,
+                                               line_depths_2, camera1, camera2, opt, &geometry, &inlier_mask);
+    py::gil_scoped_acquire acquire;
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(geometry, output_dict);
+}
+
+std::pair<MonoDepthTwoViewGeometry, py::dict> estimate_monodepth_relative_pose_lines_wrapper(
+    const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
+    const std::vector<double> &depth_1, const std::vector<double> &depth_2,
+    const std::vector<Eigen::Vector4d> &lines2D_1, const std::vector<Eigen::Vector4d> &lines2D_2,
+    const std::vector<Eigen::Vector2d> &line_depths_1, const std::vector<Eigen::Vector2d> &line_depths_2,
+    const py::dict &camera1_dict, const py::dict &camera2_dict, const py::dict &opt_dict) {
+    return estimate_monodepth_relative_pose_lines_wrapper(points2D_1, points2D_2, depth_1, depth_2, lines2D_1,
+                                                          lines2D_2, line_depths_1, line_depths_2,
+                                                          camera_from_dict(camera1_dict),
+                                                          camera_from_dict(camera2_dict), opt_dict);
+}
+
 std::pair<ImagePair, py::dict>
 estimate_shared_focal_relative_pose_wrapper(const std::vector<Eigen::Vector2d> &points2D_1,
                                             const std::vector<Eigen::Vector2d> &points2D_2, const Eigen::Vector2d &pp,
@@ -464,6 +536,41 @@ void register_relative_pose(py::module &m) {
         py::arg("camera2_dict"), py::arg("opt") = py::dict(),
         py::arg("initial_pose") = py::none(),
         "Relative pose estimation using depth estimates with non-linear refinement.");
+
+    using V2 = std::vector<Eigen::Vector2d>;
+    using V4 = std::vector<Eigen::Vector4d>;
+    m.def("estimate_relative_pose_lines",
+          py::overload_cast<const V2 &, const V2 &, const V4 &, const V4 &, const V2 &, const V2 &, const Camera &,
+                            const Camera &, const py::dict &>(&estimate_relative_pose_lines_wrapper),
+          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("lines2D_1"), py::arg("lines2D_2"),
+          py::arg("line_depths_1"), py::arg("line_depths_2"), py::arg("camera1"), py::arg("camera2"),
+          py::arg("opt") = py::dict(),
+          "Relative pose from points and lines with depth (1L3P / 2L2P / 5pt, optional line residuals in scoring, "
+          "LO and refinement).");
+    m.def("estimate_relative_pose_lines",
+          py::overload_cast<const V2 &, const V2 &, const V4 &, const V4 &, const V2 &, const V2 &, const py::dict &,
+                            const py::dict &, const py::dict &>(&estimate_relative_pose_lines_wrapper),
+          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("lines2D_1"), py::arg("lines2D_2"),
+          py::arg("line_depths_1"), py::arg("line_depths_2"), py::arg("camera1_dict"), py::arg("camera2_dict"),
+          py::arg("opt") = py::dict(),
+          "Relative pose from points and lines with depth (1L3P / 2L2P / 5pt, optional line residuals in scoring, "
+          "LO and refinement).");
+    m.def("estimate_monodepth_relative_pose_lines",
+          py::overload_cast<const V2 &, const V2 &, const std::vector<double> &, const std::vector<double> &,
+                            const V4 &, const V4 &, const V2 &, const V2 &, const Camera &, const Camera &,
+                            const py::dict &>(&estimate_monodepth_relative_pose_lines_wrapper),
+          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("depth_1"), py::arg("depth_2"), py::arg("lines2D_1"),
+          py::arg("lines2D_2"), py::arg("line_depths_1"), py::arg("line_depths_2"), py::arg("camera1"),
+          py::arg("camera2"), py::arg("opt") = py::dict(),
+          "RePoseD with lines with depth (optional line residuals in scoring, LO and refinement).");
+    m.def("estimate_monodepth_relative_pose_lines",
+          py::overload_cast<const V2 &, const V2 &, const std::vector<double> &, const std::vector<double> &,
+                            const V4 &, const V4 &, const V2 &, const V2 &, const py::dict &, const py::dict &,
+                            const py::dict &>(&estimate_monodepth_relative_pose_lines_wrapper),
+          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("depth_1"), py::arg("depth_2"), py::arg("lines2D_1"),
+          py::arg("lines2D_2"), py::arg("line_depths_1"), py::arg("line_depths_2"), py::arg("camera1_dict"),
+          py::arg("camera2_dict"), py::arg("opt") = py::dict(),
+          "RePoseD with lines with depth (optional line residuals in scoring, LO and refinement).");
 
     m.def("estimate_shared_focal_relative_pose", &estimate_shared_focal_relative_pose_wrapper, py::arg("points2D_1"),
           py::arg("points2D_2"), py::arg("pp") = Eigen::Vector2d::Zero(), py::arg("opt") = py::dict(),

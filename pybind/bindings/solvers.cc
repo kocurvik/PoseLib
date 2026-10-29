@@ -259,6 +259,22 @@ Eigen::Matrix3d essential_matrix_8pt_wrapper(const std::vector<Eigen::Vector3d> 
     return essential_matrix;
 }
 
+std::vector<CameraPose> relpose_upright_3pt_qep_wrapper(const std::vector<Eigen::Vector3d> &x1,
+                                                        const std::vector<Eigen::Vector3d> &x2) {
+    std::vector<CameraPose> output;
+    relpose_upright_3pt_qep(x1, x2, &output);
+    return output;
+}
+
+std::vector<CameraPose> relpose_2l2p_wrapper(const std::vector<Eigen::Vector3d> &x1,
+                                             const std::vector<Eigen::Vector3d> &x2,
+                                             const std::vector<Eigen::Vector3d> &d1,
+                                             const std::vector<Eigen::Vector3d> &d2) {
+    std::vector<CameraPose> output;
+    relpose_2l2p(x1, x2, d1, d2, &output);
+    return output;
+}
+
 std::vector<CameraPose> relpose_upright_3pt_wrapper(const std::vector<Eigen::Vector3d> &x1,
                                                     const std::vector<Eigen::Vector3d> &x2) {
     std::vector<CameraPose> output;
@@ -360,6 +376,10 @@ void register_solvers(py::module &m) {
           py::arg("d2"), py::call_guard<py::gil_scoped_release>());
     m.def("relpose_8pt", &relpose_8pt_wrapper, py::arg("x1"), py::arg("x2"), py::call_guard<py::gil_scoped_release>());
     m.def("essential_matrix_8pt", &essential_matrix_8pt_wrapper, py::arg("x1"), py::arg("x2"),
+          py::call_guard<py::gil_scoped_release>());
+    m.def("relpose_upright_3pt_qep", &relpose_upright_3pt_qep_wrapper, py::arg("x1"), py::arg("x2"),
+          py::call_guard<py::gil_scoped_release>());
+    m.def("relpose_2l2p", &relpose_2l2p_wrapper, py::arg("x1"), py::arg("x2"), py::arg("d1"), py::arg("d2"),
           py::call_guard<py::gil_scoped_release>());
     m.def("relpose_upright_3pt", &relpose_upright_3pt_wrapper, py::arg("x1"), py::arg("x2"),
           py::call_guard<py::gil_scoped_release>());

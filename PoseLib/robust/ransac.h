@@ -75,6 +75,20 @@ RansacStats ransac_monodepth_relpose(const std::vector<Point2D> &x1, const std::
                                      const MonoDepthRelativePoseOptions &opt, MonoDepthTwoViewGeometry *best_model,
                                      std::vector<char> *best_inliers);
 
+// Relative pose from points and lines with depth (RelativePoseLineEstimator, opt.twoview_solver). L1, L2 are the 3D
+// line segments in the camera frames. Returns an empty model if there are too few points or lines for the solver.
+RansacStats ransac_relpose_lines(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                 const std::vector<Line3D> &L1, const std::vector<Line3D> &L2,
+                                 const RelativePoseOptions &opt, CameraPose *best_model,
+                                 std::vector<char> *best_inliers);
+
+// RePoseD with lines with depth in scoring and LO (MonoDepthRelativePoseLineEstimator)
+RansacStats ransac_monodepth_relpose_lines(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                           const std::vector<double> &d1, const std::vector<double> &d2,
+                                           const std::vector<Line3D> &L1, const std::vector<Line3D> &L2,
+                                           const MonoDepthRelativePoseOptions &opt,
+                                           MonoDepthTwoViewGeometry *best_model, std::vector<char> *best_inliers);
+
 RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         const RelativePoseOptions &opt, ImagePair *best_model,
                                         std::vector<char> *best_inliers);

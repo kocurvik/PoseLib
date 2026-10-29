@@ -126,7 +126,22 @@ struct AbsolutePoseOptions {
     double min_fov = 5.0; // circa 500mm lens 35mm-equivalent
 };
 
-struct RelativePoseOptions {
+// Lines with depth (3D-3D line matches) in two view relative pose (estimate_relative_pose_lines,
+// estimate_monodepth_relative_pose_lines), see TwoViewLine in robust/optim/twoview_lines.h
+struct TwoViewLineOptions {
+    // Lines also in the MSAC score, the local optimization and the final refinement (otherwise points only)
+    bool line_refine = false;
+    // Line threshold (deg), mapped to the point (Sampson) threshold: line residuals are scaled by
+    // max_error / sin(max_line_angle)
+    double max_line_angle = 2.0;
+    // Weight of the line score and residuals
+    double line_weight = 1.0;
+    // 0 - direction (R d1) x d2, 1 - plane (n2^T R d1, n1^T R^T d2), 2 - both,
+    // 3 - plane with separately robustified components
+    int line_residual = 0;
+};
+
+struct RelativePoseOptions : TwoViewLineOptions {
     RansacOptions ransac;
     BundleOptions bundle;
 
@@ -142,6 +157,16 @@ struct RelativePoseOptions {
     // Whether we should use real focal length checking: https://arxiv.org/abs/2311.16304
     // Assumes that principal points of both cameras are at origin.
     bool real_focal_check = false;
+
+    // Minimal solver of estimate_relative_pose_lines: 0 - 1L3P (1 line direction + 3 points, upright solver),
+    // 1 - 2L2P (rotation from 2 line directions, translation from 2 points), 2 - 5pt
+    int twoview_solver = 0;
+    // Upright solver of 1L3P: 0 - Ding et al. CVPR 2023 (relpose_upright_3pt), 1 - QEP (relpose_upright_3pt_qep)
+    int upright_solver = 0;
+    // Direction check (deg, 0 off): hypotheses are dropped before scoring unless R d1 is within line_check_angle of
+    // +-d2 for line_check_num random line tracks
+    double line_check_angle = 0.0;
+    size_t line_check_num = 1;
 };
 
 struct HybridPoseOptions {
@@ -152,7 +177,7 @@ struct HybridPoseOptions {
     std::array<double, 2> max_errors = {12.0, 1.0};
 };
 
-struct MonoDepthRelativePoseOptions {
+struct MonoDepthRelativePoseOptions : TwoViewLineOptions {
     RansacOptions ransac;
     BundleOptions bundle;
 

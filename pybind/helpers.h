@@ -105,6 +105,13 @@ inline void update_absolute_pose_options(const py::dict &input, AbsolutePoseOpti
     update(input, "min_fov", opt.min_fov);
 }
 
+inline void update_twoview_line_options(const py::dict &input, TwoViewLineOptions &opt) {
+    update(input, "line_refine", opt.line_refine);
+    update(input, "max_line_angle", opt.max_line_angle);
+    update(input, "line_weight", opt.line_weight);
+    update(input, "line_residual", opt.line_residual);
+}
+
 inline void update_relative_pose_options(const py::dict &input, RelativePoseOptions &opt) {
     // Handle nested ransac and bundle options
     if (input.contains("ransac")) {
@@ -117,6 +124,11 @@ inline void update_relative_pose_options(const py::dict &input, RelativePoseOpti
     update(input, "max_error", opt.max_error);
     update(input, "tangent_sampson", opt.tangent_sampson);
     update(input, "real_focal_check", opt.real_focal_check);
+    update(input, "twoview_solver", opt.twoview_solver);
+    update(input, "upright_solver", opt.upright_solver);
+    update(input, "line_check_angle", opt.line_check_angle);
+    update(input, "line_check_num", opt.line_check_num);
+    update_twoview_line_options(input, opt);
 }
 
 inline void update_hybrid_pose_options(const py::dict &input, HybridPoseOptions &opt) {
@@ -170,6 +182,7 @@ inline void update_monodepth_relative_pose_options(const py::dict &input, MonoDe
 
     update(input, "estimate_shift", opt.estimate_shift);
     update(input, "weight_sampson", opt.weight_sampson);
+    update_twoview_line_options(input, opt);
 }
 
 inline void write_to_dict(const RansacOptions &ransac_opt, py::dict &dict) {

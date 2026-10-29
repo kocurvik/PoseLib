@@ -15,6 +15,7 @@ add_executable(run_tests
     optim_gen_relative_test.cc
     optim_homography_test.cc
     optim_monodepth_relpose_test.cc
+    optim_twoview_lines_test.cc
     recalibrator_test.cc
 )
 target_link_libraries(run_tests PRIVATE PoseLib::PoseLib Eigen3::Eigen)

@@ -28,6 +28,7 @@
 
 #include "robust.h"
 
+#include "PoseLib/robust/optim/twoview_lines.h"
 #include "PoseLib/robust/utils.h"
 #include "robust/recalibrator.h"
 
@@ -426,6 +427,123 @@ RansacStats estimate_monodepth_relative_pose(const std::vector<Point2D> &points2
 
         refine_monodepth_relpose(x1_inliers, x2_inliers, d1_inliers, d2_inliers, geometry, scale_reproj, weight_sampson,
                                  scaled_bundle_opt, opt.estimate_shift);
+    }
+    return stats;
+}
+
+namespace {
+// Lines as 3D segments in the camera frame (depth * normalized ray)
+std::vector<Line3D> calibrate_lines(const std::vector<Line2D> &lines, const std::vector<Eigen::Vector2d> &depths,
+                                    const Camera &camera) {
+    std::vector<Line3D> lines3D(lines.size());
+    Point2D x1, x2;
+    for (size_t k = 0; k < lines.size(); ++k) {
+        camera.unproject(lines[k].x1, &x1);
+        camera.unproject(lines[k].x2, &x2);
+        lines3D[k].X1 = depths[k](0) * x1.homogeneous();
+        lines3D[k].X2 = depths[k](1) * x2.homogeneous();
+    }
+    return lines3D;
+}
+
+template <typename T> std::vector<T> select_inliers(const std::vector<T> &x, const std::vector<char> &inliers) {
+    std::vector<T> out;
+    for (size_t k = 0; k < x.size(); ++k)
+        if (inliers[k])
+            out.push_back(x[k]);
+    return out;
+}
+} // namespace
+
+RansacStats estimate_relative_pose_lines(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
+                                         const std::vector<Line2D> &lines2D_1, const std::vector<Line2D> &lines2D_2,
+                                         const std::vector<Eigen::Vector2d> &line_depths_1,
+                                         const std::vector<Eigen::Vector2d> &line_depths_2, const Camera &camera1,
+                                         const Camera &camera2, const RelativePoseOptions &opt,
+                                         CameraPose *relative_pose, std::vector<char> *inliers) {
+    const size_t num_pts = points2D_1.size();
+    std::vector<Point2D> x1_calib(num_pts), x2_calib(num_pts);
+    for (size_t k = 0; k < num_pts; ++k) {
+        camera1.unproject(points2D_1[k], &x1_calib[k]);
+        camera2.unproject(points2D_2[k], &x2_calib[k]);
+    }
+    const std::vector<Line3D> L1 = calibrate_lines(lines2D_1, line_depths_1, camera1);
+    const std::vector<Line3D> L2 = calibrate_lines(lines2D_2, line_depths_2, camera2);
+
+    const double scale = 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
+    RelativePoseOptions opt_scaled = opt;
+    opt_scaled.max_error *= scale;
+    opt_scaled.bundle.loss_scale *= scale;
+
+    RansacStats stats = ransac_relpose_lines(x1_calib, x2_calib, L1, L2, opt_scaled, relative_pose, inliers);
+
+    if (stats.num_inliers > 5) {
+        if (opt.line_refine) {
+            const std::vector<TwoViewLine> lines = make_twoview_lines(L1, L2);
+            const double line_scale = opt_scaled.max_error / std::sin(opt.max_line_angle * M_PI / 180.0);
+            std::vector<char> line_inliers;
+            compute_twoview_line_msac_score(relative_pose->R(), lines, opt.line_residual, line_scale,
+                                            opt_scaled.max_error * opt_scaled.max_error, &line_inliers);
+            refine_relpose_lines(select_inliers(x1_calib, *inliers), select_inliers(x2_calib, *inliers),
+                                 select_inliers(lines, line_inliers), opt.line_residual, relative_pose,
+                                 opt_scaled.bundle, opt.line_weight, line_scale);
+        } else {
+            refine_relpose(select_inliers(x1_calib, *inliers), select_inliers(x2_calib, *inliers), relative_pose,
+                           opt_scaled.bundle);
+        }
+    }
+    return stats;
+}
+
+RansacStats estimate_monodepth_relative_pose_lines(
+    const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2, const std::vector<double> &depth_1,
+    const std::vector<double> &depth_2, const std::vector<Line2D> &lines2D_1, const std::vector<Line2D> &lines2D_2,
+    const std::vector<Eigen::Vector2d> &line_depths_1, const std::vector<Eigen::Vector2d> &line_depths_2,
+    const Camera &camera1, const Camera &camera2, const MonoDepthRelativePoseOptions &opt,
+    MonoDepthTwoViewGeometry *geometry, std::vector<char> *inliers) {
+    const size_t num_pts = points2D_1.size();
+    std::vector<Point2D> x1_calib(num_pts), x2_calib(num_pts);
+    for (size_t k = 0; k < num_pts; ++k) {
+        camera1.unproject(points2D_1[k], &x1_calib[k]);
+        camera2.unproject(points2D_2[k], &x2_calib[k]);
+    }
+    const std::vector<Line3D> L1 = calibrate_lines(lines2D_1, line_depths_1, camera1);
+    const std::vector<Line3D> L2 = calibrate_lines(lines2D_2, line_depths_2, camera2);
+
+    const double scale = 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
+    MonoDepthRelativePoseOptions opt_scaled = opt;
+    opt_scaled.max_errors[0] = opt.max_errors[0] * scale; // reproj error
+    opt_scaled.max_errors[1] = opt.max_errors[1] * scale; // epipolar error
+
+    RansacStats stats =
+        ransac_monodepth_relpose_lines(x1_calib, x2_calib, depth_1, depth_2, L1, L2, opt_scaled, geometry, inliers);
+    if (stats.num_inliers > 3) {
+        // as in estimate_monodepth_relative_pose
+        BundleOptions scaled_bundle_opt = opt.bundle;
+        const double scale_reproj =
+            (opt.max_errors[0] > 0.0) ? (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0])
+                                      : 0.0;
+        const double weight_sampson = (opt.weight_sampson > 0.0) ? opt.weight_sampson : 0.0;
+        scaled_bundle_opt.loss_scale = 0.5 * opt_scaled.max_errors[1];
+
+        const std::vector<Point2D> x1_inliers = select_inliers(x1_calib, *inliers);
+        const std::vector<Point2D> x2_inliers = select_inliers(x2_calib, *inliers);
+        const std::vector<double> d1_inliers = select_inliers(depth_1, *inliers);
+        const std::vector<double> d2_inliers = select_inliers(depth_2, *inliers);
+        if (opt.line_refine) {
+            const std::vector<TwoViewLine> lines = make_twoview_lines(L1, L2);
+            const double line_scale = opt_scaled.max_errors[1] / std::sin(opt.max_line_angle * M_PI / 180.0);
+            std::vector<char> line_inliers;
+            compute_twoview_line_msac_score(geometry->pose.R(), lines, opt.line_residual, line_scale,
+                                            opt_scaled.max_errors[1] * opt_scaled.max_errors[1], &line_inliers);
+            refine_monodepth_relpose_lines(x1_inliers, x2_inliers, d1_inliers, d2_inliers,
+                                           select_inliers(lines, line_inliers), opt.line_residual, geometry,
+                                           scale_reproj, weight_sampson, scaled_bundle_opt, opt.estimate_shift,
+                                           opt.line_weight, line_scale);
+        } else {
+            refine_monodepth_relpose(x1_inliers, x2_inliers, d1_inliers, d2_inliers, geometry, scale_reproj,
+                                     weight_sampson, scaled_bundle_opt, opt.estimate_shift);
+        }
     }
     return stats;
 }

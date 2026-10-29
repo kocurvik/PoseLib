@@ -111,6 +111,24 @@ BundleStats refine_monodepth_relpose(const std::vector<Point2D> &x1, const std::
                                      bool refine_shift = false,
                                      const std::vector<double> &weights = std::vector<double>());
 
+// Two view refinement from points and lines with depth (direction and / or plane residuals selected by
+// line_residual, see TwoViewLine in robust/optim/twoview_lines.h). The line residuals are multiplied by
+// line_residual_scale (e.g. point threshold / sin(line threshold)), the line cost is weighted by line_weight.
+// Points use the Sampson error (refine_relpose) or the hybrid RePoseD error (refine_monodepth_relpose).
+struct TwoViewLine;
+BundleStats refine_relpose_lines(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                 const std::vector<TwoViewLine> &lines, int line_residual, CameraPose *pose,
+                                 const BundleOptions &opt = BundleOptions(), double line_weight = 1.0,
+                                 double line_residual_scale = 1.0);
+
+BundleStats refine_monodepth_relpose_lines(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                           const std::vector<double> &d1, const std::vector<double> &d2,
+                                           const std::vector<TwoViewLine> &lines, int line_residual,
+                                           MonoDepthTwoViewGeometry *pose, const double scale_reproj,
+                                           const double weight_sampson, const BundleOptions &opt = BundleOptions(),
+                                           bool refine_shift = false, double line_weight = 1.0,
+                                           double line_residual_scale = 1.0);
+
 // Relative pose with single unknown focal refinement. Minimizes Sampson error error.
 BundleStats refine_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         ImagePair *image_pair, const BundleOptions &opt = BundleOptions(),

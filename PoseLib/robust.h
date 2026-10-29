@@ -90,6 +90,28 @@ RansacStats estimate_monodepth_relative_pose(const std::vector<Point2D> &points2
                                              const Camera &camera2, const MonoDepthRelativePoseOptions &opt,
                                              MonoDepthTwoViewGeometry *geometry, std::vector<char> *inliers);
 
+// Relative pose from points and lines with depth (3D-3D line matches) using LO-RANSAC followed by non-linear
+// refinement. lines2D_k are the 2D line segments (pixels), line_depths_k the depths of their endpoints (any scale per
+// image). The minimal solver is RelativePoseOptions.twoview_solver (1L3P, 2L2P or 5pt), with
+// RelativePoseOptions.line_refine the lines are used in the score, LO and the final refinement
+// (see RelativePoseLineEstimator). Thresholds: max_error (Sampson, px) and max_line_angle (deg).
+RansacStats estimate_relative_pose_lines(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
+                                         const std::vector<Line2D> &lines2D_1, const std::vector<Line2D> &lines2D_2,
+                                         const std::vector<Eigen::Vector2d> &line_depths_1,
+                                         const std::vector<Eigen::Vector2d> &line_depths_2, const Camera &camera1,
+                                         const Camera &camera2, const RelativePoseOptions &opt,
+                                         CameraPose *relative_pose, std::vector<char> *inliers);
+
+// RePoseD (estimate_monodepth_relative_pose) with lines with depth: with MonoDepthRelativePoseOptions.line_refine the
+// lines are used in the score, LO and the final refinement (line residuals in the units of the Sampson error,
+// threshold max_line_angle in deg), see MonoDepthRelativePoseLineEstimator.
+RansacStats estimate_monodepth_relative_pose_lines(
+    const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2, const std::vector<double> &depth_1,
+    const std::vector<double> &depth_2, const std::vector<Line2D> &lines2D_1, const std::vector<Line2D> &lines2D_2,
+    const std::vector<Eigen::Vector2d> &line_depths_1, const std::vector<Eigen::Vector2d> &line_depths_2,
+    const Camera &camera1, const Camera &camera2, const MonoDepthRelativePoseOptions &opt,
+    MonoDepthTwoViewGeometry *geometry, std::vector<char> *inliers);
+
 // Estimates relative pose with shared unknown focal length using LO-RANSAC followed by non-linear refinement
 // Threshold for Sampson error is set by RelativePoseOptions.max_error
 RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &points2D_1,

@@ -34,6 +34,7 @@
 #include "PoseLib/robust/estimators/homography.h"
 #include "PoseLib/robust/estimators/hybrid_pose.h"
 #include "PoseLib/robust/estimators/relative_pose.h"
+#include "PoseLib/robust/estimators/relative_pose_lines.h"
 #include "PoseLib/solvers/gen_relpose_5p1pt.h"
 #include "PoseLib/solvers/p3p.h"
 #include "PoseLib/solvers/relpose_5pt.h"
@@ -204,6 +205,39 @@ RansacStats ransac_monodepth_relpose(const std::vector<Point2D> &x1, const std::
     best_model->pose.t.setZero();
     RelativePoseMonoDepthEstimator estimator(opt, x1, x2, d1, d2);
     RansacStats stats = ransac<RelativePoseMonoDepthEstimator>(estimator, opt.ransac, best_model);
+    get_inliers(best_model->pose, x1, x2, opt.max_errors[1] * opt.max_errors[1], best_inliers);
+    return stats;
+}
+
+RansacStats ransac_relpose_lines(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                 const std::vector<Line3D> &L1, const std::vector<Line3D> &L2,
+                                 const RelativePoseOptions &opt, CameraPose *best_model,
+                                 std::vector<char> *best_inliers) {
+    *best_model = CameraPose();
+    RansacStats stats;
+    const size_t min_points = opt.twoview_solver == 1 ? 2 : (opt.twoview_solver == 2 ? 5 : 3);
+    // 5pt needs lines only for the direction check
+    const size_t min_lines =
+        opt.twoview_solver == 1 ? 2 : (opt.twoview_solver == 2 && opt.line_check_angle <= 0 ? 0 : 1);
+    if (x1.size() < min_points || L1.size() < min_lines) {
+        best_inliers->assign(x1.size(), 0);
+        return stats;
+    }
+    RelativePoseLineEstimator estimator(opt, x1, x2, L1, L2);
+    stats = ransac<RelativePoseLineEstimator>(estimator, opt.ransac, best_model);
+    get_inliers(*best_model, x1, x2, opt.max_error * opt.max_error, best_inliers);
+    return stats;
+}
+
+RansacStats ransac_monodepth_relpose_lines(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                           const std::vector<double> &d1, const std::vector<double> &d2,
+                                           const std::vector<Line3D> &L1, const std::vector<Line3D> &L2,
+                                           const MonoDepthRelativePoseOptions &opt,
+                                           MonoDepthTwoViewGeometry *best_model, std::vector<char> *best_inliers) {
+    best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
+    best_model->pose.t.setZero();
+    MonoDepthRelativePoseLineEstimator estimator(opt, x1, x2, d1, d2, L1, L2);
+    RansacStats stats = ransac<MonoDepthRelativePoseLineEstimator>(estimator, opt.ransac, best_model);
     get_inliers(best_model->pose, x1, x2, opt.max_errors[1] * opt.max_errors[1], best_inliers);
     return stats;
 }
