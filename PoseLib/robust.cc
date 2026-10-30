@@ -437,11 +437,22 @@ RansacStats estimate_3v_relative_pose_hybrid(
     if (stats.num_inliers > 4) {
         BundleOptions scaled_bundle_opt = bundle_opt;
         scaled_bundle_opt.loss_scale = bundle_opt.loss_scale * focal_scale;
-        refine_3v_hybrid(select_inliers(x1_calib, *point_inliers), select_inliers(x2_calib, *point_inliers),
-                         select_inliers(x3_calib, *point_inliers), select_inliers(l1_calib, *line_inliers),
-                         select_inliers(l2_calib, *line_inliers), select_inliers(l3_calib, *line_inliers),
-                         three_view_pose, scaled_bundle_opt, ransac_opt.line_weight,
-                         ransac_opt.max_epipolar_error / ransac_opt.max_line_error, ransac_opt.line_sampson);
+        if (ransac_opt.threeview_line_error == 1) {
+            const double line_scale =
+                ransac_opt_scaled.max_epipolar_error / std::sin(ransac_opt.max_line_angle * M_PI / 180.0);
+            refine_3v_hybrid_angular(select_inliers(x1_calib, *point_inliers),
+                                     select_inliers(x2_calib, *point_inliers),
+                                     select_inliers(x3_calib, *point_inliers),
+                                     select_angular_lines(make_threeview_angular_lines(L1, L2, L3), *line_inliers),
+                                     ransac_opt.line_residual, three_view_pose, scaled_bundle_opt,
+                                     ransac_opt.line_weight, line_scale);
+        } else {
+            refine_3v_hybrid(select_inliers(x1_calib, *point_inliers), select_inliers(x2_calib, *point_inliers),
+                             select_inliers(x3_calib, *point_inliers), select_inliers(l1_calib, *line_inliers),
+                             select_inliers(l2_calib, *line_inliers), select_inliers(l3_calib, *line_inliers),
+                             three_view_pose, scaled_bundle_opt, ransac_opt.line_weight,
+                             ransac_opt.max_epipolar_error / ransac_opt.max_line_error, ransac_opt.line_sampson);
+        }
     }
 
     return stats;

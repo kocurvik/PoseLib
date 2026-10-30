@@ -16,6 +16,13 @@ scale of view 1. Results of the experiments are in the `mlde` project (`D:\Resea
 * `threeview_2l_planes` — 2 lines with depth. Rotation as above; translation from the back-projected planes of the
   2D lines in views 2, 3 (`l^T (R X + t) = 0`). With known R each line gives only one constraint on t, so the
   component along `l_a x l_b` is recovered from the depth (`(I - d d^T)(R X_1 + t - sigma X_k) = 0`).
+* `threeview_2p2l` — 2 points with depth + 2 lines without depth (port of `mlde/theory/solver_rotation_2sift_orientation.cpp`
+  and `test_twosift3view.m`). The vector between the points fixes R2, R3 up to an angle about it (frames
+  `Q_k u_k ~ e_y`, `R_k = Q_k^T K_k^T Q_1`, K_k Cayley rotation about y); the two angles follow from
+  `det([l1, R2^T l2, R3^T l3]) = 0` of both lines (generated action matrix solver, 8x8 eigenproblem). Up to 8
+  solutions, the lines need not pass through the points.
+* `threeview_2p2l_ratio` — as `threeview_2p2l` with depth ratios between the views (e.g. SIFT scales) instead of
+  depths within the views; the unknown depths m, n of point 1 are recovered from the equal-length constraints first.
 
 Endpoints are not assumed to correspond between views.
 
@@ -36,13 +43,23 @@ coinciding camera centers it vanishes for the third view, so RANSAC prefers such
   `line_residual_scale` (point threshold / line threshold) and weighted by `line_weight`.
 * `refine_3v_lines`, `refine_3v_hybrid` in `robust/bundle.h`.
 
+Angular residuals (`threeview_line_error = 1`): the two view line residuals (`TwoViewLine`: direction `(R d_a) x d_b`,
+plane `(n_b^T R d_a, d_b^T R n_a)`, selected by `line_residual` 0 / 1 / 2) for the pairs 1-2, 1-3 and 2-3
+(`R23 = R13 R12^T`), rotation only, using the line depths. Scaled by `max_epipolar_error / sin(max_line_angle)` so
+that the point loss can be used; a track is an inlier if it is an inlier in all three pairs.
+* `ThreeViewAngularLineJacobianAccumulator`, `ThreeViewHybridAngularJacobianAccumulator` (+ points, Sampson).
+* `refine_3v_hybrid_angular` in `robust/bundle.h`.
+
 ## Estimators (`PoseLib/robust/estimators/threeview_lines.h`)
 
 * `ThreeViewLineEstimator` — line-only LO-RANSAC, solver selected by `RansacOptions::line_solver`
   (0 common perpendicular, 1 planes).
-* `ThreeViewHybridEstimator` — points + lines, 2p1l solver, score = point Sampson MSAC + `line_weight` x line MSAC.
+* `ThreeViewHybridEstimator` — points + lines, solver selected by `hybrid_solver` (0 2p1l, 1 1l3p, 2 2p2l),
+  score = point Sampson MSAC + `line_weight` x line MSAC (transfer distance or angular, `threeview_line_error`),
+  used also in LO and the final refinement.
 
-New `RansacOptions`: `line_solver`, `max_line_error` (px), `line_weight`, `line_sampson`.
+New `RansacOptions`: `line_solver`, `max_line_error` (px), `line_weight`, `line_sampson`, `hybrid_solver`,
+`threeview_line_error` (with `line_residual`, `max_line_angle` in deg).
 
 Entry points (`robust.h`, pixel inputs, cameras unproject points/endpoints and lift them with the depths):
 `estimate_3v_relative_pose_lines`, `estimate_3v_relative_pose_hybrid`.
@@ -57,6 +74,8 @@ pose, info = poselib.estimate_three_view_relative_pose_hybrid(x1, x2, x3, xd1, x
 # x*: (M, 2) points in px, xd*: (M,) depths; info['inliers'] (points), info['line_inliers']
 poselib.refine_three_view_lines(...), poselib.refine_three_view_hybrid(...)   # calibrated inputs
 poselib.threeview_2p1l(...), poselib.threeview_2l(...), poselib.threeview_2l_planes(...)
+poselib.threeview_2p2l(X1, X2, X3, l1, l2, l3)   # 2 points with depth, 2 homogeneous lines per view
+poselib.threeview_2p2l_ratio(x1, x2, x3, r21, r22, r31, l1, l2, l3)
 ```
 
 ## Tests

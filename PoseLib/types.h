@@ -73,7 +73,7 @@ struct RansacOptions {
     int line_solver = 0;          // 0 - 2 lines, common perpendicular, 1 - 2 lines, planes
     double max_line_error = 1.0;  // threshold for line transfer error (pixels)
     double line_weight = 1.0;     // weight of the line score and residuals in the hybrid estimator
-    int hybrid_solver = 0;        // hybrid estimator minimal solver: 0 - 2p1l, 1 - 1l3p
+    int hybrid_solver = 0;        // hybrid estimator minimal solver: 0 - 2p1l, 1 - 1l3p, 2 - 2p2l, 3 - 5p3v
     int upright_solver = 0;       // two view relpose with line direction: 0 - Ding et al. CVPR23, 1 - QEP
     int twoview_solver = 0;       // two view relpose with line directions: 0 - 1L3P, 1 - 2L2P, 2 - 5pt
     double line_check_angle = 0;  // two view relpose with line directions: direction check of hypotheses (deg, 0 off)
@@ -83,6 +83,9 @@ struct RansacOptions {
     double max_line_angle = 2.0;  // two view relpose with line directions: line direction threshold (deg)
     int line_residual = 0;        // two view line residual (twoview_line_refine): 0 - direction, 1 - plane, 2 - both,
                                   // 3 - plane with separately robustified components
+    int threeview_line_error = 0; // three view hybrid line error in scoring, LO, refinement: 0 - transfer distance
+                                  // (max_line_error), 1 - angular residuals of the pairs 12, 13, 23 (line_residual
+                                  // 0-2, max_line_angle, uses the line depths)
 };
 
 struct RansacStats {

@@ -862,7 +862,7 @@ class ThreeViewRelativePoseJacobianAccumulator {
             Eigen::Matrix<double, 1, 11> J12;
             J12.block<1, 3>(0, 0) = dSdE12 * dE12dr12;
             J12.block<1, 2>(0, 3) = dSdE12 * dE12dt12;
-            J12.block<1, 6>(0, 6).setZero();
+            J12.block<1, 6>(0, 5).setZero();
 
             Eigen::Matrix<double, 1, 11> J13;
             J13.block<1, 5>(0, 0).setZero();
@@ -1276,7 +1276,7 @@ class ThreeViewSharedFocalRelativePoseJacobianAccumulator {
             Eigen::Matrix<double, 1, 12> J12;
             J12.block<1, 3>(0, 0) = dSdF12.cwiseProduct(dFdE) * dE12dr12;
             J12.block<1, 2>(0, 3) = dSdF12.cwiseProduct(dFdE) * dE12dt12;
-            J12.block<1, 6>(0, 6).setZero();
+            J12.block<1, 6>(0, 5).setZero();
             J12(0, 11) = dSdF12 * dF12df;
 
             Eigen::Matrix<double, 1, 12> J13;

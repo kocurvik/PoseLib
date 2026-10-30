@@ -983,6 +983,29 @@ std::vector<ThreeViewCameraPose> threeview_2p1l_wrapper(const std::vector<Eigen:
     return models;
 }
 
+std::vector<ThreeViewCameraPose> threeview_2p2l_wrapper(const std::vector<Eigen::Vector3d> &X1,
+                                                        const std::vector<Eigen::Vector3d> &X2,
+                                                        const std::vector<Eigen::Vector3d> &X3,
+                                                        const std::vector<Eigen::Vector3d> &l1,
+                                                        const std::vector<Eigen::Vector3d> &l2,
+                                                        const std::vector<Eigen::Vector3d> &l3) {
+    std::vector<ThreeViewCameraPose> models;
+    threeview_2p2l(X1, X2, X3, l1, l2, l3, &models);
+    return models;
+}
+
+std::vector<ThreeViewCameraPose> threeview_2p2l_ratio_wrapper(const std::vector<Eigen::Vector3d> &x1,
+                                                              const std::vector<Eigen::Vector3d> &x2,
+                                                              const std::vector<Eigen::Vector3d> &x3, double r21,
+                                                              double r22, double r31,
+                                                              const std::vector<Eigen::Vector3d> &l1,
+                                                              const std::vector<Eigen::Vector3d> &l2,
+                                                              const std::vector<Eigen::Vector3d> &l3) {
+    std::vector<ThreeViewCameraPose> models;
+    threeview_2p2l_ratio(x1, x2, x3, r21, r22, r31, l1, l2, l3, &models);
+    return models;
+}
+
 std::vector<ThreeViewCameraPose> threeview_1l3p_wrapper(const std::vector<Eigen::Vector3d> &x1,
                                                         const std::vector<Eigen::Vector3d> &x2,
                                                         const std::vector<Eigen::Vector3d> &x3,
@@ -1181,6 +1204,12 @@ PYBIND11_MODULE(poselib, m) {
           "Upright 3 point relative pose (Ding et al. CVPR 2023) with known common direction g_cam2 = R g_cam1.");
     m.def("relpose_2l2p", &poselib::relpose_2l2p_wrapper, py::arg("x1"), py::arg("x2"), py::arg("d1"),
           py::arg("d2"), "Two view relative pose from 2 line directions + 2 points (bearings).");
+    m.def("threeview_2p2l", &poselib::threeview_2p2l_wrapper, py::arg("X1"), py::arg("X2"), py::arg("X3"),
+          py::arg("l1"), py::arg("l2"), py::arg("l3"),
+          "Minimal solver: 2 points with depth + 2 homogeneous 2D lines (normalized coordinates).");
+    m.def("threeview_2p2l_ratio", &poselib::threeview_2p2l_ratio_wrapper, py::arg("x1"), py::arg("x2"),
+          py::arg("x3"), py::arg("r21"), py::arg("r22"), py::arg("r31"), py::arg("l1"), py::arg("l2"), py::arg("l3"),
+          "Minimal solver: 2 points with depth ratios between the views (e.g. SIFT scales) + 2 2D lines.");
     m.def("threeview_1l3p", &poselib::threeview_1l3p_wrapper, py::arg("x1"), py::arg("x2"), py::arg("x3"),
           py::arg("d1"), py::arg("d2"), py::arg("d3"), "Minimal solver: 1 line direction + 3 points (bearings).");
     m.def("threeview_2l", &poselib::threeview_2l_wrapper, py::arg("L1"), py::arg("L2"), py::arg("L3"),

@@ -152,17 +152,24 @@ RansacStats ransac_3v_hybrid(const std::vector<Point2D> &x1, const std::vector<P
     *three_view_pose = ThreeViewCameraPose();
     RansacStats stats;
 
-    const size_t min_points = opt.hybrid_solver == 1 ? 3 : 2;
-    if (x1.size() >= min_points && !l1.empty()) {
+    const size_t min_points = opt.hybrid_solver == 1 ? 3 : (opt.hybrid_solver == 3 ? 5 : 2);
+    const size_t min_lines = opt.hybrid_solver == 2 ? 2 : (opt.hybrid_solver == 3 ? 0 : 1);
+    if (x1.size() >= min_points && l1.size() >= min_lines) {
         ThreeViewHybridEstimator estimator(opt, x1, x2, x3, X1, X2, X3, l1, l2, l3, L1, L2, L3);
         stats = ransac<ThreeViewHybridEstimator>(estimator, opt, three_view_pose);
     }
 
     get_inliers(*three_view_pose, x1, x2, x3, opt.max_epipolar_error * opt.max_epipolar_error, point_inliers);
     size_t num_inl;
-    compute_threeview_line_msac_score(*three_view_pose, make_line_tracks(l1, l2, l3),
-                                      opt.max_line_error * opt.max_line_error, &num_inl, line_inliers,
-                                      opt.line_sampson);
+    if (opt.threeview_line_error == 1)
+        compute_threeview_angular_line_msac_score(
+            *three_view_pose, make_threeview_angular_lines(L1, L2, L3), opt.line_residual,
+            opt.max_epipolar_error / std::sin(opt.max_line_angle * M_PI / 180.0),
+            opt.max_epipolar_error * opt.max_epipolar_error, &num_inl, line_inliers);
+    else
+        compute_threeview_line_msac_score(*three_view_pose, make_line_tracks(l1, l2, l3),
+                                          opt.max_line_error * opt.max_line_error, &num_inl, line_inliers,
+                                          opt.line_sampson);
     return stats;
 }
 

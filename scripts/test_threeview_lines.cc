@@ -148,6 +148,52 @@ static int test_solvers() {
         if (best > 1e-6)
             fail_1l3p++;
     }
+    // 2p2l (depth within views) and 2p2l_ratio (depth ratios between views), lines not through the points
+    int fail_2p2l = 0, fail_2p2l_ratio = 0;
+    double max_models_2p2l = 0, max_models_2p2l_ratio = 0;
+    for (int trial = 0; trial < trials; ++trial) {
+        Scene sc = random_scene();
+        const Eigen::Matrix3d R[3] = {Eigen::Matrix3d::Identity(), sc.R2, sc.R3};
+        const Eigen::Vector3d t[3] = {Eigen::Vector3d::Zero(), sc.t2, sc.t3};
+        std::vector<Eigen::Vector3d> X[3], x[3], l[3];
+        const Eigen::Vector3d P[2] = {random_point(), random_point()};
+        for (int k = 0; k < 3; ++k)
+            for (int i = 0; i < 2; ++i) {
+                X[k].push_back(sc.s[k] * (R[k] * P[i] + t[k]));
+                x[k].push_back((R[k] * P[i] + t[k]).normalized());
+            }
+        for (int i = 0; i < 2; ++i) {
+            Line3D L[3];
+            Line2D l2d[3];
+            random_line(sc, L, l2d);
+            for (int k = 0; k < 3; ++k)
+                l[k].push_back(l2d[k].x1.homogeneous().cross(l2d[k].x2.homogeneous()));
+        }
+        std::vector<ThreeViewCameraPose> models;
+        threeview_2p2l(X[0], X[1], X[2], l[0], l[1], l[2], &models);
+        max_models_2p2l = std::max<double>(max_models_2p2l, models.size());
+        if (best_error(models, sc) > 1e-6)
+            fail_2p2l++;
+
+        // true depths (scale of view 1), translation in units of the depth of point 0 in view 1
+        double d[3][2];
+        for (int k = 0; k < 3; ++k)
+            for (int i = 0; i < 2; ++i)
+                d[k][i] = (R[k] * P[i] + t[k])(2);
+        threeview_2p2l_ratio(x[0], x[1], x[2], d[1][0] / d[0][0], d[1][1] / d[0][1], d[2][0] / d[0][0], l[0], l[1],
+                             l[2], &models);
+        max_models_2p2l_ratio = std::max<double>(max_models_2p2l_ratio, models.size());
+        Scene sc_ratio = sc;
+        sc_ratio.s[0] = 1.0 / d[0][0];
+        if (best_error(models, sc_ratio) > 1e-6)
+            fail_2p2l_ratio++;
+    }
+    std::cout << "2p2l failures: " << fail_2p2l << "/" << trials << " (max models " << max_models_2p2l << ")\n";
+    std::cout << "2p2l_ratio failures: " << fail_2p2l_ratio << "/" << trials << " (max models "
+              << max_models_2p2l_ratio << ")\n";
+    fails += fail_2p2l > trials / 100;
+    fails += fail_2p2l_ratio > trials / 100;
+
     std::cout << "1l3p failures: " << fail_1l3p << "/" << trials << " (max models " << max_models_1l3p << ")\n";
     fails += fail_1l3p > trials / 100;
 
@@ -315,9 +361,88 @@ static int test_refinement_basin(double rot_noise, double t_noise, double min_pl
     return converged;
 }
 
+// Gradient of the angular line cost (trivial loss: cost = sum s^2 |r|^2, gradient = 2 Jtr) vs finite differences
+static int test_angular_jacobian(int line_residual) {
+    Scene sc = random_scene();
+    std::vector<Line3D> L1, L2, L3;
+    for (int i = 0; i < 20; ++i) {
+        Line3D L[3];
+        Line2D l[3];
+        random_line(sc, L, l);
+        // perturb the depths so that the residuals are non-zero
+        for (int k = 0; k < 3; ++k) {
+            L[k].X1 *= 1.0 + 0.05 * randn();
+            L[k].X2 *= 1.0 + 0.05 * randn();
+        }
+        L1.push_back(L[0]);
+        L2.push_back(L[1]);
+        L3.push_back(L[2]);
+    }
+    const ThreeViewAngularLines lines = make_threeview_angular_lines(L1, L2, L3);
+    ThreeViewCameraPose pose(CameraPose(sc.R2, Eigen::Vector3d(sc.t2.normalized())),
+                             CameraPose(sc.R3, Eigen::Vector3d(sc.t3 / sc.t2.norm())));
+    TrivialLoss loss_fn;
+    ThreeViewAngularLineJacobianAccumulator<TrivialLoss> accum(lines, line_residual, loss_fn, 0.7, 3.0);
+    Eigen::Matrix<double, 11, 11> JtJ = Eigen::Matrix<double, 11, 11>::Zero();
+    Eigen::Matrix<double, 11, 1> Jtr = Eigen::Matrix<double, 11, 1>::Zero();
+    accum.accumulate(pose, JtJ, Jtr);
+
+    Eigen::Matrix<double, 3, 2> tangent_basis;
+    tangent_basis.col(0) = pose.pose12.t.cross(Eigen::Vector3d::UnitX()).normalized();
+    tangent_basis.col(1) = tangent_basis.col(0).cross(pose.pose12.t).normalized();
+    const double h = 1e-6;
+    double max_rel_err = 0.0;
+    for (int p = 0; p < 11; ++p) {
+        Eigen::Matrix<double, 11, 1> dp = Eigen::Matrix<double, 11, 1>::Zero();
+        dp(p) = h;
+        const double num = (accum.residual(threeview_step(dp, pose, tangent_basis)) -
+                            accum.residual(threeview_step(-dp, pose, tangent_basis))) /
+                           (2 * h);
+        max_rel_err = std::max(max_rel_err, std::abs(num - 2 * Jtr(p)) / std::max(1.0, std::abs(num)));
+    }
+    std::cout << "angular line jacobian (line_residual " << line_residual << ") max error: " << max_rel_err << "\n";
+    return max_rel_err > 1e-5;
+}
+
+// The hybrid accumulators without lines must give the same refinement as ThreeViewRelativePoseJacobianAccumulator
+static int test_hybrid_points_only() {
+    Scene sc = random_scene();
+    const Eigen::Matrix3d R[3] = {Eigen::Matrix3d::Identity(), sc.R2, sc.R3};
+    const Eigen::Vector3d t[3] = {Eigen::Vector3d::Zero(), sc.t2, sc.t3};
+    std::vector<Point2D> x[3];
+    for (int i = 0; i < 200; ++i) {
+        const Eigen::Vector3d P = random_point();
+        for (int k = 0; k < 3; ++k)
+            x[k].push_back((R[k] * P + t[k]).hnormalized() + 0.001 * Eigen::Vector2d(randn(), randn()));
+    }
+    const Eigen::Matrix3d R2i = rand_rot(0.02) * sc.R2, R3i = rand_rot(0.02) * sc.R3;
+    ThreeViewCameraPose init(CameraPose(R2i, Eigen::Vector3d((sc.t2 + 0.05 * randv()).normalized())),
+                             CameraPose(R3i, Eigen::Vector3d(sc.t3 / sc.t2.norm() + 0.05 * randv())));
+    BundleOptions bopt;
+    bopt.max_iterations = 25;
+    TruncatedLoss loss_fn(0.01);
+    UniformWeightVector w;
+    const std::vector<ThreeViewLineTrack> no_tracks;
+    const ThreeViewAngularLines no_lines;
+
+    ThreeViewCameraPose p0 = init, p1 = init, p2 = init;
+    ThreeViewRelativePoseJacobianAccumulator<TruncatedLoss> a0(x[0], x[1], x[2], loss_fn, w);
+    ThreeViewHybridJacobianAccumulator<TruncatedLoss> a1(x[0], x[1], x[2], no_tracks, loss_fn, 0.0, 0.1);
+    ThreeViewHybridAngularJacobianAccumulator<TruncatedLoss> a2(x[0], x[1], x[2], no_lines, 1, loss_fn, 0.0, 1.0);
+    BundleStats s0 = lm_impl<decltype(a0)>(a0, &p0, bopt);
+    BundleStats s1 = lm_impl<decltype(a1)>(a1, &p1, bopt);
+    BundleStats s2 = lm_impl<decltype(a2)>(a2, &p2, bopt);
+    std::cout << "points only refinement cost: plain " << s0.cost << " hybrid " << s1.cost << " hybrid angular "
+              << s2.cost << " (initial " << s0.initial_cost << ")\n";
+    return std::abs(s0.cost - s1.cost) > 1e-6 * s0.initial_cost || std::abs(s0.cost - s2.cost) > 1e-6 * s0.initial_cost;
+}
+
 int main() {
     int fails = 0;
+    fails += test_hybrid_points_only();
     fails += test_solvers();
+    for (int line_residual : {0, 1, 2})
+        fails += test_angular_jacobian(line_residual);
     for (bool sampson : {false, true})
         fails += test_jacobian(sampson);
     // Sampson: converges also with ill-conditioned tracks

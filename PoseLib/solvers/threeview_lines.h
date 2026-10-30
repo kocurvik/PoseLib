@@ -24,6 +24,28 @@ int threeview_2p1l(const std::vector<Eigen::Vector3d> &X1, const std::vector<Eig
                    const std::vector<Eigen::Vector3d> &X3, const Eigen::Vector3d &d1, const Eigen::Vector3d &d2,
                    const Eigen::Vector3d &d3, std::vector<ThreeViewCameraPose> *output);
 
+// 2 points with depth + 2 lines without depth (port of theory/solver_rotation_2sift_orientation.cpp,
+// theory/test_twosift3view.m). The vector between the two points fixes the rotations up to an angle about it, the
+// two angles follow from the rotation part of the trifocal line constraint det([l1, R2^T l2, R3^T l3]) = 0 of both
+// lines (the back-projected planes contain the common line direction). Up to 8 solutions. The lines need not pass
+// through the points.
+//   X1, X2, X3 - two 3D points (depth * ray) in each view
+//   l1, l2, l3 - two homogeneous 2D lines (normalized image coordinates) in each view
+int threeview_2p2l(const std::vector<Eigen::Vector3d> &X1, const std::vector<Eigen::Vector3d> &X2,
+                   const std::vector<Eigen::Vector3d> &X3, const std::vector<Eigen::Vector3d> &l1,
+                   const std::vector<Eigen::Vector3d> &l2, const std::vector<Eigen::Vector3d> &l3,
+                   std::vector<ThreeViewCameraPose> *output);
+
+// As threeview_2p2l, but with depth ratios between the views instead of depths within the views (e.g. from SIFT
+// scales, depth ratio = inverse scale ratio), as in theory/test_twosift3view.m: r21 = depth of point 0 in view 2 /
+// depth in view 1, r22 the same for point 1, r31 = depth of point 0 in view 3 / depth in view 1. The depth of point
+// 1 in views 1 and 3 is recovered from the length of the vector between the points (up to 2 x 2 candidates).
+//   x1, x2, x3 - two bearing vectors (z > 0) in each view
+int threeview_2p2l_ratio(const std::vector<Eigen::Vector3d> &x1, const std::vector<Eigen::Vector3d> &x2,
+                         const std::vector<Eigen::Vector3d> &x3, double r21, double r22, double r31,
+                         const std::vector<Eigen::Vector3d> &l1, const std::vector<Eigen::Vector3d> &l2,
+                         const std::vector<Eigen::Vector3d> &l3, std::vector<ThreeViewCameraPose> *output);
+
 // 1 line direction + 3 points without depth. The line direction acts as a known vertical direction: views 1-2 are
 // solved with the upright 3 point relative pose solver, view 3 with the upright 2 point absolute pose solver
 // (points 0, 1 triangulated from views 1-2). For each pose of views 1-2 only the view 3 solution (over the

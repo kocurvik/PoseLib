@@ -51,8 +51,11 @@ class ThreeViewLineEstimator {
 //   X1, X2, X3 - corresponding 3D points in the camera frames (depth * ray), arbitrary scale per view
 //   l*, L*     - see ThreeViewLineEstimator
 // The score is the sum of the point (Sampson) and line MSAC scores, the line one weighted by opt.line_weight.
+// Line error (opt.threeview_line_error): 0 - transfer distance, 1 - angular residuals of the three pairs (see
+// ThreeViewAngularLines), scaled by line_scale = max_epipolar_error / sin(opt.max_line_angle).
 // Minimal solver is selected by opt.hybrid_solver: 0 - 2p1l, 1 - 1l3p (1 line direction + 3 points, the point
-// depths X* are not used).
+// depths X* are not used), 2 - 2p2l (2 points with depth + 2 lines, only the 2D lines are used), 3 - 5p3v (points
+// only, the lines are used in scoring and refinement only and are not counted in sample_sz, num_data and the inliers).
 class ThreeViewHybridEstimator {
   public:
     ThreeViewHybridEstimator(const RansacOptions &ransac_opt, const std::vector<Point2D> &x1,
@@ -62,32 +65,44 @@ class ThreeViewHybridEstimator {
                              const std::vector<Line2D> &l2, const std::vector<Line2D> &l3,
                              const std::vector<Line3D> &L1, const std::vector<Line3D> &L2,
                              const std::vector<Line3D> &L3)
-        : sample_sz(ransac_opt.hybrid_solver == 1 ? 4 : 3), num_data(x1.size() + l1.size()), opt(ransac_opt), x1(x1),
-          x2(x2), x3(x3), X1(X1), X2(X2), X3(X3), L1(L1), L2(L2), L3(L3), tracks(make_line_tracks(l1, l2, l3)) {
+        : sample_sz(ransac_opt.hybrid_solver == 0 ? 3 : (ransac_opt.hybrid_solver == 3 ? 5 : 4)),
+          num_data(x1.size() + (ransac_opt.hybrid_solver == 3 ? 0 : l1.size())),
+          num_sample_lines(ransac_opt.hybrid_solver == 2 ? 2 : (ransac_opt.hybrid_solver == 3 ? 0 : 1)),
+          opt(ransac_opt), x1(x1), x2(x2), x3(x3), X1(X1),
+          X2(X2), X3(X3), L1(L1), L2(L2), L3(L3), tracks(make_line_tracks(l1, l2, l3)),
+          angular_lines(make_threeview_angular_lines(L1, L2, L3)),
+          line_scale(ransac_opt.max_epipolar_error / std::sin(ransac_opt.max_line_angle * M_PI / 180.0)) {
         rng = opt.seed;
-        X1s.resize(sample_sz - 1);
-        X2s.resize(sample_sz - 1);
-        X3s.resize(sample_sz - 1);
-        sample.resize(sample_sz - 1);
+        X1s.resize(sample_sz - num_sample_lines);
+        X2s.resize(sample_sz - num_sample_lines);
+        X3s.resize(sample_sz - num_sample_lines);
+        sample.resize(sample_sz - num_sample_lines);
+        line_sample.resize(num_sample_lines);
+        for (auto &l : ls)
+            l.resize(num_sample_lines);
     }
 
     void generate_models(std::vector<ThreeViewCameraPose> *models);
     double score_model(const ThreeViewCameraPose &three_view_pose, size_t *inlier_count) const;
     void refine_model(ThreeViewCameraPose *three_view_pose) const;
 
-    const size_t sample_sz; // number of points + 1 line
+    const size_t sample_sz; // number of points + lines
     const size_t num_data;
 
   private:
+    const size_t num_sample_lines;
     const RansacOptions &opt;
     const std::vector<Point2D> &x1, &x2, &x3;
     const std::vector<Eigen::Vector3d> &X1, &X2, &X3;
     const std::vector<Line3D> &L1, &L2, &L3;
     const std::vector<ThreeViewLineTrack> tracks;
+    const ThreeViewAngularLines angular_lines;
+    const double line_scale;
 
     RNG_t rng;
     std::vector<Eigen::Vector3d> X1s, X2s, X3s;
-    std::vector<size_t> sample;
+    std::vector<Eigen::Vector3d> ls[3];
+    std::vector<size_t> sample, line_sample;
 };
 
 // Two view relative pose from points and 3D line directions. A line track (with endpoint depths) gives a common

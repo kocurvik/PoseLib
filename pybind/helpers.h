@@ -67,6 +67,7 @@ void update_ransac_options(const py::dict &input, RansacOptions &ransac_opt) {
     update(input, "twoview_line_refine", ransac_opt.twoview_line_refine);
     update(input, "max_line_angle", ransac_opt.max_line_angle);
     update(input, "line_residual", ransac_opt.line_residual);
+    update(input, "threeview_line_error", ransac_opt.threeview_line_error);
     update(input, "line_sampson", ransac_opt.line_sampson);
 }
 

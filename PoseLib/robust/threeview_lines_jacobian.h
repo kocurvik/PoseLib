@@ -598,6 +598,183 @@ class RelativePoseHybridLineJacobianAccumulator {
     RelativePoseLineJacobianAccumulator<LossFunction, UniformWeightVector> line_accum;
 };
 
+// Three view lines with depth, angular residuals
+// ----------------------------------------------
+// The two view residuals of TwoViewLine (line_residual 0 - direction, 1 - plane, 2 - both; 3 is not supported) for
+// the pairs 1-2, 1-3 and 2-3 with R23 = R13 R12^T, each robustified separately. With the update of
+// ThreeViewRelativePoseJacobianAccumulator (R12 <- R12 exp([w12]_x), R13 <- R13 exp([w13]_x)) the derivative of R b
+// for a vector b in the first view of the pair is
+//   1-2: -R12 [b]_x w12,   1-3: -R13 [b]_x w13,   2-3: R13 [v]_x (w12 - w13), v = R12^T b.
+// With r_plane = (n_b^T R d_a, d_b^T R n_a) and r_direction = (R d_a) x d_b = -[d_b]_x R d_a the Jacobians follow.
+// The rotations do not depend on the translations, so only the rotation blocks (0-2, 5-7) are filled.
+
+struct ThreeViewAngularLines {
+    std::vector<TwoViewLine> l12, l13, l23;
+};
+
+inline ThreeViewAngularLines make_threeview_angular_lines(const std::vector<Line3D> &L1, const std::vector<Line3D> &L2,
+                                                          const std::vector<Line3D> &L3) {
+    return {make_twoview_lines(L1, L2), make_twoview_lines(L1, L3), make_twoview_lines(L2, L3)};
+}
+
+inline ThreeViewAngularLines select_angular_lines(const ThreeViewAngularLines &lines, const std::vector<char> &inliers) {
+    ThreeViewAngularLines out;
+    for (size_t k = 0; k < inliers.size(); ++k) {
+        if (inliers[k]) {
+            out.l12.push_back(lines.l12[k]);
+            out.l13.push_back(lines.l13[k]);
+            out.l23.push_back(lines.l23[k]);
+        }
+    }
+    return out;
+}
+
+// Sum of the two view MSAC scores of the three pairs, a line is an inlier if it is an inlier in all pairs.
+inline double compute_threeview_angular_line_msac_score(const ThreeViewCameraPose &pose,
+                                                        const ThreeViewAngularLines &lines, int line_residual,
+                                                        double residual_scale, double sq_threshold,
+                                                        size_t *inlier_count, std::vector<char> *inliers = nullptr) {
+    std::vector<char> inl12, inl13, inl23;
+    double score = compute_twoview_line_msac_score(pose.pose12.R(), lines.l12, line_residual, residual_scale,
+                                                   sq_threshold, &inl12);
+    score += compute_twoview_line_msac_score(pose.pose13.R(), lines.l13, line_residual, residual_scale, sq_threshold,
+                                             &inl13);
+    score += compute_twoview_line_msac_score(pose.pose23().R(), lines.l23, line_residual, residual_scale,
+                                             sq_threshold, &inl23);
+    *inlier_count = 0;
+    if (inliers)
+        inliers->resize(lines.l12.size());
+    for (size_t k = 0; k < lines.l12.size(); ++k) {
+        const bool inlier = inl12[k] && inl13[k] && inl23[k];
+        *inlier_count += inlier;
+        if (inliers)
+            (*inliers)[k] = inlier;
+    }
+    return score;
+}
+
+template <typename LossFunction>
+class ThreeViewAngularLineJacobianAccumulator {
+  public:
+    ThreeViewAngularLineJacobianAccumulator(const ThreeViewAngularLines &lines, int line_residual,
+                                            const LossFunction &l, double weight_scale = 1.0,
+                                            double residual_scale = 1.0)
+        : lines(lines), line_residual(line_residual), loss_fn(l), weight_scale(weight_scale),
+          residual_scale_sq(residual_scale * residual_scale) {}
+
+    double residual(const ThreeViewCameraPose &pose) const {
+        const Eigen::Matrix3d R[3] = {pose.pose12.R(), pose.pose13.R(), pose.pose23().R()};
+        const std::vector<TwoViewLine> *ls[3] = {&lines.l12, &lines.l13, &lines.l23};
+        double cost = 0.0;
+        for (int p = 0; p < 3; ++p) {
+            for (const TwoViewLine &l : *ls[p]) {
+                if (uses_direction_residual(line_residual))
+                    cost += weight_scale *
+                            loss_fn.loss(residual_scale_sq * line_direction_residual(R[p], l).squaredNorm());
+                if (line_residual != 0)
+                    cost += weight_scale * loss_fn.loss(residual_scale_sq * line_plane_residual(R[p], l).squaredNorm());
+            }
+        }
+        return cost;
+    }
+
+    size_t accumulate(const ThreeViewCameraPose &pose, Eigen::Matrix<double, 11, 11> &JtJ,
+                      Eigen::Matrix<double, 11, 1> &Jtr) const {
+        const Eigen::Matrix3d R12 = pose.pose12.R();
+        const Eigen::Matrix3d R13 = pose.pose13.R();
+        const Eigen::Matrix3d R[3] = {R12, R13, R13 * R12.transpose()};
+        const std::vector<TwoViewLine> *ls[3] = {&lines.l12, &lines.l13, &lines.l23};
+        size_t num_residuals = 0;
+
+        for (int p = 0; p < 3; ++p) {
+            // d(R b) / d(params)
+            auto dRb = [&](const Eigen::Vector3d &b) {
+                Eigen::Matrix<double, 3, 11> G = Eigen::Matrix<double, 3, 11>::Zero();
+                if (p == 0) {
+                    G.block<3, 3>(0, 0) = -R12 * skew_mat(b);
+                } else if (p == 1) {
+                    G.block<3, 3>(0, 5) = -R13 * skew_mat(b);
+                } else {
+                    const Eigen::Matrix3d M = R13 * skew_mat(R12.transpose() * b);
+                    G.block<3, 3>(0, 0) = M;
+                    G.block<3, 3>(0, 5) = -M;
+                }
+                return G;
+            };
+
+            for (const TwoViewLine &l : *ls[p]) {
+                if (uses_direction_residual(line_residual)) {
+                    const Eigen::Vector3d r = line_direction_residual(R[p], l);
+                    const double weight =
+                        residual_scale_sq * weight_scale * loss_fn.weight(residual_scale_sq * r.squaredNorm());
+                    if (weight > 0.0) {
+                        num_residuals += 3;
+                        const Eigen::Matrix<double, 3, 11> J = -skew_mat(l.d2) * dRb(l.d1);
+                        Jtr += weight * J.transpose() * r;
+                        JtJ += weight * J.transpose() * J;
+                    }
+                }
+                if (line_residual != 0) {
+                    const Eigen::Vector2d r = line_plane_residual(R[p], l);
+                    const double weight =
+                        residual_scale_sq * weight_scale * loss_fn.weight(residual_scale_sq * r.squaredNorm());
+                    if (weight > 0.0) {
+                        num_residuals += 2;
+                        Eigen::Matrix<double, 2, 11> J;
+                        J.row(0) = l.n2.transpose() * dRb(l.d1);
+                        J.row(1) = l.d2.transpose() * dRb(l.n1);
+                        Jtr += weight * J.transpose() * r;
+                        JtJ += weight * J.transpose() * J;
+                    }
+                }
+            }
+        }
+        return num_residuals;
+    }
+
+  private:
+    const ThreeViewAngularLines &lines;
+    const int line_residual;
+    const LossFunction &loss_fn;
+    const double weight_scale;
+    const double residual_scale_sq;
+};
+
+// Joint refinement of points (Sampson error) and angular line residuals (ThreeViewAngularLineJacobianAccumulator)
+template <typename LossFunction>
+class ThreeViewHybridAngularJacobianAccumulator {
+  public:
+    ThreeViewHybridAngularJacobianAccumulator(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                              const std::vector<Point2D> &x3, const ThreeViewAngularLines &lines,
+                                              int line_residual, const LossFunction &l, double line_weight,
+                                              double line_residual_scale)
+        : point_accum(x1, x2, x3, l, point_weights),
+          line_accum(lines, line_residual, l, line_weight, line_residual_scale) {}
+
+    double residual(const ThreeViewCameraPose &three_view_pose) const {
+        return point_accum.residual(three_view_pose) + line_accum.residual(three_view_pose);
+    }
+
+    size_t accumulate(const ThreeViewCameraPose &three_view_pose, Eigen::Matrix<double, 11, 11> &JtJ,
+                      Eigen::Matrix<double, 11, 1> &Jtr) {
+        size_t n = point_accum.accumulate(three_view_pose, JtJ, Jtr);
+        n += line_accum.accumulate(three_view_pose, JtJ, Jtr);
+        return n;
+    }
+
+    ThreeViewCameraPose step(Eigen::Matrix<double, 11, 1> dp, const ThreeViewCameraPose &three_view_pose) const {
+        return point_accum.step(dp, three_view_pose);
+    }
+
+    typedef ThreeViewCameraPose param_t;
+    static constexpr size_t num_params = 11;
+
+  private:
+    UniformWeightVector point_weights;
+    ThreeViewRelativePoseJacobianAccumulator<LossFunction, UniformWeightVector> point_accum;
+    ThreeViewAngularLineJacobianAccumulator<LossFunction> line_accum;
+};
+
 } // namespace poselib
 
 #endif
