@@ -27,6 +27,7 @@ std::vector<Test> register_optim_homography_test();
 std::vector<Test> register_optim_monodepth_relpose_test();
 std::vector<Test> register_optim_twoview_lines_test();
 std::vector<Test> register_threeview_test();
+std::vector<Test> register_solvers_monodepth_segments_test();
 std::vector<Test> register_recalibrator_test();
 
 namespace {
@@ -195,6 +196,7 @@ int main(int argc, char *argv[]) {
     RUN_TESTS(optim_monodepth_relpose_test);
     RUN_TESTS(optim_twoview_lines_test);
     RUN_TESTS(threeview_test);
+    RUN_TESTS(solvers_monodepth_segments_test);
     RUN_TESTS(recalibrator_test);
 
     std::cout << "Test suite finished (" << passed << " / " << num_tests << " passed, seed = " << opt.seed

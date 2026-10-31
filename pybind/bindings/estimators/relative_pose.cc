@@ -161,6 +161,29 @@ std::pair<MonoDepthTwoViewGeometry, py::dict> estimate_monodepth_relative_pose_l
                                                           camera_from_dict(camera2_dict), opt_dict);
 }
 
+std::pair<MonoDepthTwoViewGeometry, py::dict> estimate_monodepth_relative_pose_segments_wrapper(
+    const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
+    const std::vector<double> &depth_1, const std::vector<double> &depth_2,
+    const std::vector<Eigen::Vector4d> &segments2D_1, const std::vector<Eigen::Vector4d> &segments2D_2,
+    const std::vector<Eigen::Vector2d> &segment_depths_1, const std::vector<Eigen::Vector2d> &segment_depths_2,
+    const py::dict &camera1_dict, const py::dict &camera2_dict, const py::dict &opt_dict) {
+    MonoDepthRelativePoseOptions opt;
+    update_monodepth_relative_pose_options(opt_dict, opt);
+    const Camera camera1 = camera_from_dict(camera1_dict), camera2 = camera_from_dict(camera2_dict);
+    const std::vector<Line2D> s1 = lines_from_vectors(segments2D_1), s2 = lines_from_vectors(segments2D_2);
+    MonoDepthTwoViewGeometry geometry;
+    std::vector<char> inlier_mask;
+    py::gil_scoped_release release;
+    RansacStats stats =
+        estimate_monodepth_relative_pose_segments(points2D_1, points2D_2, depth_1, depth_2, s1, s2, segment_depths_1,
+                                                  segment_depths_2, camera1, camera2, opt, &geometry, &inlier_mask);
+    py::gil_scoped_acquire acquire;
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(geometry, output_dict);
+}
+
 std::pair<ThreeViewGeometry, py::dict> estimate_threeview_relative_pose_wrapper(
     const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
     const std::vector<Eigen::Vector2d> &points2D_3, const std::vector<double> &depth_1,
@@ -610,6 +633,13 @@ void register_relative_pose(py::module &m) {
           py::arg("lines2D_2"), py::arg("line_depths_1"), py::arg("line_depths_2"), py::arg("camera1_dict"),
           py::arg("camera2_dict"), py::arg("opt") = py::dict(),
           "RePoseD with lines with depth (optional line residuals in scoring, LO and refinement).");
+
+    m.def("estimate_monodepth_relative_pose_segments", &estimate_monodepth_relative_pose_segments_wrapper,
+          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("depth_1"), py::arg("depth_2"), py::arg("segments2D_1"),
+          py::arg("segments2D_2"), py::arg("segment_depths_1"), py::arg("segment_depths_2"), py::arg("camera1_dict"),
+          py::arg("camera2_dict"), py::arg("opt") = py::dict(),
+          "RePoseD with minimal samples from matched segments with depth (segment_solver: 0 - 1S1P, 1 - 2S), score and "
+          "refinement from the points only.");
 
     m.def("estimate_threeview_relative_pose", &estimate_threeview_relative_pose_wrapper, py::arg("points2D_1"),
           py::arg("points2D_2"), py::arg("points2D_3"), py::arg("depth_1"), py::arg("depth_2"), py::arg("depth_3"),

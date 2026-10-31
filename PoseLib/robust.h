@@ -112,6 +112,16 @@ RansacStats estimate_monodepth_relative_pose_lines(
     const Camera &camera1, const Camera &camera2, const MonoDepthRelativePoseOptions &opt,
     MonoDepthTwoViewGeometry *geometry, std::vector<char> *inliers);
 
+// RePoseD (estimate_monodepth_relative_pose) with minimal samples from matched segments with depth, see
+// MonoDepthRelativePoseSegmentEstimator. segments2D_1[k] matches segments2D_2[k] endpoint by endpoint, the score and the
+// refinement use the points only.
+RansacStats estimate_monodepth_relative_pose_segments(
+    const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2, const std::vector<double> &depth_1,
+    const std::vector<double> &depth_2, const std::vector<Line2D> &segments2D_1, const std::vector<Line2D> &segments2D_2,
+    const std::vector<Eigen::Vector2d> &segment_depths_1, const std::vector<Eigen::Vector2d> &segment_depths_2,
+    const Camera &camera1, const Camera &camera2, const MonoDepthRelativePoseOptions &opt,
+    MonoDepthTwoViewGeometry *geometry, std::vector<char> *inliers);
+
 // Three view relative pose from point tracks using LO-RANSAC followed by non-linear refinement, see ThreeViewEstimator.
 // Minimal solver ThreeViewOptions.threeview_solver: 5pt + P3P, RePoseD or 2-SIFT (samples features, in pixels). The
 // refinement uses the Sampson errors (weight_sampson), the symmetric reprojection errors (weight_reproj, needs the

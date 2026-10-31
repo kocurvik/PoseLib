@@ -28,6 +28,7 @@ set(SOURCES
     solvers/relpose_upright_3pt.cc
     solvers/relpose_upright_3pt_qep.cc
     solvers/relpose_2l2p.cc
+    solvers/relpose_monodepth_segments.cc
     solvers/threeview_2sift.cc
     solvers/relpose_upright_planar_2pt.cc
     solvers/relpose_upright_planar_3pt.cc
@@ -102,6 +103,7 @@ set(HEADERS_PUBLIC
     solvers/relpose_upright_3pt.h
     solvers/relpose_upright_3pt_qep.h
     solvers/relpose_2l2p.h
+    solvers/relpose_monodepth_segments.h
     solvers/threeview_2sift.h
     solvers/relpose_upright_planar_2pt.h
     solvers/relpose_upright_planar_3pt.h

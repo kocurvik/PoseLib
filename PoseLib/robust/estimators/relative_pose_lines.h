@@ -101,4 +101,44 @@ class MonoDepthRelativePoseLineEstimator {
     const double scale_reproj;
 };
 
+// RePoseD with the minimal samples from matched segments with depth (opt.segment_solver), the score and the refinement
+// are those of RelativePoseMonoDepthEstimator (points only). A segment is two 3D-3D point matches.
+//   0 - 1S1P: 1 segment + 1 point without its depth (relpose_monodepth_1s1p)
+//   1 - 2S: 2 segments (relpose_monodepth_2s)
+//   x1, x2 - points in normalized image coordinates, d1, d2 - their depths
+//   S1, S2 - matched 3D segments in the camera frames (depth * ray), S1[k].X1 matches S2[k].X1 and S1[k].X2 S2[k].X2
+class MonoDepthRelativePoseSegmentEstimator {
+  public:
+    MonoDepthRelativePoseSegmentEstimator(const MonoDepthRelativePoseOptions &opt, const std::vector<Point2D> &x1,
+                                          const std::vector<Point2D> &x2, const std::vector<double> &d1,
+                                          const std::vector<double> &d2, const std::vector<Line3D> &S1,
+                                          const std::vector<Line3D> &S2)
+        : point_estimator(opt, x1, x2, d1, d2), sample_sz(2), num_data(x1.size()), opt(opt), x1(x1), x2(x2), S1(S1),
+          S2(S2) {
+        rng = opt.ransac.seed;
+        segment_sample.resize(2);
+    }
+
+    void generate_models(std::vector<MonoDepthTwoViewGeometry> *models);
+    double score_model(const MonoDepthTwoViewGeometry &model, size_t *inlier_count) const {
+        return point_estimator.score_model(model, inlier_count);
+    }
+    void refine_model(MonoDepthTwoViewGeometry *model) const { point_estimator.refine_model(model); }
+
+  private:
+    RelativePoseMonoDepthEstimator point_estimator;
+
+  public:
+    const size_t sample_sz;
+    const size_t num_data;
+
+  private:
+    const MonoDepthRelativePoseOptions &opt;
+    const std::vector<Point2D> &x1, &x2;
+    const std::vector<Line3D> &S1, &S2;
+
+    RNG_t rng;
+    std::vector<size_t> segment_sample;
+};
+
 } // namespace poselib

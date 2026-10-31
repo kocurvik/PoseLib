@@ -190,6 +190,9 @@ struct MonoDepthRelativePoseOptions : TwoViewLineOptions {
     // The weight of the Sampson error compared to the reprojection error used by the monodepth estimators, which use
     // hybrid errors for LO.
     float weight_sampson = 1.0;
+    // Minimal solver of estimate_monodepth_relative_pose_segments: 0 - 1S1P (relpose_monodepth_1s1p), 1 - 2S
+    // (relpose_monodepth_2s)
+    int segment_solver = 0;
 };
 
 // Three view relative pose (estimate_threeview_relative_pose), see ThreeViewEstimator

@@ -5,6 +5,7 @@
 #include "PoseLib/robust/utils.h"
 #include "PoseLib/solvers/relpose_2l2p.h"
 #include "PoseLib/solvers/relpose_5pt.h"
+#include "PoseLib/solvers/relpose_monodepth_segments.h"
 #include "PoseLib/solvers/relpose_upright_3pt.h"
 #include "PoseLib/solvers/relpose_upright_3pt_qep.h"
 
@@ -155,6 +156,23 @@ void MonoDepthRelativePoseLineEstimator::refine_model(MonoDepthTwoViewGeometry *
     bundle_opt.loss_scale = opt.max_errors[1];
     refine_monodepth_relpose_lines(x1, x2, d1, d2, lines, opt.line_residual, model, scale_reproj, opt.weight_sampson,
                                    bundle_opt, opt.estimate_shift, opt.line_weight, line_scale);
+}
+
+void MonoDepthRelativePoseSegmentEstimator::generate_models(std::vector<MonoDepthTwoViewGeometry> *models) {
+    models->clear();
+    if (opt.segment_solver == 1) {
+        if (S1.size() < 2)
+            return;
+        draw_sample(2, S1.size(), &segment_sample, rng);
+        relpose_monodepth_2s(S1[segment_sample[0]], S1[segment_sample[1]], S2[segment_sample[0]], S2[segment_sample[1]],
+                             models);
+        return;
+    }
+    if (S1.empty() || x1.empty())
+        return;
+    const size_t segment = random_int(rng) % S1.size();
+    const size_t point = random_int(rng) % x1.size();
+    relpose_monodepth_1s1p(S1[segment], S2[segment], x1[point].homogeneous(), x2[point].homogeneous(), models);
 }
 
 } // namespace poselib

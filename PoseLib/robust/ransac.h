@@ -89,6 +89,13 @@ RansacStats ransac_monodepth_relpose_lines(const std::vector<Point2D> &x1, const
                                            const MonoDepthRelativePoseOptions &opt,
                                            MonoDepthTwoViewGeometry *best_model, std::vector<char> *best_inliers);
 
+// RePoseD with minimal samples from matched segments with depth (MonoDepthRelativePoseSegmentEstimator)
+RansacStats ransac_monodepth_relpose_segments(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                              const std::vector<double> &d1, const std::vector<double> &d2,
+                                              const std::vector<Line3D> &S1, const std::vector<Line3D> &S2,
+                                              const MonoDepthRelativePoseOptions &opt,
+                                              MonoDepthTwoViewGeometry *best_model, std::vector<char> *best_inliers);
+
 // Three view relative pose (ThreeViewEstimator, opt.threeview_solver). Returns an empty model if there are too few
 // points or features or the depths the options need are missing.
 RansacStats ransac_threeview(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,

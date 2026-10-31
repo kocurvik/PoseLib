@@ -243,6 +243,19 @@ RansacStats ransac_monodepth_relpose_lines(const std::vector<Point2D> &x1, const
     return stats;
 }
 
+RansacStats ransac_monodepth_relpose_segments(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                                              const std::vector<double> &d1, const std::vector<double> &d2,
+                                              const std::vector<Line3D> &S1, const std::vector<Line3D> &S2,
+                                              const MonoDepthRelativePoseOptions &opt,
+                                              MonoDepthTwoViewGeometry *best_model, std::vector<char> *best_inliers) {
+    best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
+    best_model->pose.t.setZero();
+    MonoDepthRelativePoseSegmentEstimator estimator(opt, x1, x2, d1, d2, S1, S2);
+    RansacStats stats = ransac<MonoDepthRelativePoseSegmentEstimator>(estimator, opt.ransac, best_model);
+    get_inliers(best_model->pose, x1, x2, opt.max_errors[1] * opt.max_errors[1], best_inliers);
+    return stats;
+}
+
 RansacStats ransac_threeview(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                              const std::vector<Point2D> &x3, const std::vector<double> &d1,
                              const std::vector<double> &d2, const std::vector<double> &d3,

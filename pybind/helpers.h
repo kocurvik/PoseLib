@@ -182,6 +182,7 @@ inline void update_monodepth_relative_pose_options(const py::dict &input, MonoDe
 
     update(input, "estimate_shift", opt.estimate_shift);
     update(input, "weight_sampson", opt.weight_sampson);
+    update(input, "segment_solver", opt.segment_solver);
     update_twoview_line_options(input, opt);
 }
 
