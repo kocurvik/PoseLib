@@ -161,6 +161,45 @@ std::pair<MonoDepthTwoViewGeometry, py::dict> estimate_monodepth_relative_pose_l
                                                           camera_from_dict(camera2_dict), opt_dict);
 }
 
+std::pair<ThreeViewGeometry, py::dict> estimate_threeview_relative_pose_wrapper(
+    const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
+    const std::vector<Eigen::Vector2d> &points2D_3, const std::vector<double> &depth_1,
+    const std::vector<double> &depth_2, const std::vector<double> &depth_3,
+    const std::vector<Eigen::Vector4d> &lines2D_1, const std::vector<Eigen::Vector4d> &lines2D_2,
+    const std::vector<Eigen::Vector4d> &lines2D_3, const std::vector<Eigen::Vector2d> &line_depths_1,
+    const std::vector<Eigen::Vector2d> &line_depths_2, const std::vector<Eigen::Vector2d> &line_depths_3,
+    const std::vector<Eigen::Vector2d> &feature_points_1, const std::vector<Eigen::Vector2d> &feature_points_2,
+    const std::vector<Eigen::Vector2d> &feature_points_3, const std::vector<Eigen::Vector4d> &feature_lines_1,
+    const std::vector<Eigen::Vector4d> &feature_lines_2, const std::vector<Eigen::Vector4d> &feature_lines_3,
+    const py::dict &camera1_dict, const py::dict &camera2_dict, const py::dict &camera3_dict,
+    const py::dict &opt_dict) {
+    ThreeViewOptions opt;
+    update_threeview_options(opt_dict, opt);
+    ThreeViewFeatures features;
+    features.x[0] = feature_points_1;
+    features.x[1] = feature_points_2;
+    features.x[2] = feature_points_3;
+    features.l[0] = lines_from_vectors(feature_lines_1);
+    features.l[1] = lines_from_vectors(feature_lines_2);
+    features.l[2] = lines_from_vectors(feature_lines_3);
+    const Camera camera1 = camera_from_dict(camera1_dict), camera2 = camera_from_dict(camera2_dict),
+                 camera3 = camera_from_dict(camera3_dict);
+    const std::vector<Line2D> l1 = lines_from_vectors(lines2D_1), l2 = lines_from_vectors(lines2D_2),
+                              l3 = lines_from_vectors(lines2D_3);
+    ThreeViewGeometry geometry;
+    std::vector<char> inlier_mask;
+    py::gil_scoped_release release;
+    RansacStats stats = estimate_threeview_relative_pose(points2D_1, points2D_2, points2D_3, depth_1, depth_2, depth_3,
+                                                         l1, l2, l3, line_depths_1, line_depths_2, line_depths_3,
+                                                         features, camera1, camera2, camera3, opt, &geometry,
+                                                         &inlier_mask);
+    py::gil_scoped_acquire acquire;
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(geometry, output_dict);
+}
+
 std::pair<ImagePair, py::dict>
 estimate_shared_focal_relative_pose_wrapper(const std::vector<Eigen::Vector2d> &points2D_1,
                                             const std::vector<Eigen::Vector2d> &points2D_2, const Eigen::Vector2d &pp,
@@ -571,6 +610,16 @@ void register_relative_pose(py::module &m) {
           py::arg("lines2D_2"), py::arg("line_depths_1"), py::arg("line_depths_2"), py::arg("camera1_dict"),
           py::arg("camera2_dict"), py::arg("opt") = py::dict(),
           "RePoseD with lines with depth (optional line residuals in scoring, LO and refinement).");
+
+    m.def("estimate_threeview_relative_pose", &estimate_threeview_relative_pose_wrapper, py::arg("points2D_1"),
+          py::arg("points2D_2"), py::arg("points2D_3"), py::arg("depth_1"), py::arg("depth_2"), py::arg("depth_3"),
+          py::arg("lines2D_1"), py::arg("lines2D_2"), py::arg("lines2D_3"), py::arg("line_depths_1"),
+          py::arg("line_depths_2"), py::arg("line_depths_3"), py::arg("feature_points_1"), py::arg("feature_points_2"),
+          py::arg("feature_points_3"), py::arg("feature_lines_1"), py::arg("feature_lines_2"),
+          py::arg("feature_lines_3"), py::arg("camera1_dict"), py::arg("camera2_dict"), py::arg("camera3_dict"),
+          py::arg("opt") = py::dict(),
+          "Three view relative pose (5pt + P3P, RePoseD or 2-SIFT) with Sampson, symmetric reprojection and line "
+          "residuals in the refinement.");
 
     m.def("estimate_shared_focal_relative_pose", &estimate_shared_focal_relative_pose_wrapper, py::arg("points2D_1"),
           py::arg("points2D_2"), py::arg("pp") = Eigen::Vector2d::Zero(), py::arg("opt") = py::dict(),

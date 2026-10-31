@@ -192,6 +192,23 @@ struct MonoDepthRelativePoseOptions : TwoViewLineOptions {
     float weight_sampson = 1.0;
 };
 
+// Three view relative pose (estimate_threeview_relative_pose), see ThreeViewEstimator
+struct ThreeViewOptions : TwoViewLineOptions {
+    RansacOptions ransac;
+    BundleOptions bundle;
+
+    // Inlier thresholds for reprojection error and Sampson error (in this order). The reprojection threshold only
+    // sets the relative weight of the reprojection errors in the refinement.
+    std::array<double, 2> max_errors = {12.0, 1.0};
+
+    // Minimal solver: 0 - 5pt + P3P, 1 - RePoseD (3 points with depths, P3P to views 2 and 3), 2 - 2-SIFT (2 oriented
+    // features, every feature is assumed to have the same scale in all views)
+    int threeview_solver = 0;
+    // Residuals of the LO and the final refinement, 0 switches a term off. The lines are switched by line_refine.
+    double weight_sampson = 1.0;
+    double weight_reproj = 0.0;
+};
+
 struct HomographyOptions {
     RansacOptions ransac;
     BundleOptions bundle;
@@ -220,6 +237,13 @@ struct Line3D {
     Line3D() {}
     Line3D(const Eigen::Vector3d &e1, const Eigen::Vector3d &e2) : X1(e1), X2(e2) {}
     Eigen::Vector3d X1, X2;
+};
+
+// Oriented features matched in three views for the 2-SIFT solver: a point and a line through it per view, e.g. the
+// orientation of a SIFT feature or a matched line with a point on it
+struct ThreeViewFeatures {
+    std::vector<Point2D> x[3];
+    std::vector<Line2D> l[3];
 };
 
 // Options for hybrid RANSAC with multiple data types and minimal solvers.

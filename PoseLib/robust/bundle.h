@@ -129,6 +129,17 @@ BundleStats refine_monodepth_relpose_lines(const std::vector<Point2D> &x1, const
                                            bool refine_shift = false, double line_weight = 1.0,
                                            double line_residual_scale = 1.0);
 
+// Three view refinement with the Sampson errors, the symmetric reprojection errors and the lines, see ThreeViewRefiner
+// in robust/optim/threeview.h. scale_reproj = 0 or weight_sampson = 0 switch the point terms off, with scale_reproj = 0
+// the depths are not used and may be empty, empty lines switch the line term off.
+struct ThreeViewLines;
+BundleStats refine_threeview(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                             const std::vector<Point2D> &x3, const std::vector<double> &d1,
+                             const std::vector<double> &d2, const std::vector<double> &d3, const ThreeViewLines &lines,
+                             int line_residual, ThreeViewGeometry *geometry, double scale_reproj, double weight_sampson,
+                             const BundleOptions &opt = BundleOptions(), double line_weight = 1.0,
+                             double line_residual_scale = 1.0);
+
 // Relative pose with single unknown focal refinement. Minimizes Sampson error error.
 BundleStats refine_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         ImagePair *image_pair, const BundleOptions &opt = BundleOptions(),

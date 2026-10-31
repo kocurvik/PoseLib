@@ -112,6 +112,21 @@ RansacStats estimate_monodepth_relative_pose_lines(
     const Camera &camera1, const Camera &camera2, const MonoDepthRelativePoseOptions &opt,
     MonoDepthTwoViewGeometry *geometry, std::vector<char> *inliers);
 
+// Three view relative pose from point tracks using LO-RANSAC followed by non-linear refinement, see ThreeViewEstimator.
+// Minimal solver ThreeViewOptions.threeview_solver: 5pt + P3P, RePoseD or 2-SIFT (samples features, in pixels). The
+// refinement uses the Sampson errors (weight_sampson), the symmetric reprojection errors (weight_reproj, needs the
+// depths) and the lines with depth (line_refine). Thresholds: max_errors (reprojection, Sampson, px) and max_line_angle
+// (deg). The depths and features can be empty if they are not needed. The final loss scale is 0.5 * the Sampson threshold.
+RansacStats estimate_threeview_relative_pose(
+    const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
+    const std::vector<Point2D> &points2D_3, const std::vector<double> &depth_1, const std::vector<double> &depth_2,
+    const std::vector<double> &depth_3, const std::vector<Line2D> &lines2D_1, const std::vector<Line2D> &lines2D_2,
+    const std::vector<Line2D> &lines2D_3, const std::vector<Eigen::Vector2d> &line_depths_1,
+    const std::vector<Eigen::Vector2d> &line_depths_2, const std::vector<Eigen::Vector2d> &line_depths_3,
+    const ThreeViewFeatures &features, const Camera &camera1, const Camera &camera2, const Camera &camera3,
+    const ThreeViewOptions &opt,
+    ThreeViewGeometry *geometry, std::vector<char> *inliers);
+
 // Estimates relative pose with shared unknown focal length using LO-RANSAC followed by non-linear refinement
 // Threshold for Sampson error is set by RelativePoseOptions.max_error
 RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &points2D_1,

@@ -65,6 +65,21 @@ void register_types(py::module &m) {
                    "shift2: " + std::to_string(a.shift2) + "]";
         });
 
+    py::classh<ThreeViewGeometry>(m, "ThreeViewGeometry")
+        .def(py::init<>())
+        .def(py::init<const CameraPose &, const CameraPose &, double, double>(), py::arg("pose12"), py::arg("pose13"),
+             py::arg("scale2") = 1.0, py::arg("scale3") = 1.0)
+        .def_readwrite("pose12", &ThreeViewGeometry::pose12)
+        .def_readwrite("pose13", &ThreeViewGeometry::pose13)
+        .def_readwrite("scale2", &ThreeViewGeometry::scale2)
+        .def_readwrite("scale3", &ThreeViewGeometry::scale3)
+        .def("pose23", &ThreeViewGeometry::pose23, "Returns the relative pose of views 2 and 3.")
+        .def("__repr__", [](const ThreeViewGeometry &a) {
+            return "[q12: " + toString(a.pose12.q.transpose()) + ", t12: " + toString(a.pose12.t.transpose()) +
+                   ", q13: " + toString(a.pose13.q.transpose()) + ", t13: " + toString(a.pose13.t.transpose()) +
+                   ", scale2: " + std::to_string(a.scale2) + ", scale3: " + std::to_string(a.scale3) + "]";
+        });
+
     py::classh<Camera>(m, "Camera")
         .def(py::init<>())
         .def(py::init<const std::string &, const std::vector<double> &, int, int>())

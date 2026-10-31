@@ -28,6 +28,7 @@ set(SOURCES
     solvers/relpose_upright_3pt.cc
     solvers/relpose_upright_3pt_qep.cc
     solvers/relpose_2l2p.cc
+    solvers/threeview_2sift.cc
     solvers/relpose_upright_planar_2pt.cc
     solvers/relpose_upright_planar_3pt.cc
     solvers/relpose_8pt.cc
@@ -60,6 +61,7 @@ set(SOURCES
     robust/estimators/absolute_pose.cc
     robust/estimators/relative_pose.cc
     robust/estimators/relative_pose_lines.cc
+    robust/estimators/threeview_relpose.cc
     robust/estimators/hybrid_pose.cc
     robust/estimators/homography.cc
     robust/optim/lm_impl.cc
@@ -100,6 +102,7 @@ set(HEADERS_PUBLIC
     solvers/relpose_upright_3pt.h
     solvers/relpose_upright_3pt_qep.h
     solvers/relpose_2l2p.h
+    solvers/threeview_2sift.h
     solvers/relpose_upright_planar_2pt.h
     solvers/relpose_upright_planar_3pt.h
     solvers/relpose_8pt.h
@@ -136,6 +139,7 @@ set(HEADERS_PUBLIC
     robust/estimators/absolute_pose.h
     robust/estimators/relative_pose.h
     robust/estimators/relative_pose_lines.h
+    robust/estimators/threeview_relpose.h
     robust/estimators/hybrid_pose.h
     robust/estimators/homography.h
     robust/hybrid_ransac.h

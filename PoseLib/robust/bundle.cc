@@ -41,6 +41,7 @@
 #include "PoseLib/robust/optim/jacobian_accumulator.h"
 #include "PoseLib/robust/optim/lm_impl.h"
 #include "PoseLib/robust/optim/monodepth_relpose.h"
+#include "PoseLib/robust/optim/threeview.h"
 #include "PoseLib/robust/optim/twoview_lines.h"
 #include "PoseLib/robust/robust_loss.h"
 
@@ -642,6 +643,20 @@ BundleStats refine_monodepth_relpose_lines(const std::vector<Point2D> &x1, const
                                                  weight_sampson, opt, refine_shift, line_weight, line_residual_scale);
     return refine_monodepth_relpose_lines<7>(x1, x2, d1, d2, lines, line_residual, pose, scale_reproj,
                                              weight_sampson, opt, refine_shift, line_weight, line_residual_scale);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+// Three view relative pose refinement
+
+BundleStats refine_threeview(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                             const std::vector<Point2D> &x3, const std::vector<double> &d1,
+                             const std::vector<double> &d2, const std::vector<double> &d3, const ThreeViewLines &lines,
+                             int line_residual, ThreeViewGeometry *geometry, double scale_reproj, double weight_sampson,
+                             const BundleOptions &opt, double line_weight, double line_residual_scale) {
+    IterationCallback callback = setup_callback(opt);
+    ThreeViewRefiner<> refiner(x1, x2, x3, d1, d2, d3, lines, line_residual, scale_reproj, weight_sampson, line_weight,
+                               line_residual_scale);
+    return lm_impl<decltype(refiner)>(refiner, geometry, opt, callback);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -35,6 +35,7 @@
 #include "PoseLib/robust/estimators/hybrid_pose.h"
 #include "PoseLib/robust/estimators/relative_pose.h"
 #include "PoseLib/robust/estimators/relative_pose_lines.h"
+#include "PoseLib/robust/estimators/threeview_relpose.h"
 #include "PoseLib/solvers/gen_relpose_5p1pt.h"
 #include "PoseLib/solvers/p3p.h"
 #include "PoseLib/solvers/relpose_5pt.h"
@@ -239,6 +240,28 @@ RansacStats ransac_monodepth_relpose_lines(const std::vector<Point2D> &x1, const
     MonoDepthRelativePoseLineEstimator estimator(opt, x1, x2, d1, d2, L1, L2);
     RansacStats stats = ransac<MonoDepthRelativePoseLineEstimator>(estimator, opt.ransac, best_model);
     get_inliers(best_model->pose, x1, x2, opt.max_errors[1] * opt.max_errors[1], best_inliers);
+    return stats;
+}
+
+RansacStats ransac_threeview(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                             const std::vector<Point2D> &x3, const std::vector<double> &d1,
+                             const std::vector<double> &d2, const std::vector<double> &d3,
+                             const std::vector<Line3D> &L1, const std::vector<Line3D> &L2,
+                             const std::vector<Line3D> &L3, const ThreeViewFeatures &features,
+                             const ThreeViewOptions &opt, ThreeViewGeometry *best_model,
+                             std::vector<char> *best_inliers) {
+    *best_model = ThreeViewGeometry();
+    const bool needs_depth = opt.threeview_solver == 1 || opt.weight_reproj > 0.0;
+    const bool has_depth = d1.size() == x1.size() && d2.size() == x1.size() && d3.size() == x1.size();
+    const bool too_few = opt.threeview_solver == 2 ? features.x[0].size() < 2
+                                                   : x1.size() < (opt.threeview_solver == 0 ? 5u : 3u);
+    if (too_few || (needs_depth && !has_depth)) {
+        best_inliers->assign(x1.size(), 0);
+        return RansacStats();
+    }
+    ThreeViewEstimator estimator(opt, x1, x2, x3, d1, d2, d3, L1, L2, L3, features);
+    RansacStats stats = ransac<ThreeViewEstimator, ThreeViewGeometry>(estimator, opt.ransac, best_model);
+    estimator.get_inliers(*best_model, opt.max_errors[1] * opt.max_errors[1], best_inliers);
     return stats;
 }
 

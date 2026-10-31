@@ -185,6 +185,27 @@ inline void update_monodepth_relative_pose_options(const py::dict &input, MonoDe
     update_twoview_line_options(input, opt);
 }
 
+inline void update_threeview_options(const py::dict &input, ThreeViewOptions &opt) {
+    if (input.contains("ransac")) {
+        update_ransac_options(input["ransac"].cast<py::dict>(), opt.ransac);
+    }
+    if (input.contains("bundle")) {
+        update_bundle_options(input["bundle"].cast<py::dict>(), opt.bundle);
+    }
+    // max_errors is a std::array<double, 2> with indices [reproj_error, sampson_error]
+    if (input.contains("max_errors")) {
+        auto max_errors_list = input["max_errors"].cast<std::vector<double>>();
+        if (max_errors_list.size() >= 2) {
+            opt.max_errors[0] = max_errors_list[0];
+            opt.max_errors[1] = max_errors_list[1];
+        }
+    }
+    update(input, "threeview_solver", opt.threeview_solver);
+    update(input, "weight_sampson", opt.weight_sampson);
+    update(input, "weight_reproj", opt.weight_reproj);
+    update_twoview_line_options(input, opt);
+}
+
 inline void write_to_dict(const RansacOptions &ransac_opt, py::dict &dict) {
     dict["max_iterations"] = ransac_opt.max_iterations;
     dict["min_iterations"] = ransac_opt.min_iterations;

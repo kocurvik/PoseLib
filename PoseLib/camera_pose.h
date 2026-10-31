@@ -105,6 +105,26 @@ struct alignas(32) MonoDepthTwoViewGeometry {
         : pose(pose), scale(scale), shift1(s1), shift2(s2) {}
 };
 
+// Three views relative to view 1: X_2 = R12 X_1 + t12, X_3 = R13 X_1 + t13, the translations share one scale. With
+// depths d of the points of a view X_1 = d1 x1, X_2 = scale2 d2 x2, X_3 = scale3 d3 x3.
+struct alignas(32) ThreeViewGeometry {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    CameraPose pose12;
+    CameraPose pose13;
+    double scale2;
+    double scale3;
+
+    ThreeViewGeometry() : pose12(), pose13(), scale2(1.0), scale3(1.0) {}
+    ThreeViewGeometry(const CameraPose &pose12, const CameraPose &pose13, double scale2 = 1.0, double scale3 = 1.0)
+        : pose12(pose12), pose13(pose13), scale2(scale2), scale3(scale3) {}
+
+    inline CameraPose pose23() const {
+        const Eigen::Matrix3d R23 = pose13.R() * pose12.R().transpose();
+        return CameraPose(R23, Eigen::Vector3d(pose13.t - R23 * pose12.t));
+    }
+};
+
 struct alignas(32) Image {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     // Struct simply holds information about camera and its pose

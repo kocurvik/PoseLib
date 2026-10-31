@@ -28,6 +28,7 @@
 
 #include "robust.h"
 
+#include "PoseLib/robust/estimators/threeview_relpose.h"
 #include "PoseLib/robust/optim/twoview_lines.h"
 #include "PoseLib/robust/utils.h"
 #include "robust/recalibrator.h"
@@ -544,6 +545,53 @@ RansacStats estimate_monodepth_relative_pose_lines(
             refine_monodepth_relpose(x1_inliers, x2_inliers, d1_inliers, d2_inliers, geometry, scale_reproj,
                                      weight_sampson, scaled_bundle_opt, opt.estimate_shift);
         }
+    }
+    return stats;
+}
+
+RansacStats estimate_threeview_relative_pose(
+    const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
+    const std::vector<Point2D> &points2D_3, const std::vector<double> &depth_1, const std::vector<double> &depth_2,
+    const std::vector<double> &depth_3, const std::vector<Line2D> &lines2D_1, const std::vector<Line2D> &lines2D_2,
+    const std::vector<Line2D> &lines2D_3, const std::vector<Eigen::Vector2d> &line_depths_1,
+    const std::vector<Eigen::Vector2d> &line_depths_2, const std::vector<Eigen::Vector2d> &line_depths_3,
+    const ThreeViewFeatures &features, const Camera &camera1, const Camera &camera2, const Camera &camera3,
+    const ThreeViewOptions &opt, ThreeViewGeometry *geometry, std::vector<char> *inliers) {
+    const size_t num_pts = points2D_1.size();
+    std::vector<Point2D> x1(num_pts), x2(num_pts), x3(num_pts);
+    for (size_t k = 0; k < num_pts; ++k) {
+        camera1.unproject(points2D_1[k], &x1[k]);
+        camera2.unproject(points2D_2[k], &x2[k]);
+        camera3.unproject(points2D_3[k], &x3[k]);
+    }
+    const std::vector<Line3D> L1 = calibrate_lines(lines2D_1, line_depths_1, camera1);
+    const std::vector<Line3D> L2 = calibrate_lines(lines2D_2, line_depths_2, camera2);
+    const std::vector<Line3D> L3 = calibrate_lines(lines2D_3, line_depths_3, camera3);
+
+    ThreeViewFeatures features_calib;
+    const Camera *cameras[3] = {&camera1, &camera2, &camera3};
+    for (int v = 0; v < 3; ++v) {
+        features_calib.x[v].resize(features.x[v].size());
+        features_calib.l[v].resize(features.l[v].size());
+        for (size_t k = 0; k < features.x[v].size(); ++k) {
+            cameras[v]->unproject(features.x[v][k], &features_calib.x[v][k]);
+            cameras[v]->unproject(features.l[v][k].x1, &features_calib.l[v][k].x1);
+            cameras[v]->unproject(features.l[v][k].x2, &features_calib.l[v][k].x2);
+        }
+    }
+
+    const double scale = (1.0 / camera1.focal() + 1.0 / camera2.focal() + 1.0 / camera3.focal()) / 3.0;
+    ThreeViewOptions opt_scaled = opt;
+    opt_scaled.max_errors[0] = opt.max_errors[0] * scale;
+    opt_scaled.max_errors[1] = opt.max_errors[1] * scale;
+
+    RansacStats stats =
+        ransac_threeview(x1, x2, x3, depth_1, depth_2, depth_3, L1, L2, L3, features_calib, opt_scaled, geometry, inliers);
+    if (stats.num_inliers > 3) {
+        BundleOptions bundle_opt = opt.bundle;
+        bundle_opt.loss_scale = 0.5 * opt_scaled.max_errors[1];
+        ThreeViewEstimator(opt_scaled, x1, x2, x3, depth_1, depth_2, depth_3, L1, L2, L3, features_calib)
+            .refine(geometry, opt_scaled.max_errors[1] * opt_scaled.max_errors[1], bundle_opt);
     }
     return stats;
 }
