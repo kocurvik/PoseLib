@@ -99,11 +99,12 @@ template <int NumParams> bool check_monodepth(bool refine_shift) {
         geometry.shift1 = 0.05;
         geometry.shift2 = -0.03;
     }
-    for (int line_residual = 0; line_residual < 4; ++line_residual) {
+    // 4, 5: line reprojection (scale 0.8)
+    for (int line_residual = 0; line_residual < 6; ++line_residual) {
         MonoDepthRelPoseRefiner<UniformWeightVector, TestAccumulator> pts_refiner(x1, x2, d1, d2, 0.5, 1.0,
                                                                                   refine_shift);
-        TwoViewLineRefiner<MonoDepthTwoViewGeometry, NumParams, TestAccumulator> line_refiner(lines, line_residual, 0.7,
-                                                                                              3.0, &pts_refiner);
+        TwoViewLineRefiner<MonoDepthTwoViewGeometry, NumParams, TestAccumulator> line_refiner(
+            lines, line_residual, 0.7, 3.0, &pts_refiner, 0.8);
         if (!check_refiner(line_refiner, geometry))
             return false;
         HybridRefiner<MonoDepthTwoViewGeometry, TestAccumulator> refiner;
@@ -115,6 +116,27 @@ template <int NumParams> bool check_monodepth(bool refine_shift) {
     return true;
 }
 
+// At the true relative pose (scale 1, no shifts) the line reprojection residuals vanish and all lines are inliers
+bool test_twoview_line_reprojection_zero() {
+    CameraPose pose;
+    std::vector<Point2D> x1, x2;
+    std::vector<double> d1, d2;
+    std::vector<TwoViewLine> lines;
+    setup_scene(10, pose, x1, x2, d1, d2, lines, 2);
+    pose.q = quat_step_post(pose.q, Eigen::Vector3d(-0.01, 0.02, -0.015));
+    pose.t -= Eigen::Vector3d(0.01, 0.02, -0.01);
+    MonoDepthTwoViewGeometry geometry(pose, 1.0);
+    std::vector<char> inliers;
+    const double score = compute_twoview_line_reprojection_msac_score(geometry, lines, 1.0, 1e-12, &inliers);
+    REQUIRE_SMALL(score, 1e-14);
+    for (char inl : inliers)
+        REQUIRE(inl);
+    // a wrong scale is penalized
+    MonoDepthTwoViewGeometry wrong(pose, 1.3);
+    REQUIRE(compute_twoview_line_reprojection_msac_score(wrong, lines, 1.0, 1.0) > 1e-6);
+    return true;
+}
+
 bool test_twoview_line_monodepth_jacobian() { return check_monodepth<7>(false); }
 bool test_twoview_line_monodepth_shift_jacobian() { return check_monodepth<9>(true); }
 
@@ -123,5 +145,5 @@ bool test_twoview_line_monodepth_shift_jacobian() { return check_monodepth<9>(tr
 using namespace test::twoview_lines;
 std::vector<Test> register_optim_twoview_lines_test() {
     return {TEST(test_twoview_line_relpose_jacobian), TEST(test_twoview_line_monodepth_jacobian),
-            TEST(test_twoview_line_monodepth_shift_jacobian)};
+            TEST(test_twoview_line_monodepth_shift_jacobian), TEST(test_twoview_line_reprojection_zero)};
 }

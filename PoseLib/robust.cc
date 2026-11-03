@@ -33,6 +33,8 @@
 #include "PoseLib/robust/utils.h"
 #include "robust/recalibrator.h"
 
+#include <stdexcept>
+
 namespace poselib {
 
 RansacStats estimate_absolute_pose(const std::vector<Point2D> &points2D, const std::vector<Point3D> &points3D,
@@ -462,6 +464,9 @@ RansacStats estimate_relative_pose_lines(const std::vector<Point2D> &points2D_1,
                                          const std::vector<Eigen::Vector2d> &line_depths_2, const Camera &camera1,
                                          const Camera &camera2, const RelativePoseOptions &opt,
                                          CameraPose *relative_pose, std::vector<char> *inliers) {
+    if (opt.line_refine && uses_reprojection_residual(opt.line_residual))
+        throw std::invalid_argument("line_residual 4, 5 (line reprojection) need the RePoseD model, use "
+                                    "estimate_monodepth_relative_pose_lines");
     const size_t num_pts = points2D_1.size();
     std::vector<Point2D> x1_calib(num_pts), x2_calib(num_pts);
     for (size_t k = 0; k < num_pts; ++k) {
@@ -534,13 +539,14 @@ RansacStats estimate_monodepth_relative_pose_lines(
         if (opt.line_refine) {
             const std::vector<TwoViewLine> lines = make_twoview_lines(L1, L2);
             const double line_scale = opt_scaled.max_errors[1] / std::sin(opt.max_line_angle * M_PI / 180.0);
+            const double reproj_scale = std::sqrt(scale_reproj);
             std::vector<char> line_inliers;
-            compute_twoview_line_msac_score(geometry->pose.R(), lines, opt.line_residual, line_scale,
+            compute_twoview_line_msac_score(*geometry, lines, opt.line_residual, line_scale, reproj_scale,
                                             opt_scaled.max_errors[1] * opt_scaled.max_errors[1], &line_inliers);
             refine_monodepth_relpose_lines(x1_inliers, x2_inliers, d1_inliers, d2_inliers,
                                            select_inliers(lines, line_inliers), opt.line_residual, geometry,
                                            scale_reproj, weight_sampson, scaled_bundle_opt, opt.estimate_shift,
-                                           opt.line_weight, line_scale);
+                                           opt.line_weight, line_scale, reproj_scale);
         } else {
             refine_monodepth_relpose(x1_inliers, x2_inliers, d1_inliers, d2_inliers, geometry, scale_reproj,
                                      weight_sampson, scaled_bundle_opt, opt.estimate_shift);

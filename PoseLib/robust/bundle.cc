@@ -619,12 +619,13 @@ BundleStats refine_monodepth_relpose_lines(const std::vector<Point2D> &x1, const
                                            const std::vector<TwoViewLine> &lines, int line_residual,
                                            MonoDepthTwoViewGeometry *pose, const double scale_reproj,
                                            const double weight_sampson, const BundleOptions &opt, bool refine_shift,
-                                           double line_weight, double line_residual_scale) {
+                                           double line_weight, double line_residual_scale, double line_reproj_scale) {
     IterationCallback callback = setup_callback(opt);
     MonoDepthRelPoseRefiner<UniformWeightVector> pts_refiner(x1, x2, d1, d2, scale_reproj, weight_sampson,
                                                              refine_shift, UniformWeightVector());
     TwoViewLineRefiner<MonoDepthTwoViewGeometry, NumParams> line_refiner(lines, line_residual, line_weight,
-                                                                         line_residual_scale, &pts_refiner);
+                                                                         line_residual_scale, &pts_refiner,
+                                                                         line_reproj_scale);
     HybridRefiner<MonoDepthTwoViewGeometry> refiner;
     refiner.register_refiner(&pts_refiner);
     refiner.register_refiner(&line_refiner);
@@ -636,13 +637,15 @@ BundleStats refine_monodepth_relpose_lines(const std::vector<Point2D> &x1, const
                                            const std::vector<TwoViewLine> &lines, int line_residual,
                                            MonoDepthTwoViewGeometry *pose, const double scale_reproj,
                                            const double weight_sampson, const BundleOptions &opt, bool refine_shift,
-                                           double line_weight, double line_residual_scale) {
+                                           double line_weight, double line_residual_scale, double line_reproj_scale) {
     // the update has 7 parameters (rotation, translation, scale) or 9 with the shifts
     if (refine_shift)
         return refine_monodepth_relpose_lines<9>(x1, x2, d1, d2, lines, line_residual, pose, scale_reproj,
-                                                 weight_sampson, opt, refine_shift, line_weight, line_residual_scale);
+                                                 weight_sampson, opt, refine_shift, line_weight, line_residual_scale,
+                                                 line_reproj_scale);
     return refine_monodepth_relpose_lines<7>(x1, x2, d1, d2, lines, line_residual, pose, scale_reproj,
-                                             weight_sampson, opt, refine_shift, line_weight, line_residual_scale);
+                                             weight_sampson, opt, refine_shift, line_weight, line_residual_scale,
+                                             line_reproj_scale);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -66,6 +66,8 @@ class RelativePoseLineEstimator {
 // RePoseD (calibrated relative pose with monocular depths, RelativePoseMonoDepthEstimator) with lines with depth in
 // the MSAC score and the local optimization (opt.line_refine, as in RelativePoseLineEstimator; the line residuals are
 // in the units of the Sampson error). The minimal samples are those of RelativePoseMonoDepthEstimator.
+// opt.line_residual 4, 5 add the line reprojection residual (see TwoViewLine), scaled as the point reprojection errors
+// (sqrt(scale_reproj)), it needs line depths in the frame of the point depths.
 //   x1, x2 - points in normalized image coordinates, d1, d2 - their depths
 //   L1, L2 - 3D line segments in the camera frames (depth * ray), arbitrary scale per view
 class MonoDepthRelativePoseLineEstimator {
@@ -79,7 +81,8 @@ class MonoDepthRelativePoseLineEstimator {
           line_scale(opt.max_errors[1] / std::sin(opt.max_line_angle * M_PI / 180.0)),
           scale_reproj(opt.max_errors[0] > 0.0
                            ? (opt.max_errors[1] * opt.max_errors[1]) / (opt.max_errors[0] * opt.max_errors[0])
-                           : 0.0) {}
+                           : 0.0),
+          reproj_scale(std::sqrt(scale_reproj)) {}
 
     void generate_models(std::vector<MonoDepthTwoViewGeometry> *models) { point_estimator.generate_models(models); }
     double score_model(const MonoDepthTwoViewGeometry &model, size_t *inlier_count) const;
@@ -99,6 +102,7 @@ class MonoDepthRelativePoseLineEstimator {
     const std::vector<TwoViewLine> lines;
     const double line_scale;
     const double scale_reproj;
+    const double reproj_scale; // sqrt(scale_reproj), for the line reprojection residual
 };
 
 // RePoseD with the minimal samples from matched segments with depth (opt.segment_solver), the score and the refinement

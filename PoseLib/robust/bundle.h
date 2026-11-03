@@ -114,6 +114,8 @@ BundleStats refine_monodepth_relpose(const std::vector<Point2D> &x1, const std::
 // Two view refinement from points and lines with depth (direction and / or plane residuals selected by
 // line_residual, see TwoViewLine in robust/optim/twoview_lines.h). The line residuals are multiplied by
 // line_residual_scale (e.g. point threshold / sin(line threshold)), the line cost is weighted by line_weight.
+// The line reprojection residuals (line_residual 4, 5, refine_monodepth_relpose_lines only) are multiplied by
+// line_reproj_scale (sqrt(scale_reproj) of the points).
 // Points use the Sampson error (refine_relpose) or the hybrid RePoseD error (refine_monodepth_relpose).
 struct TwoViewLine;
 BundleStats refine_relpose_lines(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
@@ -127,7 +129,7 @@ BundleStats refine_monodepth_relpose_lines(const std::vector<Point2D> &x1, const
                                            MonoDepthTwoViewGeometry *pose, const double scale_reproj,
                                            const double weight_sampson, const BundleOptions &opt = BundleOptions(),
                                            bool refine_shift = false, double line_weight = 1.0,
-                                           double line_residual_scale = 1.0);
+                                           double line_residual_scale = 1.0, double line_reproj_scale = 0.0);
 
 // Three view refinement with the Sampson errors, the symmetric reprojection errors and the lines, see ThreeViewRefiner
 // in robust/optim/threeview.h. scale_reproj = 0 or weight_sampson = 0 switch the point terms off, with scale_reproj = 0

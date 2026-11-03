@@ -139,8 +139,9 @@ double MonoDepthRelativePoseLineEstimator::score_model(const MonoDepthTwoViewGeo
                                                        size_t *inlier_count) const {
     double score = point_estimator.score_model(model, inlier_count);
     if (opt.line_refine)
-        score += opt.line_weight * compute_twoview_line_msac_score(model.pose.R(), lines, opt.line_residual,
-                                                                   line_scale, opt.max_errors[1] * opt.max_errors[1]);
+        score += opt.line_weight * compute_twoview_line_msac_score(model, lines, opt.line_residual, line_scale,
+                                                                   reproj_scale,
+                                                                   opt.max_errors[1] * opt.max_errors[1]);
     return score;
 }
 
@@ -155,7 +156,7 @@ void MonoDepthRelativePoseLineEstimator::refine_model(MonoDepthTwoViewGeometry *
     bundle_opt.max_iterations = 25;
     bundle_opt.loss_scale = opt.max_errors[1];
     refine_monodepth_relpose_lines(x1, x2, d1, d2, lines, opt.line_residual, model, scale_reproj, opt.weight_sampson,
-                                   bundle_opt, opt.estimate_shift, opt.line_weight, line_scale);
+                                   bundle_opt, opt.estimate_shift, opt.line_weight, line_scale, reproj_scale);
 }
 
 void MonoDepthRelativePoseSegmentEstimator::generate_models(std::vector<MonoDepthTwoViewGeometry> *models) {
