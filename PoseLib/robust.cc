@@ -473,10 +473,11 @@ RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &poin
     opt_scaled.bundle.loss_scale /= scale;
 
     if (opt.ransac.score_initial_model) {
-        image_pair->camera1 = Camera(SimplePinholeCameraModel::model_id,
-                                     std::vector<double>{image_pair->camera1.focal() / scale, 0.0, 0.0}, -1, -1);
-        image_pair->camera2 = Camera(SimplePinholeCameraModel::model_id,
-                                     std::vector<double>{image_pair->camera2.focal() / scale, 0.0, 0.0}, -1, -1);
+        check_focal_initial_model(&image_pair->camera1, &image_pair->camera2, pp, pp, true);
+        // Express the initial cameras in the normalized frame (pp at the origin, coordinates divided by scale)
+        for (Camera *cam : {&image_pair->camera1, &image_pair->camera2}) {
+            cam->params = {cam->focal() / scale, 0.0, 0.0};
+        }
     }
 
     RansacStats stats = ransac_shared_focal_relpose(x1_norm, x2_norm, opt_scaled, image_pair, inliers);
@@ -529,10 +530,11 @@ RansacStats estimate_varying_focal_relative_pose(const std::vector<Point2D> &poi
     opt_scaled.bundle.loss_scale /= scale;
 
     if (opt.ransac.score_initial_model) {
-        image_pair->camera1 = Camera(SimplePinholeCameraModel::model_id,
-                                     std::vector<double>{image_pair->camera1.focal() / scale, 0.0, 0.0}, -1, -1);
-        image_pair->camera2 = Camera(SimplePinholeCameraModel::model_id,
-                                     std::vector<double>{image_pair->camera2.focal() / scale, 0.0, 0.0}, -1, -1);
+        check_focal_initial_model(&image_pair->camera1, &image_pair->camera2, pp1, pp2, false);
+        // Express the initial cameras in the normalized frame (pp at the origin, coordinates divided by scale)
+        for (Camera *cam : {&image_pair->camera1, &image_pair->camera2}) {
+            cam->params = {cam->focal() / scale, 0.0, 0.0};
+        }
     }
 
     RansacStats stats = ransac_varying_focal_relpose(x1_norm, x2_norm, opt_scaled, image_pair, inliers);
@@ -596,9 +598,11 @@ RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Poin
     opt_scaled.bundle.loss_scale /= scale;
 
     if (opt.ransac.score_initial_model) {
-        image_pair->camera1 = Camera(SimplePinholeCameraModel::model_id,
-                                     std::vector<double>{image_pair->camera1.focal() / scale, 0.0, 0.0}, -1, -1);
-        image_pair->camera2 = image_pair->camera1;
+        check_focal_initial_model(&image_pair->camera1, &image_pair->camera2, pp, pp, true);
+        // Express the initial cameras in the normalized frame (pp at the origin, coordinates divided by scale)
+        for (Camera *cam : {&image_pair->camera1, &image_pair->camera2}) {
+            cam->params = {cam->focal() / scale, 0.0, 0.0};
+        }
     }
 
     RansacStats stats =
@@ -666,10 +670,11 @@ RansacStats estimate_varying_focal_monodepth_relative_pose(const std::vector<Poi
     opt_scaled.bundle.loss_scale /= scale;
 
     if (opt.ransac.score_initial_model) {
-        image_pair->camera1 = Camera(SimplePinholeCameraModel::model_id,
-                                     std::vector<double>{image_pair->camera1.focal() / scale, 0.0, 0.0}, -1, -1);
-        image_pair->camera2 = Camera(SimplePinholeCameraModel::model_id,
-                                     std::vector<double>{image_pair->camera2.focal() / scale, 0.0, 0.0}, -1, -1);
+        check_focal_initial_model(&image_pair->camera1, &image_pair->camera2, pp1, pp2, false);
+        // Express the initial cameras in the normalized frame (pp at the origin, coordinates divided by scale)
+        for (Camera *cam : {&image_pair->camera1, &image_pair->camera2}) {
+            cam->params = {cam->focal() / scale, 0.0, 0.0};
+        }
     }
 
     RansacStats stats =

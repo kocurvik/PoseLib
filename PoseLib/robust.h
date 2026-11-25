@@ -92,6 +92,8 @@ RansacStats estimate_monodepth_relative_pose(const std::vector<Point2D> &points2
 
 // Estimates relative pose with shared unknown focal length using LO-RANSAC followed by non-linear refinement
 // Threshold for Sampson error is set by RelativePoseOptions.max_error
+// With ransac.score_initial_model, both cameras of image_pair must be SIMPLE_PINHOLE or PINHOLE with the same positive
+// focal length (equal in x and y) and principal point pp (std::invalid_argument is thrown otherwise).
 RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &points2D_1,
                                                 const std::vector<Point2D> &points2D_2, const Point2D &pp,
                                                 const RelativePoseOptions &opt, ImagePair *image_pair,
@@ -101,6 +103,8 @@ RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &poin
 // Threshold for Sampson error is set by RelativePoseOptions.max_error.
 // Uses the Bougnoux (ICCV 1998) decomposition of F for each solution then refines pose and focals directly.
 // This was used as baseline in Ding. et al. (ICCV 2025) and Kocur et al. (IJCV 2026).
+// With ransac.score_initial_model, the cameras of image_pair must be SIMPLE_PINHOLE or PINHOLE with a positive focal
+// length (equal in x and y) and principal points pp1 and pp2 (std::invalid_argument is thrown otherwise).
 RansacStats estimate_varying_focal_relative_pose(const std::vector<Point2D> &points2D_1,
                                                  const std::vector<Point2D> &points2D_2, const Point2D &pp1,
                                                  const Point2D &pp2, const RelativePoseOptions &opt,
@@ -109,6 +113,7 @@ RansacStats estimate_varying_focal_relative_pose(const std::vector<Point2D> &poi
 // Estimates relative pose with shared unknown focal length from point correspondences with estimated monodepth
 // using LO-RANSAC followed by non-linear refinement.
 // Uses hybrid scoring with reprojection and epipolar errors
+// The initial model has the same requirements as in estimate_shared_focal_relative_pose.
 RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Point2D> &points2D_1,
                                                           const std::vector<Point2D> &points2D_2,
                                                           const std::vector<double> &depths_1,
@@ -119,6 +124,7 @@ RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Poin
 // Estimates relative pose with two different unknown focal lengths from point correspondences with estimated monodepth
 // using LO-RANSAC followed by non-linear refinement.
 // Uses hybrid scoring with reprojection and epipolar errors
+// The initial model has the same requirements as in estimate_varying_focal_relative_pose.
 RansacStats estimate_varying_focal_monodepth_relative_pose(const std::vector<Point2D> &points2D_1,
                                                            const std::vector<Point2D> &points2D_2,
                                                            const std::vector<double> &depth_1,

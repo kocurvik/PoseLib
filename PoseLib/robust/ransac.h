@@ -75,6 +75,9 @@ RansacStats ransac_monodepth_relpose(const std::vector<Point2D> &x1, const std::
                                      const MonoDepthRelativePoseOptions &opt, MonoDepthTwoViewGeometry *best_model,
                                      std::vector<char> *best_inliers);
 
+// Shared/varying focal relative pose. Points need to be centered (principal point subtracted). With
+// ransac.score_initial_model, the initial cameras must be SIMPLE_PINHOLE {f, 0, 0} (with the same f for the shared
+// variants); this is not checked here, see estimate_shared_focal_relative_pose and the related estimators.
 RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         const RelativePoseOptions &opt, ImagePair *best_model,
                                         std::vector<char> *best_inliers);
@@ -97,6 +100,9 @@ RansacStats ransac_fundamental(const std::vector<Point2D> &x1, const std::vector
                                const RelativePoseOptions &opt, Eigen::Matrix3d *best_model,
                                std::vector<char> *best_inliers);
 
+// Fundamental matrix with (shared) radial distortion, assuming principal points at the origin. With
+// ransac.score_initial_model, the initial cameras must be DIVISION {1, 1, 0, 0, k} (with the same k for the shared
+// variant); this is not checked here, see estimate_rd_fundamental and estimate_shared_rd_fundamental.
 RansacStats ransac_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                   std::vector<double> &ks, const double min_k, const double max_k,
                                   const RelativePoseOptions &opt, ProjectiveImagePair *best_model,

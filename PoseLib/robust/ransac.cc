@@ -34,7 +34,6 @@
 #include "PoseLib/robust/estimators/homography.h"
 #include "PoseLib/robust/estimators/hybrid_pose.h"
 #include "PoseLib/robust/estimators/relative_pose.h"
-#include "PoseLib/robust/utils.h"
 #include "PoseLib/solvers/gen_relpose_5p1pt.h"
 #include "PoseLib/solvers/p3p.h"
 #include "PoseLib/solvers/relpose_5pt.h"
@@ -348,8 +347,6 @@ RansacStats ransac_rd_fundamental(const std::vector<Point2D> &x1, const std::vec
         best_model->F.setIdentity();
         best_model->camera1 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
         best_model->camera2 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
-    } else {
-        check_rd_initial_model(best_model, false);
     }
     RansacStats stats;
 
@@ -370,8 +367,6 @@ RansacStats ransac_shared_rd_fundamental(const std::vector<Point2D> &x1, const s
         best_model->F.setIdentity();
         best_model->camera1 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
         best_model->camera2 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
-    } else {
-        check_rd_initial_model(best_model, true);
     }
     RansacStats stats;
 

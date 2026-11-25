@@ -124,4 +124,12 @@ bool calculate_RFC(const Eigen::Matrix3d &F);
 // On success, converts the cameras to the DIVISION {1, 1, 0, 0, k} cameras used by the estimators.
 void check_rd_initial_model(ProjectiveImagePair *F_cam_pair, bool shared_k);
 
+// Checks that both cameras of an initial model of the shared/varying focal (monodepth) relative pose estimators are
+// SIMPLE_PINHOLE or PINHOLE with a positive focal length that is equal in x and y, and with principal points pp1 and
+// pp2 (up to a small tolerance). If shared_focal is set, both cameras must also have the same focal length. Throws
+// std::invalid_argument otherwise, leaving the input unchanged. On success, converts the cameras to SIMPLE_PINHOLE
+// {f, pp(0), pp(1)}, keeping their image size.
+void check_focal_initial_model(Camera *camera1, Camera *camera2, const Point2D &pp1, const Point2D &pp2,
+                               bool shared_focal);
+
 } // namespace poselib

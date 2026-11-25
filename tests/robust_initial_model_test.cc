@@ -257,6 +257,122 @@ bool test_varying_focal_monodepth_relative_pose() {
     return true;
 }
 
+template <typename F> bool throws_invalid_argument(F &&f) {
+    try {
+        f();
+    } catch (const std::invalid_argument &) {
+        return true;
+    }
+    return false;
+}
+
+// Initial PINHOLE cameras with non-zero principal points: the estimate must keep the initial focal lengths and return
+// SIMPLE_PINHOLE cameras with the principal points passed as arguments
+bool test_focal_relative_pose_principal_point() {
+    test_rng::Rng rng = test_rng::make_rng("focal_relative_pose_principal_point");
+    const double f1 = 1000.0, f2 = 1500.0;
+    const Point2D pp1(320.0, 240.0), pp2(400.0, 300.0);
+
+    for (bool shared : {true, false}) {
+        const double f2_used = shared ? f1 : f2;
+        const Point2D pp2_used = shared ? pp1 : pp2;
+        CameraPose pose_gt;
+        std::vector<Point2D> x1, x2;
+        std::vector<double> d1, d2;
+        setup_monodepth(rng, f1, f2_used, &pose_gt, &x1, &x2, &d1, &d2);
+        for (size_t i = 0; i < x1.size(); ++i) {
+            x1[i] += pp1;
+            x2[i] += pp2_used;
+        }
+        const Camera camera1("PINHOLE", {f1, f1, pp1(0), pp1(1)}, -1, -1);
+        const Camera camera2("PINHOLE", {f2_used, f2_used, pp2_used(0), pp2_used(1)}, -1, -1);
+        std::vector<char> inliers;
+
+        RelativePoseOptions opt;
+        opt.ransac = initial_model_only_ransac();
+        ImagePair image_pair(pose_gt, camera1, camera2);
+        MonoDepthImagePair md_pair(MonoDepthTwoViewGeometry(pose_gt, 1.0), camera1, camera2);
+        if (shared) {
+            estimate_shared_focal_relative_pose(x1, x2, pp1, opt, &image_pair, &inliers);
+            estimate_shared_focal_monodepth_relative_pose(x1, x2, d1, d2, pp1, monodepth_options(), &md_pair, &inliers);
+        } else {
+            estimate_varying_focal_relative_pose(x1, x2, pp1, pp2, opt, &image_pair, &inliers);
+            estimate_varying_focal_monodepth_relative_pose(x1, x2, d1, d2, pp1, pp2, monodepth_options(), &md_pair,
+                                                           &inliers);
+        }
+
+        REQUIRE(pose_close(image_pair.pose, pose_gt));
+        REQUIRE(pose_close(md_pair.geometry.pose, pose_gt));
+        const ImagePair md_result(md_pair.geometry.pose, md_pair.camera1, md_pair.camera2);
+        for (const ImagePair &result : {image_pair, md_result}) {
+            REQUIRE_EQ(result.camera1.model_id, SimplePinholeCameraModel::model_id);
+            REQUIRE_EQ(result.camera2.model_id, SimplePinholeCameraModel::model_id);
+            REQUIRE_SMALL(result.camera1.focal() / f1 - 1.0, kTol);
+            REQUIRE_SMALL(result.camera2.focal() / f2_used - 1.0, kTol);
+            REQUIRE_SMALL((result.camera1.principal_point() - pp1).norm(), kTol);
+            REQUIRE_SMALL((result.camera2.principal_point() - pp2_used).norm(), kTol);
+        }
+    }
+    return true;
+}
+
+bool test_focal_relative_pose_invalid_initial_model() {
+    test_rng::Rng rng = test_rng::make_rng("focal_relative_pose_invalid_initial_model");
+    std::vector<Point2D> x1, x2;
+    std::vector<double> d1(20, 4.0), d2(20, 4.0);
+    for (size_t i = 0; i < 20; ++i) {
+        x1.push_back(test_rng::symmetric_vec2(rng));
+        x2.push_back(test_rng::symmetric_vec2(rng));
+    }
+    const Point2D pp(320.0, 240.0);
+    RelativePoseOptions opt;
+    opt.ransac = initial_model_only_ransac();
+    std::vector<char> inliers;
+
+    // Runs all four estimators (shared ones only if shared is set) with the given initial cameras and checks that each
+    // throws and leaves the valid camera1 (PINHOLE, would be converted to SIMPLE_PINHOLE) unchanged
+    auto all_throw = [&](const Camera &camera1, const Camera &camera2, bool shared_only) {
+        for (bool shared : {true, false}) {
+            if (!shared && shared_only)
+                continue;
+            ImagePair image_pair(CameraPose(), camera1, camera2);
+            MonoDepthImagePair md_pair(MonoDepthTwoViewGeometry(), camera1, camera2);
+            if (shared) {
+                REQUIRE(throws_invalid_argument(
+                    [&] { estimate_shared_focal_relative_pose(x1, x2, pp, opt, &image_pair, &inliers); }));
+                REQUIRE(throws_invalid_argument([&] {
+                    estimate_shared_focal_monodepth_relative_pose(x1, x2, d1, d2, pp, monodepth_options(), &md_pair,
+                                                                  &inliers);
+                }));
+            } else {
+                REQUIRE(throws_invalid_argument(
+                    [&] { estimate_varying_focal_relative_pose(x1, x2, pp, pp, opt, &image_pair, &inliers); }));
+                REQUIRE(throws_invalid_argument([&] {
+                    estimate_varying_focal_monodepth_relative_pose(x1, x2, d1, d2, pp, pp, monodepth_options(),
+                                                                   &md_pair, &inliers);
+                }));
+            }
+            REQUIRE_EQ(image_pair.camera1.model_id, camera1.model_id);
+            REQUIRE_EQ(md_pair.camera1.model_id, camera1.model_id);
+        }
+        return true;
+    };
+
+    const Camera valid("PINHOLE", {1000.0, 1000.0, pp(0), pp(1)}, -1, -1);
+    const std::vector<Camera> invalid_cameras = {
+        Camera("SIMPLE_RADIAL", {1000.0, pp(0), pp(1), 0.0}, -1, -1), // unsupported model
+        Camera("PINHOLE", {1000.0, 1100.0, pp(0), pp(1)}, -1, -1),    // fx != fy
+        Camera("SIMPLE_PINHOLE", {1000.0, 0.0, 0.0}, -1, -1),         // principal point differs from pp
+        Camera("SIMPLE_PINHOLE", {-1000.0, pp(0), pp(1)}, -1, -1)};   // negative focal
+    for (const Camera &invalid : invalid_cameras) {
+        REQUIRE(all_throw(valid, invalid, false));
+    }
+
+    // The shared variants require both cameras to have the same focal length
+    REQUIRE(all_throw(valid, Camera("SIMPLE_PINHOLE", {1100.0, pp(0), pp(1)}, -1, -1), true));
+    return true;
+}
+
 bool check_rd_fundamental(bool shared) {
     test_rng::Rng rng = test_rng::make_rng(shared ? "shared_rd_fundamental" : "rd_fundamental");
     const double f1 = 1000.0, f2 = shared ? 1000.0 : 1500.0;
@@ -321,15 +437,6 @@ bool test_rd_fundamental() { return check_rd_fundamental(false); }
 
 bool test_shared_rd_fundamental() { return check_rd_fundamental(true); }
 
-template <typename F> bool throws_invalid_argument(F &&f) {
-    try {
-        f();
-    } catch (const std::invalid_argument &) {
-        return true;
-    }
-    return false;
-}
-
 bool test_rd_fundamental_invalid_initial_model() {
     test_rng::Rng rng = test_rng::make_rng("rd_fundamental_invalid_initial_model");
     std::vector<Point2D> x1, x2;
@@ -359,13 +466,6 @@ bool test_rd_fundamental_invalid_initial_model() {
                               Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, -0.1}, -1, -1));
     REQUIRE(
         throws_invalid_argument([&] { estimate_shared_rd_fundamental(x1_few, x2_few, {}, opt, &model, &inliers); }));
-
-    // Direct callers of ransac_rd_fundamental also get SIMPLE_DIVISION converted to DIVISION
-    model = ProjectiveImagePair(Eigen::Matrix3d::Identity(), valid, valid);
-    std::vector<double> ks;
-    ransac_rd_fundamental(x1, x2, ks, -2.0, 0.5, opt, &model, &inliers);
-    REQUIRE_EQ(model.camera1.model_id, DivisionCameraModel::model_id);
-    REQUIRE_EQ(model.camera2.params.size(), DivisionCameraModel::num_params);
     return true;
 }
 
@@ -380,6 +480,8 @@ std::vector<Test> register_robust_initial_model_test() {
             TEST(test_monodepth_relative_pose),
             TEST(test_shared_focal_monodepth_relative_pose),
             TEST(test_varying_focal_monodepth_relative_pose),
+            TEST(test_focal_relative_pose_principal_point),
+            TEST(test_focal_relative_pose_invalid_initial_model),
             TEST(test_rd_fundamental),
             TEST(test_shared_rd_fundamental),
             TEST(test_rd_fundamental_invalid_initial_model)};
