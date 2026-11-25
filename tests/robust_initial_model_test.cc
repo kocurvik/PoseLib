@@ -198,12 +198,15 @@ bool test_monodepth_relative_pose() {
 
     Camera camera1(SimplePinholeCameraModel::model_id, {f1, 0.0, 0.0}, 0, 0);
     Camera camera2(SimplePinholeCameraModel::model_id, {f2, 0.0, 0.0}, 0, 0);
-    MonoDepthTwoViewGeometry geometry(pose_gt, 1.0);
+    // Non-zero shifts (e.g. from an earlier run with estimate_shift) must be discarded when shifts are not estimated
+    MonoDepthTwoViewGeometry geometry(pose_gt, 1.0, 0.5, -0.5);
     std::vector<char> inliers;
     estimate_monodepth_relative_pose(x1, x2, d1, d2, camera1, camera2, monodepth_options(), &geometry, &inliers);
 
     REQUIRE(pose_close(geometry.pose, pose_gt));
     REQUIRE_SMALL(geometry.scale - 1.0, kTol);
+    REQUIRE_EQ(geometry.shift1, 0.0);
+    REQUIRE_EQ(geometry.shift2, 0.0);
     return true;
 }
 
@@ -216,12 +219,15 @@ bool test_shared_focal_monodepth_relative_pose() {
     setup_monodepth(rng, focal, focal, &pose_gt, &x1, &x2, &d1, &d2);
 
     Camera camera(SimplePinholeCameraModel::model_id, {focal, 0.0, 0.0}, -1, -1);
-    MonoDepthImagePair image_pair(MonoDepthTwoViewGeometry(pose_gt, 1.0), camera, camera);
+    MonoDepthImagePair image_pair(MonoDepthTwoViewGeometry(pose_gt, 1.0, 0.5, -0.5), camera, camera);
     std::vector<char> inliers;
     estimate_shared_focal_monodepth_relative_pose(x1, x2, d1, d2, Point2D::Zero(), monodepth_options(), &image_pair,
                                                   &inliers);
 
     REQUIRE(pose_close(image_pair.geometry.pose, pose_gt));
+    REQUIRE_SMALL(image_pair.geometry.scale - 1.0, kTol);
+    REQUIRE_EQ(image_pair.geometry.shift1, 0.0);
+    REQUIRE_EQ(image_pair.geometry.shift2, 0.0);
     REQUIRE_SMALL(image_pair.camera1.focal() / focal - 1.0, kTol);
     REQUIRE_SMALL(image_pair.camera2.focal() / focal - 1.0, kTol);
     return true;
@@ -237,12 +243,15 @@ bool test_varying_focal_monodepth_relative_pose() {
 
     Camera camera1(SimplePinholeCameraModel::model_id, {f1, 0.0, 0.0}, -1, -1);
     Camera camera2(SimplePinholeCameraModel::model_id, {f2, 0.0, 0.0}, -1, -1);
-    MonoDepthImagePair image_pair(MonoDepthTwoViewGeometry(pose_gt, 1.0), camera1, camera2);
+    MonoDepthImagePair image_pair(MonoDepthTwoViewGeometry(pose_gt, 1.0, 0.5, -0.5), camera1, camera2);
     std::vector<char> inliers;
     estimate_varying_focal_monodepth_relative_pose(x1, x2, d1, d2, Point2D::Zero(), Point2D::Zero(),
                                                    monodepth_options(), &image_pair, &inliers);
 
     REQUIRE(pose_close(image_pair.geometry.pose, pose_gt));
+    REQUIRE_SMALL(image_pair.geometry.scale - 1.0, kTol);
+    REQUIRE_EQ(image_pair.geometry.shift1, 0.0);
+    REQUIRE_EQ(image_pair.geometry.shift2, 0.0);
     REQUIRE_SMALL(image_pair.camera1.focal() / f1 - 1.0, kTol);
     REQUIRE_SMALL(image_pair.camera2.focal() / f2 - 1.0, kTol);
     return true;
@@ -272,12 +281,16 @@ bool check_rd_fundamental(bool shared) {
     Eigen::Matrix3d F_gt = K2_inv * E * K1_inv;
     const double k1_px = k1 / (f1 * f1), k2_px = k2 / (f2 * f2);
 
-    // The same initial model expressed with DIVISION and SIMPLE_DIVISION cameras
+    // The same initial model expressed with DIVISION and SIMPLE_DIVISION cameras, and with a focal length that is
+    // unit only up to floating point error
+    const double f_almost_one = f1 * (1.0 / f1) - 1e-15;
     std::vector<ProjectiveImagePair> initial_models = {
         ProjectiveImagePair(F_gt, Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, k1_px}, -1, -1),
                             Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, k2_px}, -1, -1)),
         ProjectiveImagePair(F_gt, Camera("SIMPLE_DIVISION", {1.0, 0.0, 0.0, k1_px}, -1, -1),
-                            Camera("SIMPLE_DIVISION", {1.0, 0.0, 0.0, k2_px}, -1, -1))};
+                            Camera("SIMPLE_DIVISION", {1.0, 0.0, 0.0, k2_px}, -1, -1)),
+        ProjectiveImagePair(F_gt, Camera("SIMPLE_DIVISION", {f_almost_one, 1e-12, 0.0, k1_px}, -1, -1),
+                            Camera("DIVISION", {1.0, f_almost_one, 0.0, -1e-12, k2_px}, -1, -1))};
 
     for (ProjectiveImagePair model : initial_models) {
         RelativePoseOptions opt;
@@ -308,6 +321,15 @@ bool test_rd_fundamental() { return check_rd_fundamental(false); }
 
 bool test_shared_rd_fundamental() { return check_rd_fundamental(true); }
 
+template <typename F> bool throws_invalid_argument(F &&f) {
+    try {
+        f();
+    } catch (const std::invalid_argument &) {
+        return true;
+    }
+    return false;
+}
+
 bool test_rd_fundamental_invalid_initial_model() {
     test_rng::Rng rng = test_rng::make_rng("rd_fundamental_invalid_initial_model");
     std::vector<Point2D> x1, x2;
@@ -315,32 +337,35 @@ bool test_rd_fundamental_invalid_initial_model() {
         x1.push_back(test_rng::symmetric_vec2(rng));
         x2.push_back(test_rng::symmetric_vec2(rng));
     }
-    const Camera valid("DIVISION", {1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
-    const std::vector<Camera> invalid_cameras = {Camera("SIMPLE_PINHOLE", {1.0, 0.0, 0.0}, -1, -1),
-                                                 Camera("DIVISION", {1.0, 2.0, 0.0, 0.0, 0.0}, -1, -1),
-                                                 Camera("DIVISION", {1000.0, 1000.0, 0.0, 0.0, 0.0}, -1, -1),
-                                                 Camera("SIMPLE_DIVISION", {1000.0, 0.0, 0.0, 0.0}, -1, -1),
-                                                 Camera("SIMPLE_DIVISION", {1.0, 0.5, 0.0, 0.0}, -1, -1)};
-
+    // 9 points: below the minimal sample, so this also checks that validation happens before the early return
+    const std::vector<Point2D> x1_few(x1.begin(), x1.begin() + 9), x2_few(x2.begin(), x2.begin() + 9);
     RelativePoseOptions opt;
     opt.ransac = initial_model_only_ransac();
     std::vector<char> inliers;
+
+    const std::vector<Camera> invalid_cameras = {Camera("SIMPLE_PINHOLE", {1.0, 0.0, 0.0}, -1, -1),
+                                                 Camera("DIVISION", {1000.0, 1000.0, 0.0, 0.0, 0.0}, -1, -1),
+                                                 Camera("SIMPLE_DIVISION", {1.0, 0.5, 0.0, 0.0}, -1, -1)};
+    // camera1 is valid but would be converted to DIVISION, so this also checks that a failed check modifies nothing
+    const Camera valid("SIMPLE_DIVISION", {1.0, 0.0, 0.0, 0.0}, -1, -1);
     for (const Camera &invalid : invalid_cameras) {
-        for (bool shared : {false, true}) {
-            ProjectiveImagePair model(Eigen::Matrix3d::Identity(), valid, invalid);
-            bool thrown = false;
-            try {
-                if (shared) {
-                    estimate_shared_rd_fundamental(x1, x2, {}, opt, &model, &inliers);
-                } else {
-                    estimate_rd_fundamental(x1, x2, {}, opt, &model, &inliers);
-                }
-            } catch (const std::invalid_argument &) {
-                thrown = true;
-            }
-            REQUIRE(thrown);
-        }
+        ProjectiveImagePair model(Eigen::Matrix3d::Identity(), valid, invalid);
+        REQUIRE(throws_invalid_argument([&] { estimate_rd_fundamental(x1_few, x2_few, {}, opt, &model, &inliers); }));
+        REQUIRE_EQ(model.camera1.model_id, SimpleDivisionCameraModel::model_id);
     }
+
+    // The shared variant requires both cameras to have the same distortion
+    ProjectiveImagePair model(Eigen::Matrix3d::Identity(), Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, -0.3}, -1, -1),
+                              Camera("DIVISION", {1.0, 1.0, 0.0, 0.0, -0.1}, -1, -1));
+    REQUIRE(
+        throws_invalid_argument([&] { estimate_shared_rd_fundamental(x1_few, x2_few, {}, opt, &model, &inliers); }));
+
+    // Direct callers of ransac_rd_fundamental also get SIMPLE_DIVISION converted to DIVISION
+    model = ProjectiveImagePair(Eigen::Matrix3d::Identity(), valid, valid);
+    std::vector<double> ks;
+    ransac_rd_fundamental(x1, x2, ks, -2.0, 0.5, opt, &model, &inliers);
+    REQUIRE_EQ(model.camera1.model_id, DivisionCameraModel::model_id);
+    REQUIRE_EQ(model.camera2.params.size(), DivisionCameraModel::num_params);
     return true;
 }
 

@@ -148,7 +148,8 @@ RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::v
 // followed by non-linear refinement
 // Uses 9 pt algorithm (Fitzgibbon, CVPR 2001) with modification from (Tzamos et al., ECCVW 2024) if ks is empty
 // otherwise uses the sampling 7pt algorithm (Tzamos et al., ECCVW 2024)
-// The initial model has the same requirements as in estimate_rd_fundamental.
+// The initial model has the same requirements as in estimate_rd_fundamental and additionally both cameras must have
+// the same distortion parameter.
 RansacStats estimate_shared_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                            std::vector<double> ks, const RelativePoseOptions &opt,
                                            ProjectiveImagePair *F_cam_pair, std::vector<char> *inliers);

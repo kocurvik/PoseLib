@@ -72,7 +72,7 @@ void register_types(py::module &m) {
         .def_readwrite("model_id", &Camera::model_id)
         .def_readwrite("width", &Camera::width)
         .def_readwrite("height", &Camera::height)
-        .def_readwrite("params", &Camera::params)
+        .def_property("params", [](const Camera &self) { return self.params; }, &set_camera_params)
         .def("focal", &Camera::focal, "Returns the camera focal length.")
         .def("focal_x", &Camera::focal_x, "Returns the camera focal_x.")
         .def("focal_y", &Camera::focal_y, "Returns the camera focal_y.")

@@ -34,6 +34,7 @@
 #include "PoseLib/robust/estimators/homography.h"
 #include "PoseLib/robust/estimators/hybrid_pose.h"
 #include "PoseLib/robust/estimators/relative_pose.h"
+#include "PoseLib/robust/utils.h"
 #include "PoseLib/solvers/gen_relpose_5p1pt.h"
 #include "PoseLib/solvers/p3p.h"
 #include "PoseLib/solvers/relpose_5pt.h"
@@ -212,6 +213,11 @@ RansacStats ransac_monodepth_relpose(const std::vector<Point2D> &x1, const std::
         best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
         best_model->pose.t.setZero();
     }
+    if (!opt.estimate_shift) {
+        // Shifts are kept fixed during refinement, so a non-zero initial shift would bias the result.
+        best_model->shift1 = 0.0;
+        best_model->shift2 = 0.0;
+    }
     RelativePoseMonoDepthEstimator estimator(opt, x1, x2, d1, d2);
     RansacStats stats = ransac<RelativePoseMonoDepthEstimator>(estimator, opt.ransac, best_model);
     get_inliers(best_model->pose, x1, x2, opt.max_errors[1] * opt.max_errors[1], best_inliers);
@@ -274,6 +280,9 @@ RansacStats ransac_shared_focal_monodepth_relpose(const std::vector<Point2D> &x1
         best_model->camera1 = Camera(SimplePinholeCameraModel::model_id, std::vector<double>{1.0, 0.0, 0.0}, -1, -1);
         best_model->camera2 = best_model->camera1;
     }
+    // Shifts are not estimated by this estimator, so a non-zero initial shift would bias the result.
+    best_model->geometry.shift1 = 0.0;
+    best_model->geometry.shift2 = 0.0;
     SharedFocalMonodepthPoseEstimator estimator(opt, x1, x2, d1, d2);
     RansacStats stats = ransac<SharedFocalMonodepthPoseEstimator>(estimator, opt.ransac, best_model);
 
@@ -298,6 +307,9 @@ RansacStats ransac_varying_focal_monodepth_relpose(const std::vector<Point2D> &x
         best_model->camera1 = Camera(SimplePinholeCameraModel::model_id, std::vector<double>{1.0, 0.0, 0.0}, -1, -1);
         best_model->camera2 = best_model->camera1;
     }
+    // Shifts are not estimated by this estimator, so a non-zero initial shift would bias the result.
+    best_model->geometry.shift1 = 0.0;
+    best_model->geometry.shift2 = 0.0;
     VaryingFocalMonodepthPoseEstimator estimator(opt, x1, x2, d1, d2);
     RansacStats stats = ransac<VaryingFocalMonodepthPoseEstimator>(estimator, opt.ransac, best_model);
 
@@ -336,6 +348,8 @@ RansacStats ransac_rd_fundamental(const std::vector<Point2D> &x1, const std::vec
         best_model->F.setIdentity();
         best_model->camera1 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
         best_model->camera2 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
+    } else {
+        check_rd_initial_model(best_model, false);
     }
     RansacStats stats;
 
@@ -356,6 +370,8 @@ RansacStats ransac_shared_rd_fundamental(const std::vector<Point2D> &x1, const s
         best_model->F.setIdentity();
         best_model->camera1 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
         best_model->camera2 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
+    } else {
+        check_rd_initial_model(best_model, true);
     }
     RansacStats stats;
 

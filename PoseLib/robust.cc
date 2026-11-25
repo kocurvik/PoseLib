@@ -767,6 +767,10 @@ RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::v
                                     std::vector<double> ks, const RelativePoseOptions &opt,
                                     ProjectiveImagePair *F_cam_pair, std::vector<char> *inliers) {
 
+    if (opt.ransac.score_initial_model) {
+        check_rd_initial_model(F_cam_pair, false);
+    }
+
     const size_t num_pts = x1.size();
     if (num_pts < 10) {
         return RansacStats();
@@ -794,7 +798,6 @@ RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::v
     double max_limit = 0.5 * scale * scale;
 
     if (opt.ransac.score_initial_model) {
-        check_rd_initial_model(F_cam_pair);
         F_cam_pair->F = T2.transpose().inverse() * (F_cam_pair->F) * T1.inverse();
         F_cam_pair->F /= F_cam_pair->F.norm();
         F_cam_pair->camera1.params[4] *= scale * scale;
@@ -833,6 +836,10 @@ RansacStats estimate_shared_rd_fundamental(const std::vector<Point2D> &x1, const
                                            std::vector<double> ks, const RelativePoseOptions &opt,
                                            ProjectiveImagePair *F_cam_pair, std::vector<char> *inliers) {
 
+    if (opt.ransac.score_initial_model) {
+        check_rd_initial_model(F_cam_pair, true);
+    }
+
     const size_t num_pts = x1.size();
     if (num_pts < 10) {
         return RansacStats();
@@ -860,7 +867,6 @@ RansacStats estimate_shared_rd_fundamental(const std::vector<Point2D> &x1, const
     double max_limit = 0.5 * scale * scale;
 
     if (opt.ransac.score_initial_model) {
-        check_rd_initial_model(F_cam_pair);
         F_cam_pair->F = T2.transpose().inverse() * (F_cam_pair->F) * T1.inverse();
         F_cam_pair->F /= F_cam_pair->F.norm();
         F_cam_pair->camera1.params[4] *= scale * scale;

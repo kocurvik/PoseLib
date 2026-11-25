@@ -30,6 +30,8 @@
 
 #include "PoseLib/misc/essential.h"
 
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 namespace poselib {
@@ -727,15 +729,27 @@ bool calculate_RFC(const Eigen::Matrix3d &F) {
     return true;
 }
 
-void check_rd_initial_model(ProjectiveImagePair *F_cam_pair) {
-    for (Camera *cam : {&F_cam_pair->camera1, &F_cam_pair->camera2}) {
+void check_rd_initial_model(ProjectiveImagePair *F_cam_pair, bool shared_k) {
+    constexpr double tol = 1e-8;
+    Camera &cam1 = F_cam_pair->camera1, &cam2 = F_cam_pair->camera2;
+
+    // Validate both cameras before modifying anything so that a failed check leaves the input untouched.
+    for (const Camera *cam : {&cam1, &cam2}) {
+        // Unit focal length and zero principal point means that the calibration matrix is the identity
         if ((cam->model_id != DivisionCameraModel::model_id && cam->model_id != SimpleDivisionCameraModel::model_id) ||
-            cam->focal_x() != 1.0 || cam->focal_y() != 1.0 || !cam->principal_point().isZero(0.0)) {
+            !cam->calib_matrix().isIdentity(tol)) {
             throw std::invalid_argument("Initial rd fundamental model requires DIVISION or SIMPLE_DIVISION cameras "
                                         "with unit focal length and zero principal point.");
         }
-        *cam = Camera(DivisionCameraModel::model_id, {1.0, 1.0, 0.0, 0.0, cam->params.back()}, -1, -1);
     }
+
+    const double k1 = cam1.params.back(), k2 = cam2.params.back();
+    if (shared_k && std::abs(k1 - k2) > tol * std::max(std::abs(k1), std::abs(k2))) {
+        throw std::invalid_argument("Initial shared rd fundamental model requires equal distortion parameters.");
+    }
+
+    cam1 = Camera(DivisionCameraModel::model_id, {1.0, 1.0, 0.0, 0.0, k1}, -1, -1);
+    cam2 = Camera(DivisionCameraModel::model_id, {1.0, 1.0, 0.0, 0.0, shared_k ? k1 : k2}, -1, -1);
 }
 
 } // namespace poselib

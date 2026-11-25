@@ -6,6 +6,8 @@
 #include <pybind11/iostream.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <stdexcept>
+#include <string>
 
 namespace py = pybind11;
 
@@ -252,14 +254,29 @@ inline void write_to_dict(const RansacStats &stats, py::dict &dict) {
     dict["model_score"] = stats.model_score;
 }
 
+// Sets camera.params, throwing std::invalid_argument if their number does not match the camera model
+inline void set_camera_params(Camera &camera, const std::vector<double> &params) {
+    // Constructing from the model id initializes params with the number the model expects
+    const size_t expected = Camera(camera.model_id).params.size();
+    if (params.size() != expected) {
+        throw std::invalid_argument("Camera model " + camera.model_name() + " expects " + std::to_string(expected) +
+                                    " params, got " + std::to_string(params.size()));
+    }
+    camera.params = params;
+}
+
 inline Camera camera_from_dict(const py::dict &camera_dict) {
+    const std::string model_name = camera_dict["model"].cast<std::string>();
     Camera camera;
-    camera.model_id = Camera::id_from_string(camera_dict["model"].cast<std::string>());
+    camera.model_id = Camera::id_from_string(model_name);
+    if (camera.model_id == CameraModelId::INVALID) {
+        throw std::invalid_argument("Unknown camera model: " + model_name);
+    }
 
     update(camera_dict, "width", camera.width);
     update(camera_dict, "height", camera.height);
 
-    camera.params = camera_dict["params"].cast<std::vector<double>>();
+    set_camera_params(camera, camera_dict["params"].cast<std::vector<double>>());
     return camera;
 }
 
