@@ -757,7 +757,7 @@ void check_focal_initial_model(Camera *camera1, Camera *camera2, const Point2D &
                                bool shared_focal) {
     constexpr double tol = 1e-8;
     // Relative tolerance, absolute for values below one (e.g. a principal point at the origin)
-    auto nearly_equal = [tol](double a, double b) {
+    auto nearly_equal = [](double a, double b) {
         return std::abs(a - b) <= tol * std::max({1.0, std::abs(a), std::abs(b)});
     };
 
