@@ -318,8 +318,8 @@ bool all_focal_estimators_throw(const std::vector<Point2D> &x1, const std::vecto
         ImagePair image_pair(CameraPose(), camera1, camera2);
         MonoDepthImagePair md_pair(MonoDepthTwoViewGeometry(), camera1, camera2);
         REQUIRE(focal_relative_pose_throws(x1, x2, pp, opt, shared, &image_pair, &inliers));
-        REQUIRE(focal_monodepth_relative_pose_throws(x1, x2, d1, d2, pp, monodepth_options(), shared, &md_pair,
-                                                     &inliers));
+        REQUIRE(
+            focal_monodepth_relative_pose_throws(x1, x2, d1, d2, pp, monodepth_options(), shared, &md_pair, &inliers));
         REQUIRE_EQ(image_pair.camera1.model_id, camera1.model_id);
         REQUIRE_EQ(md_pair.camera1.model_id, camera1.model_id);
     }
