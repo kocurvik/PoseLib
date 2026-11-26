@@ -756,24 +756,19 @@ void check_rd_initial_model(ProjectiveImagePair *F_cam_pair, bool shared_k) {
 void check_focal_initial_model(Camera *camera1, Camera *camera2, const Point2D &pp1, const Point2D &pp2,
                                bool shared_focal) {
     constexpr double tol = 1e-8;
-    // Relative tolerance, absolute for values below one (e.g. a principal point at the origin)
-    auto nearly_equal = [](double a, double b) {
-        return std::abs(a - b) <= tol * std::max({1.0, std::abs(a), std::abs(b)});
-    };
 
     // Validate both cameras before modifying anything so that a failed check leaves the input untouched.
     for (const auto &[cam, pp] : {std::make_pair(camera1, &pp1), std::make_pair(camera2, &pp2)}) {
-        const Eigen::Vector2d cam_pp = cam->principal_point();
         if ((cam->model_id != SimplePinholeCameraModel::model_id && cam->model_id != PinholeCameraModel::model_id) ||
-            !nearly_equal(cam->focal_x(), cam->focal_y()) || cam->focal() <= 0.0 ||
-            !nearly_equal(cam_pp(0), (*pp)(0)) || !nearly_equal(cam_pp(1), (*pp)(1))) {
+            cam->focal() <= 0.0 || std::abs(cam->focal_x() - cam->focal_y()) > tol * cam->focal() ||
+            !(cam->principal_point() - *pp).isZero(tol)) {
             throw std::invalid_argument("Initial focal relative pose model requires SIMPLE_PINHOLE or PINHOLE cameras "
                                         "with positive focal length, equal in x and y, and the given principal point.");
         }
     }
 
     const double f1 = camera1->focal(), f2 = camera2->focal();
-    if (shared_focal && !nearly_equal(f1, f2)) {
+    if (shared_focal && std::abs(f1 - f2) > tol * std::max(f1, f2)) {
         throw std::invalid_argument("Initial shared focal relative pose model requires equal focal lengths.");
     }
 
