@@ -51,7 +51,7 @@ RansacStats estimate_absolute_pose(const std::vector<Point2D> &points2D, const s
         if (opt.ransac.score_initial_model) {
             // The points are unprojected with image->camera, so the initial camera has unit focal here
             img.pose = image->pose;
-            img.camera = Camera(SimplePinholeCameraModel::model_id, {1.0, 0.0, 0.0}, 0, 0);
+            img.camera = Camera(SimplePinholeCameraModel::model_id, {1.0, 0.0, 0.0}, -1, -1);
         }
         stats = ransac_pnpf(points2D_norm, points3D, opt_scaled, &img, inliers);
         image->pose = img.pose;
@@ -63,7 +63,7 @@ RansacStats estimate_absolute_pose(const std::vector<Point2D> &points2D, const s
             // The points are unprojected (and undistorted) with image->camera, so the initial camera has unit focal
             // and no distortion here
             img.pose = image->pose;
-            img.camera = Camera(SimpleDivisionCameraModel::model_id, {1.0, 0.0, 0.0, 0.0}, 0, 0);
+            img.camera = Camera(SimpleDivisionCameraModel::model_id, {1.0, 0.0, 0.0, 0.0}, -1, -1);
         }
         stats = ransac_pnpfr(points2D_norm, points3D, opt_scaled, &img, inliers);
         image->pose = img.pose;
@@ -285,7 +285,7 @@ RansacStats estimate_absolute_pose_pnplf(const std::vector<Point2D> &points2D, c
     if (opt.ransac.score_initial_model) {
         // The initial model is image->pose with the input camera, which has unit focal in the normalized frame
         img.pose = image->pose;
-        img.camera = Camera(SimplePinholeCameraModel::model_id, {1.0, 0.0, 0.0}, 0, 0);
+        img.camera = Camera(SimplePinholeCameraModel::model_id, {1.0, 0.0, 0.0}, -1, -1);
     }
     RansacStats stats =
         ransac_pnplf(points2D_norm, points3D, lines2D_norm, lines3D, opt_scaled, &img, inliers_points, inliers_lines);
