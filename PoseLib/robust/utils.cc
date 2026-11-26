@@ -758,10 +758,13 @@ void check_focal_initial_model(Camera *camera1, Camera *camera2, const Point2D &
     constexpr double tol = 1e-8;
 
     // Validate both cameras before modifying anything so that a failed check leaves the input untouched.
-    for (const auto &[cam, pp] : {std::make_pair(camera1, &pp1), std::make_pair(camera2, &pp2)}) {
+    const Camera *cams[2] = {camera1, camera2};
+    const Point2D *pps[2] = {&pp1, &pp2};
+    for (int i = 0; i < 2; ++i) {
+        const Camera *cam = cams[i];
         if ((cam->model_id != SimplePinholeCameraModel::model_id && cam->model_id != PinholeCameraModel::model_id) ||
             cam->focal() <= 0.0 || std::abs(cam->focal_x() - cam->focal_y()) > tol * cam->focal() ||
-            !(cam->principal_point() - *pp).isZero(tol)) {
+            !(cam->principal_point() - *pps[i]).isZero(tol)) {
             throw std::invalid_argument("Initial focal relative pose model requires SIMPLE_PINHOLE or PINHOLE cameras "
                                         "with positive focal length, equal in x and y, and the given principal point.");
         }
