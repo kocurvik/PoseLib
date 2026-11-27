@@ -178,11 +178,7 @@ void HybridPointLineFocalAbsolutePoseEstimator::generate_models(const std::vecto
     for (size_t i = 0; i < poses.size(); ++i) {
         if (focals[i] < 0)
             continue;
-        Camera camera;
-        camera.model_id = CameraModelId::SIMPLE_PINHOLE;
-        camera.width = 0;
-        camera.height = 0;
-        camera.params = {focals[i], 0.0, 0.0};
+        Camera camera(CameraModelId::SIMPLE_PINHOLE, {focals[i], 0.0, 0.0}, 0, 0);
         models->emplace_back(poses[i], camera);
     }
 }

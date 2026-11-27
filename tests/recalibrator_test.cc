@@ -58,8 +58,7 @@ bool test_recalibrator_pinhole() {
     std::vector<Point3D> x_unproj;
     source.unproject(x, &x_unproj);
 
-    Camera target;
-    target.model_id = CameraModelId::SIMPLE_PINHOLE;
+    Camera target(CameraModelId::SIMPLE_PINHOLE);
 
     BundleOptions opt;
     opt.verbose = true;
@@ -87,8 +86,7 @@ bool test_recalibrator_division_to_radial_fisheye() {
     std::vector<Point3D> x_unproj;
     source.unproject(x, &x_unproj);
 
-    Camera target;
-    target.model_id = CameraModelId::RADIAL;
+    Camera target(CameraModelId::RADIAL);
 
     BundleOptions opt;
     opt.verbose = true;
@@ -118,8 +116,7 @@ bool test_recalibrator_division_to_radial() {
     std::vector<Point3D> x_unproj;
     source.unproject(x, &x_unproj);
 
-    Camera target;
-    target.model_id = CameraModelId::RADIAL;
+    Camera target(CameraModelId::RADIAL);
 
     BundleOptions opt;
     opt.verbose = true;
@@ -148,8 +145,7 @@ bool test_recalibrator_division_to_thin_prism_fisheye() {
     std::vector<Point3D> x_unproj;
     source.unproject(x, &x_unproj);
 
-    Camera target;
-    target.model_id = CameraModelId::THIN_PRISM_FISHEYE;
+    Camera target(CameraModelId::THIN_PRISM_FISHEYE);
 
     BundleOptions opt;
     opt.verbose = true;

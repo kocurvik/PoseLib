@@ -253,14 +253,12 @@ inline void write_to_dict(const RansacStats &stats, py::dict &dict) {
 }
 
 inline Camera camera_from_dict(const py::dict &camera_dict) {
-    Camera camera;
-    camera.model_id = Camera::id_from_string(camera_dict["model"].cast<std::string>());
-
-    update(camera_dict, "width", camera.width);
-    update(camera_dict, "height", camera.height);
-
-    camera.params = camera_dict["params"].cast<std::vector<double>>();
-    return camera;
+    // The constructor checks the model name and the number of params
+    int width = 0, height = 0;
+    update(camera_dict, "width", width);
+    update(camera_dict, "height", height);
+    return Camera(camera_dict["model"].cast<std::string>(), camera_dict["params"].cast<std::vector<double>>(), width,
+                  height);
 }
 
 inline std::vector<bool> convert_inlier_vector(const std::vector<char> &inliers) {

@@ -289,9 +289,7 @@ bool UnknownFocalDistValidator::is_valid(const AbsolutePoseProblemInstance &inst
         return false;
 
     // Validate by checking reprojection through the SIMPLE_DIVISION camera model
-    Camera cam;
-    cam.model_id = CameraModelId::SIMPLE_DIVISION;
-    cam.params = {focal, 0.0, 0.0, dist};
+    Camera cam(CameraModelId::SIMPLE_DIVISION, {focal, 0.0, 0.0, dist});
 
     for (size_t i = 0; i < instance.x_point_.size(); ++i) {
         Eigen::Vector3d X_cam = pose.R() * instance.X_point_[i] + pose.t;
@@ -416,9 +414,7 @@ void generate_abspose_problems(int n_problems, std::vector<AbsolutePoseProblemIn
             if (options.unknown_dist_) {
                 // Project through SIMPLE_DIVISION camera model
                 Eigen::Vector3d X_cam = instance.pose_gt.R() * X + instance.pose_gt.t;
-                Camera cam;
-                cam.model_id = CameraModelId::SIMPLE_DIVISION;
-                cam.params = {instance.focal_gt, 0.0, 0.0, instance.dist_gt};
+                Camera cam(CameraModelId::SIMPLE_DIVISION, {instance.focal_gt, 0.0, 0.0, instance.dist_gt});
                 Eigen::Vector2d xp;
                 cam.project(X_cam, &xp);
                 x << xp(0), xp(1), 1.0;

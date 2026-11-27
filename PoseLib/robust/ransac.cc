@@ -61,10 +61,7 @@ RansacStats ransac_pnpf(const std::vector<Point2D> &x, const std::vector<Point3D
 
     best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
     best_model->pose.t.setZero();
-    best_model->camera.model_id = CameraModelId::SIMPLE_PINHOLE;
-    best_model->camera.width = 0;
-    best_model->camera.height = 0;
-    best_model->camera.params = {1.0, 0.0, 0.0};
+    best_model->camera = Camera(CameraModelId::SIMPLE_PINHOLE, {1.0, 0.0, 0.0}, 0, 0);
 
     FocalAbsolutePoseEstimator estimator(opt, x, X);
     RansacStats stats = ransac<FocalAbsolutePoseEstimator>(estimator, opt.ransac, best_model);
@@ -79,10 +76,7 @@ RansacStats ransac_pnpfr(const std::vector<Point2D> &x, const std::vector<Point3
 
     best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
     best_model->pose.t.setZero();
-    best_model->camera.model_id = CameraModelId::SIMPLE_DIVISION;
-    best_model->camera.width = 0;
-    best_model->camera.height = 0;
-    best_model->camera.params = {1.0, 0.0, 0.0, 0.0};
+    best_model->camera = Camera(CameraModelId::SIMPLE_DIVISION, {1.0, 0.0, 0.0, 0.0}, 0, 0);
 
     RDAbsolutePoseEstimator estimator(opt, x, X);
     RansacStats stats = ransac<RDAbsolutePoseEstimator>(estimator, opt.ransac, best_model);
@@ -146,10 +140,7 @@ RansacStats ransac_pnplf(const std::vector<Point2D> &points2D, const std::vector
 
     best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
     best_model->pose.t.setZero();
-    best_model->camera.model_id = CameraModelId::SIMPLE_PINHOLE;
-    best_model->camera.width = 0;
-    best_model->camera.height = 0;
-    best_model->camera.params = {1.0, 0.0, 0.0};
+    best_model->camera = Camera(CameraModelId::SIMPLE_PINHOLE, {1.0, 0.0, 0.0}, 0, 0);
 
     FocalAbsolutePosePointLineEstimator estimator(opt, points2D, points3D, lines2D, lines3D);
     RansacStats stats = ransac<FocalAbsolutePosePointLineEstimator>(estimator, opt.ransac, best_model);

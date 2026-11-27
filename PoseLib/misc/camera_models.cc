@@ -34,6 +34,7 @@
 #include <iostream>
 #include <limits>
 #include <sstream>
+#include <stdexcept>
 
 namespace poselib {
 
@@ -44,40 +45,68 @@ static const size_t UNDIST_MAX_ITER = 100;
 ///////////////////////////////////////////////////////////////////
 // Camera - base class storing ID
 
-Camera::Camera() : Camera(-1, {}, 0, 0) { init_params(); }
+CameraParams &CameraParams::operator=(const std::vector<double> &p) {
+    if (p.size() != values_.size()) {
+        throw std::invalid_argument("Camera params must keep their length (expected " + std::to_string(values_.size()) +
+                                    ", got " + std::to_string(p.size()) +
+                                    "). Construct a new Camera to change the model.");
+    }
+    values_ = p;
+    return *this;
+}
 
-Camera::Camera(int id) : Camera(id, {}, 0, 0) { init_params(); }
+// Throws unless model_name is a known camera model
+static int known_model_id(const std::string &model_name) {
+    const int id = Camera::id_from_string(model_name);
+    if (id == CameraModelId::INVALID && model_name != NullCameraModel::to_string()) {
+        throw std::invalid_argument("Unknown camera model \"" + model_name + "\"");
+    }
+    return id;
+}
+
+Camera::Camera() : Camera(-1, {}, 0, 0) {}
+
+Camera::Camera(int id) : Camera(id, {}, 0, 0) {}
 
 Camera::Camera(const std::string &model_name, const std::vector<double> &p, int w, int h)
-    : Camera(id_from_string(model_name), p, w, h) {
+    : Camera(known_model_id(model_name), p, w, h) {}
+
+Camera::Camera(int id, const std::vector<double> &p, int w, int h) : model_id(id), width(w), height(h) {
+    params.values_ = p;
     init_params();
 }
 
-Camera::Camera(int id, const std::vector<double> &p, int w, int h) {
-    model_id = id;
-    params = p;
-    width = w;
-    height = h;
-    init_params();
-}
-Camera::Camera(const std::string &init_txt) {
-    size_t id = id_from_string(init_txt);
-    if (id == CameraModelId::INVALID) {
+Camera::Camera(const std::string &init_txt) : model_id(-1), width(0), height(0) {
+    const int id = id_from_string(init_txt);
+    if (id == CameraModelId::INVALID && init_txt != NullCameraModel::to_string()) {
         initialize_from_txt(init_txt);
     } else {
-        model_id = id;
-        width = 0;
-        height = 0;
+        model_id.id_ = id;
+        init_params();
     }
-    init_params();
+}
+
+Camera &Camera::operator=(const Camera &other) {
+    // Replaces the whole camera, so the model and the number of params may change together
+    model_id.id_ = other.model_id.id_;
+    width = other.width;
+    height = other.height;
+    params.values_ = other.params.values_;
+    return *this;
 }
 
 void Camera::init_params() {
-    bool init_params = params.size() == 0;
+    std::vector<double> &values = params.values_;
+    bool init_params = values.size() == 0;
 
 #define SWITCH_CAMERA_MODEL_CASE(Model)                                                                                \
     case Model::model_id:                                                                                              \
-        params.resize(Model::num_params, 0.0);                                                                         \
+        if (!init_params && values.size() != Model::num_params) {                                                      \
+            throw std::invalid_argument("Camera model " + Model::to_string() + " needs " +                             \
+                                        std::to_string(Model::num_params) + " params (" + Model::params_info() +       \
+                                        "), got " + std::to_string(values.size()));                                    \
+        }                                                                                                              \
+        values.resize(Model::num_params, 0.0);                                                                         \
         if (init_params) {                                                                                             \
             if (width > 0 && height > 0) {                                                                             \
                 set_focal(max_dim() * 1.2);                                                                            \
@@ -88,7 +117,11 @@ void Camera::init_params() {
             }                                                                                                          \
         }                                                                                                              \
         break;
-    switch (model_id) { SWITCH_CAMERA_MODELS }
+    switch (model_id) {
+        SWITCH_CAMERA_MODELS
+    default:
+        throw std::invalid_argument("Unknown camera model id " + std::to_string(model_id));
+    }
 
 #undef SWITCH_CAMERA_MODEL_CASE
 }
@@ -506,25 +539,24 @@ int Camera::initialize_from_txt(const std::string &line) {
     // Read the model
     std::string model_name;
     ss >> model_name;
-    model_id = id_from_string(model_name);
-    if (model_id == -1) {
-        return -1;
-    }
 
     // Read sizes
-    double d;
+    double d = 0.0;
     ss >> d;
-    width = d;
+    const int w = static_cast<int>(d);
+    d = 0.0;
     ss >> d;
-    height = d;
+    const int h = static_cast<int>(d);
 
     // Read parameters
-    params.clear();
+    std::vector<double> p;
     double param;
     while (ss >> param) {
-        params.push_back(param);
+        p.push_back(param);
     }
 
+    // The constructor validates the model and the number of parameters
+    *this = Camera(model_name, p, w, h);
     return camera_id;
 }
 std::string Camera::to_cameras_txt(int camera_id) const {

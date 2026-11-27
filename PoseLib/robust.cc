@@ -69,8 +69,7 @@ RansacStats estimate_absolute_pose(const std::vector<Point2D> &points2D, const s
                 }
             }
 
-            Camera target_camera;
-            target_camera.model_id = image->camera.model_id;
+            Camera target_camera(image->camera.model_id);
 
             /*
             // Rescale estimated camera to orginal image points

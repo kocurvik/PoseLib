@@ -69,10 +69,14 @@ void register_types(py::module &m) {
         .def(py::init<>())
         .def(py::init<const std::string &, const std::vector<double> &, int, int>())
         .def(py::init([](const py::dict &dict) { return camera_from_dict(dict); }))
-        .def_readwrite("model_id", &Camera::model_id)
+        .def_property_readonly("model_id", [](const Camera &self) { return static_cast<int>(self.model_id); },
+                               "Camera model id. Fixed at construction: create a new Camera to change the model.")
         .def_readwrite("width", &Camera::width)
         .def_readwrite("height", &Camera::height)
-        .def_readwrite("params", &Camera::params)
+        .def_property(
+            "params", [](const Camera &self) { return self.params.vector(); },
+            [](Camera &self, const std::vector<double> &params) { self.params = params; },
+            "Camera parameters (see params_info()). Can be replaced by a list of the same length only.")
         .def("focal", &Camera::focal, "Returns the camera focal length.")
         .def("focal_x", &Camera::focal_x, "Returns the camera focal_x.")
         .def("focal_y", &Camera::focal_y, "Returns the camera focal_y.")
@@ -111,7 +115,7 @@ void register_types(py::module &m) {
                  dict["model"] = self.model_name();
                  dict["width"] = self.width;
                  dict["height"] = self.height;
-                 dict["params"] = self.params;
+                 dict["params"] = self.params.vector();
                  return dict;
              })
         .def("__repr__", [](const Camera &a) { return a.to_cameras_txt(); });

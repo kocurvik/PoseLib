@@ -84,8 +84,7 @@ IterationCallback setup_callback(const BundleOptions &opt) {
 BundleStats bundle_adjust(const std::vector<Point2D> &x, const std::vector<Point3D> &X, CameraPose *pose,
                           const BundleOptions &opt, const std::vector<double> &weights) {
     Image image;
-    image.pose = *pose;
-    image.camera.model_id = NullCameraModel::model_id;
+    image.pose = *pose; // the default camera is the null model (identity intrinsics)
     BundleStats stats = bundle_adjust(x, X, &image, opt);
     *pose = image.pose;
     return stats;
@@ -214,11 +213,8 @@ BundleStats generalized_bundle_adjust(const std::vector<std::vector<Point2D>> &x
                                       const std::vector<std::vector<Point3D>> &X,
                                       const std::vector<CameraPose> &camera_ext, CameraPose *pose,
                                       const BundleOptions &opt, const std::vector<std::vector<double>> &weights) {
-    std::vector<Camera> dummy_cameras;
-    dummy_cameras.resize(x.size());
-    for (size_t k = 0; k < x.size(); ++k) {
-        dummy_cameras[k].model_id = -1;
-    }
+    // Default cameras use the null model (identity intrinsics)
+    std::vector<Camera> dummy_cameras(x.size());
     return generalized_bundle_adjust(x, X, camera_ext, dummy_cameras, pose, opt, weights);
 }
 

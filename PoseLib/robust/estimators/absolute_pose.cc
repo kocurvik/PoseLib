@@ -98,11 +98,7 @@ void FocalAbsolutePoseEstimator::generate_models(std::vector<Image> *models) {
         if (max_focal_length >= 0 && focals[i] > max_focal_length)
             continue;
 
-        Camera camera;
-        camera.model_id = CameraModelId::SIMPLE_PINHOLE;
-        camera.width = 0;
-        camera.height = 0;
-        camera.params = {focals[i], 0.0, 0.0};
+        Camera camera(CameraModelId::SIMPLE_PINHOLE, {focals[i], 0.0, 0.0}, 0, 0);
 
         Image image(poses[i], camera);
 
@@ -194,11 +190,7 @@ void RDAbsolutePoseEstimator::generate_models(std::vector<Image> *models) {
         if (focals[i] < 0)
             continue;
 
-        Camera camera;
-        camera.model_id = CameraModelId::SIMPLE_DIVISION;
-        camera.width = 0;
-        camera.height = 0;
-        camera.params = {focals[i], 0.0, 0.0, dist[i]};
+        Camera camera(CameraModelId::SIMPLE_DIVISION, {focals[i], 0.0, 0.0, dist[i]}, 0, 0);
 
         Image image(poses[i], camera);
 
@@ -440,11 +432,7 @@ void FocalAbsolutePosePointLineEstimator::generate_models(std::vector<Image> *mo
         if (max_focal_length >= 0 && focals[i] > max_focal_length)
             continue;
 
-        Camera camera;
-        camera.model_id = CameraModelId::SIMPLE_PINHOLE;
-        camera.width = 0;
-        camera.height = 0;
-        camera.params = {focals[i], 0.0, 0.0};
+        Camera camera(CameraModelId::SIMPLE_PINHOLE, {focals[i], 0.0, 0.0}, 0, 0);
         models->emplace_back(poses[i], camera);
     }
 }

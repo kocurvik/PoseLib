@@ -3,6 +3,9 @@
 #include "test_rng.h"
 
 #include <PoseLib/misc/camera_models.h>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
 
 using namespace poselib;
 
@@ -350,9 +353,70 @@ bool test_jacobian_1D_radial() {
     return true;
 }
 
+// Returns the message of the std::invalid_argument thrown by f, or "" if f does not throw
+template <typename F> std::string invalid_argument_message(F f) {
+    try {
+        f();
+    } catch (const std::invalid_argument &e) {
+        return e.what();
+    }
+    return "";
+}
+
+// model_id can not be assigned on its own, only together with the params by assigning a whole Camera
+static_assert(!std::is_assignable<decltype(Camera::model_id) &, int>::value, "Camera::model_id must be read-only");
+static_assert(std::is_assignable<Camera &, const Camera &>::value, "whole cameras must be assignable");
+
+bool test_camera_construction_checks() {
+    std::string msg = invalid_argument_message([]() { Camera("OPENCV", {500.0, 500.0, 320.0}); });
+    REQUIRE_M(msg.find("OPENCV needs 8 params (fx, fy, cx, cy, k1, k2, p1, p2), got 3") != std::string::npos, msg);
+
+    msg = invalid_argument_message([]() { Camera("PINHOL", {500.0, 500.0, 320.0, 240.0}); });
+    REQUIRE_M(msg.find("Unknown camera model \"PINHOL\"") != std::string::npos, msg);
+
+    msg = invalid_argument_message([]() { Camera("0 SIMPLE_PINHOLE 640 480 500 320 240 0.1"); });
+    REQUIRE_M(msg.find("SIMPLE_PINHOLE needs 3 params") != std::string::npos, msg);
+
+    msg = invalid_argument_message([]() { Camera(42); });
+    REQUIRE_M(msg.find("Unknown camera model id 42") != std::string::npos, msg);
+
+    // Empty params are filled with defaults
+    Camera camera("PINHOLE", {}, 640, 480);
+    REQUIRE_EQ(camera.params.size(), 4);
+    REQUIRE_EQ(camera.params[2], 320.0);
+    return true;
+}
+
+bool test_camera_params_keep_length() {
+    Camera camera("SIMPLE_RADIAL", {500.0, 320.0, 240.0, 0.1}, 640, 480);
+
+    // Single params and same-length replacements are allowed
+    camera.params[3] = -0.1;
+    REQUIRE_EQ(camera.params[3], -0.1);
+    camera.params = {600.0, 300.0, 200.0, 0.0};
+    REQUIRE_EQ(camera.params[0], 600.0);
+
+    // Changing the length throws and leaves the camera unchanged
+    const std::string msg = invalid_argument_message([&]() { camera.params = {600.0, 300.0, 200.0}; });
+    REQUIRE_M(msg.find("expected 4, got 3") != std::string::npos, msg);
+    REQUIRE_EQ(camera.params.size(), 4);
+
+    // The model changes by assigning a whole camera
+    camera = Camera("PINHOLE", {500.0, 510.0, 320.0, 240.0});
+    REQUIRE_EQ(static_cast<int>(camera.model_id), static_cast<int>(CameraModelId::PINHOLE));
+    REQUIRE_EQ(camera.params.size(), 4);
+    return true;
+}
+
 std::vector<Test> register_camera_models_test() {
-    return {TEST(test_id_from_string), TEST(test_id_string_converstion),
-            TEST(test_model_name),     TEST(test_from_txt),
-            TEST(test_to_txt),         TEST(test_project_unproject),
-            TEST(test_jacobian),       TEST(test_jacobian_1D_radial)};
+    return {TEST(test_id_from_string),
+            TEST(test_id_string_converstion),
+            TEST(test_model_name),
+            TEST(test_from_txt),
+            TEST(test_to_txt),
+            TEST(test_project_unproject),
+            TEST(test_jacobian),
+            TEST(test_jacobian_1D_radial),
+            TEST(test_camera_construction_checks),
+            TEST(test_camera_params_keep_length)};
 }

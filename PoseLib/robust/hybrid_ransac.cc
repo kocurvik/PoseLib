@@ -67,10 +67,7 @@ HybridRansacStats hybrid_ransac_pnplf(const std::vector<Point2D> &points2D, cons
     // Initialize image (SIMPLE_PINHOLE, principal point at (0,0))
     image->pose.q << 1.0, 0.0, 0.0, 0.0;
     image->pose.t.setZero();
-    image->camera.model_id = CameraModelId::SIMPLE_PINHOLE;
-    image->camera.width = 0;
-    image->camera.height = 0;
-    image->camera.params = {1.0, 0.0, 0.0};
+    image->camera = Camera(CameraModelId::SIMPLE_PINHOLE, {1.0, 0.0, 0.0}, 0, 0);
 
     HybridPointLineFocalAbsolutePoseEstimator estimator(opt, points2D, points3D, lines2D, lines3D);
 

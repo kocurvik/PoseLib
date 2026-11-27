@@ -31,6 +31,7 @@
 
 #include <Eigen/Dense>
 #include <PoseLib/types.h>
+#include <string>
 #include <vector>
 
 namespace poselib {
@@ -56,19 +57,76 @@ enum CameraModelId {
     SIMPLE_DIVISION = 102
 };
 
+struct Camera;
+
+// Camera::model_id. It converts to int, so it can be read and compared as before, but it can not be assigned:
+// the model of a camera is fixed when the camera is constructed (assign a whole new Camera to change it).
+class CameraModelIdValue {
+  public:
+    operator int() const { return id_; }
+
+    CameraModelIdValue(const CameraModelIdValue &) = default;
+    CameraModelIdValue &operator=(const CameraModelIdValue &) = delete;
+
+  private:
+    explicit CameraModelIdValue(int id) : id_(id) {}
+    int id_;
+    friend struct Camera;
+};
+
+// Camera::params. The number of parameters is fixed by the camera model: single parameters can be read and changed
+// (params[i] = ...), and the whole vector can be replaced by one of the same length, but the length can not change.
+class CameraParams {
+  public:
+    CameraParams(const CameraParams &) = default;
+
+    double &operator[](size_t i) { return values_[i]; }
+    const double &operator[](size_t i) const { return values_[i]; }
+    double &at(size_t i) { return values_.at(i); }
+    const double &at(size_t i) const { return values_.at(i); }
+    size_t size() const { return values_.size(); }
+    bool empty() const { return values_.empty(); }
+    double *data() { return values_.data(); }
+    const double *data() const { return values_.data(); }
+    std::vector<double>::iterator begin() { return values_.begin(); }
+    std::vector<double>::iterator end() { return values_.end(); }
+    std::vector<double>::const_iterator begin() const { return values_.begin(); }
+    std::vector<double>::const_iterator end() const { return values_.end(); }
+
+    // Read-only access as a std::vector, e.g. for the camera model functions
+    const std::vector<double> &vector() const { return values_; }
+    operator const std::vector<double> &() const { return values_; }
+
+    // Replaces all parameters. Throws std::invalid_argument if the length differs.
+    CameraParams &operator=(const std::vector<double> &p);
+    CameraParams &operator=(const CameraParams &p) { return *this = p.values_; }
+
+  private:
+    CameraParams() = default;
+    std::vector<double> values_;
+    friend struct Camera;
+};
+
 struct Camera {
-    int model_id;
+    CameraModelIdValue model_id;
     int width;
     int height;
-    std::vector<double> params;
+    CameraParams params;
 
+    // Throw std::invalid_argument for an unknown model or if params is non-empty and its length does not match the
+    // model. Empty params are filled with defaults (see init_params).
     Camera();
     Camera(int model_id);
     Camera(const std::string &model_name, const std::vector<double> &params, int width = 0, int height = 0);
     Camera(int model_id, const std::vector<double> &params, int width = 0, int height = 0);
     Camera(const std::string &init_txt);
 
+    // Whole cameras can be copied and assigned (this is the way to change the model of a camera)
+    Camera(const Camera &other) = default;
+    Camera &operator=(const Camera &other);
+
     // Ensures the parameters are valid
+    // If params are empty they are initialized with defaults:
     // If width/height are non-zero
     //  focal = max(width, height) * 1.2
     //  principal point = (width,height)/2
@@ -76,6 +134,7 @@ struct Camera {
     // Else
     //  focal = 1.0
     //  principal point = extra params = 0.0
+    // Throws std::invalid_argument for an unknown model or if the number of params does not match the model.
     void init_params();
 
     // Projection and distortion (2d to 3d)
@@ -139,7 +198,8 @@ struct Camera {
     std::vector<size_t> principal_point_idx() const;
     std::vector<size_t> extra_idx() const;
 
-    // Parses a camera from a line from cameras.txt, returns the camera_id
+    // Parses a camera from a line from cameras.txt (replacing model, size and params), returns the camera_id
+    // Throws std::invalid_argument for an unknown model or if the number of params does not match the model.
     int initialize_from_txt(const std::string &line);
     // Creates line for cameras.txt (inverse of initialize_from_txt)
     // If camera_id == -1 it is ommited

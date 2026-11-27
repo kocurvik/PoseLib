@@ -314,10 +314,7 @@ std::pair<Image, py::dict> refine_absolute_pose_pnplf_wrapper(
     // Refine in the normalized frame: SIMPLE_PINHOLE with focal = 1, pp = 0.
     Image image;
     image.pose = initial_pose;
-    image.camera.model_id = CameraModelId::SIMPLE_PINHOLE;
-    image.camera.width = 0;
-    image.camera.height = 0;
-    image.camera.params = {1.0, 0.0, 0.0};
+    image.camera = Camera(CameraModelId::SIMPLE_PINHOLE, {1.0, 0.0, 0.0}, 0, 0);
 
     BundleStats stats = bundle_adjust(points2D_calib, points3D, lines2D_calib, lines3D, &image, bundle_opt,
                                       line_bundle_opt);
