@@ -32,6 +32,7 @@
 
 #include "bundle.h"
 
+#include "PoseLib/misc/input_checks.h"
 #include "PoseLib/robust/optim/absolute.h"
 #include "PoseLib/robust/optim/fundamental.h"
 #include "PoseLib/robust/optim/generalized_absolute.h"
@@ -86,7 +87,7 @@ BundleStats bundle_adjust(const std::vector<Point2D> &x, const std::vector<Point
     Image image;
     image.pose = *pose;
     image.camera.model_id = NullCameraModel::model_id;
-    BundleStats stats = bundle_adjust(x, X, &image, opt);
+    BundleStats stats = bundle_adjust(x, X, &image, opt, weights);
     *pose = image.pose;
     return stats;
 }
@@ -104,6 +105,8 @@ BundleStats bundle_adjust(const std::vector<Point2D> &x, const std::vector<Point
 // Entry point for PnP refinement
 BundleStats bundle_adjust(const std::vector<Point2D> &x, const std::vector<Point3D> &X, Image *image,
                           const BundleOptions &opt, const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x, X);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x);
     if (weights.size() == x.size()) {
         return bundle_adjust<std::vector<double>>(x, X, image, opt, weights);
     } else {
@@ -140,6 +143,10 @@ BundleStats bundle_adjust(const std::vector<Point2D> &points2D, const std::vecto
                           const std::vector<Line2D> &lines2D, const std::vector<Line3D> &lines3D, CameraPose *pose,
                           const BundleOptions &opt, const BundleOptions &opt_line,
                           const std::vector<double> &weights_pts, const std::vector<double> &weights_lines) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+    POSELIB_CHECK_SAME_SIZE(lines2D, lines3D);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights_pts, points2D);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights_lines, lines2D);
     bool have_pts_weights = weights_pts.size() == points2D.size();
     bool have_line_weights = weights_lines.size() == lines2D.size();
 
@@ -188,6 +195,10 @@ BundleStats bundle_adjust(const std::vector<Point2D> &points2D, const std::vecto
                           const std::vector<Line2D> &lines2D, const std::vector<Line3D> &lines3D, Image *image,
                           const BundleOptions &opt, const BundleOptions &opt_line,
                           const std::vector<double> &weights_pts, const std::vector<double> &weights_lines) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+    POSELIB_CHECK_SAME_SIZE(lines2D, lines3D);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights_pts, points2D);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights_lines, lines2D);
     bool have_pts_weights = weights_pts.size() == points2D.size();
     bool have_line_weights = weights_lines.size() == lines2D.size();
 
@@ -238,6 +249,14 @@ BundleStats generalized_bundle_adjust(const std::vector<std::vector<Point2D>> &x
                                       const std::vector<CameraPose> &camera_ext, const std::vector<Camera> &cameras,
                                       CameraPose *pose, const BundleOptions &opt,
                                       const std::vector<std::vector<double>> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x, X, camera_ext, cameras);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x);
+    for (size_t cam_k = 0; cam_k < x.size(); ++cam_k) {
+        POSELIB_CHECK_SAME_SIZE(x[cam_k], X[cam_k]);
+        if (!weights.empty()) {
+            POSELIB_CHECK_SAME_SIZE(weights[cam_k], x[cam_k]);
+        }
+    }
 
     if (weights.size() == x.size()) {
         return generalized_bundle_adjust<std::vector<std::vector<double>>>(x, X, camera_ext, cameras, pose, opt,
@@ -262,6 +281,8 @@ BundleStats refine_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
 // Entry point for essential matrix refinement
 BundleStats refine_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, CameraPose *pose,
                            const BundleOptions &opt, const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x1);
     if (weights.size() == x1.size()) {
         return refine_relpose<std::vector<double>>(x1, x2, pose, opt, weights);
     } else {
@@ -306,6 +327,8 @@ BundleStats refine_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
 // Entry point for essential matrix refinement
 BundleStats refine_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, ImagePair *pair,
                            const BundleOptions &opt, const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x1);
     if (weights.size() == x1.size()) {
         return refine_relpose<std::vector<double>>(x1, x2, pair, opt, weights);
     } else {
@@ -317,6 +340,8 @@ BundleStats refine_relpose(const std::vector<Point3D> &d1, const std::vector<Poi
                            const std::vector<Eigen::Matrix<double, 3, 2>> &M1,
                            const std::vector<Eigen::Matrix<double, 3, 2>> &M2, CameraPose *pose,
                            const BundleOptions &opt, const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(d1, d2, M1, M2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, d1);
     if (weights.size() == d1.size()) {
         return refine_relpose<std::vector<double>>(d1, d2, M1, M2, pose, opt, weights);
     } else {
@@ -339,6 +364,8 @@ BundleStats refine_shared_focal_relpose(const std::vector<Point2D> &x1, const st
 BundleStats refine_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         ImagePair *image_pair, const BundleOptions &opt,
                                         const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x1);
     if (weights.size() == x1.size()) {
         return refine_shared_focal_relpose<std::vector<double>>(x1, x2, image_pair, opt, weights);
     } else {
@@ -359,6 +386,8 @@ BundleStats refine_varying_focal_relpose(const std::vector<Point2D> &x1, const s
 BundleStats refine_varying_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                          ImagePair *image_pair, const BundleOptions &opt,
                                          const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x1);
     if (weights.size() == x1.size()) {
         return refine_varying_focal_relpose<std::vector<double>>(x1, x2, image_pair, opt, weights);
     } else {
@@ -384,6 +413,8 @@ BundleStats refine_fundamental(const std::vector<Point2D> &x1, const std::vector
 // Entry point for fundamental matrix refinement
 BundleStats refine_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, Eigen::Matrix3d *F,
                                const BundleOptions &opt, const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x1);
     if (weights.size() == x1.size()) {
         return refine_fundamental<std::vector<double>>(x1, x2, F, opt, weights);
     } else {
@@ -411,6 +442,8 @@ BundleStats refine_rd_fundamental(const std::vector<Point2D> &x1, const std::vec
 BundleStats refine_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                   ProjectiveImagePair *projective_image_pair, const BundleOptions &opt,
                                   const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x1);
     if (weights.size() == x1.size()) {
         return refine_rd_fundamental<std::vector<double>>(x1, x2, projective_image_pair, opt, weights);
     } else {
@@ -439,6 +472,8 @@ BundleStats refine_shared_rd_fundamental(const std::vector<Point2D> &x1, const s
 BundleStats refine_shared_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                          ProjectiveImagePair *projective_image_pair, const BundleOptions &opt,
                                          const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x1);
     if (weights.size() == x1.size()) {
         return refine_shared_rd_fundamental<std::vector<double>>(x1, x2, projective_image_pair, opt, weights);
     } else {
@@ -462,6 +497,8 @@ BundleStats refine_homography(const std::vector<Point2D> &x1, const std::vector<
 // Entry point for fundamental matrix refinement
 BundleStats refine_homography(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, Eigen::Matrix3d *H,
                               const BundleOptions &opt, const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x1);
     if (weights.size() == x1.size()) {
         return refine_homography<std::vector<double>>(x1, x2, H, opt, weights);
     } else {
@@ -478,7 +515,7 @@ BundleStats refine_generalized_relpose(const std::vector<PairwiseMatches> &match
                                        const std::vector<CameraPose> &camera2_ext, CameraPose *pose,
                                        const BundleOptions &opt, const WeightType &weights) {
     IterationCallback callback = setup_callback(opt);
-    GeneralizedPinholeRelativePoseRefiner<WeightType> refiner(matches, camera1_ext, camera2_ext);
+    GeneralizedPinholeRelativePoseRefiner<WeightType> refiner(matches, camera1_ext, camera2_ext, weights);
     BundleStats stats = lm_impl<decltype(refiner)>(refiner, pose, opt, callback);
     return stats;
 }
@@ -488,6 +525,16 @@ BundleStats refine_generalized_relpose(const std::vector<PairwiseMatches> &match
                                        const std::vector<CameraPose> &camera1_ext,
                                        const std::vector<CameraPose> &camera2_ext, CameraPose *pose,
                                        const BundleOptions &opt, const std::vector<std::vector<double>> &weights) {
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, matches);
+    for (size_t match_k = 0; match_k < matches.size(); ++match_k) {
+        const PairwiseMatches &m = matches[match_k];
+        POSELIB_CHECK_SAME_SIZE(m.x1, m.x2);
+        POSELIB_CHECK_INDEX(m.cam_id1, camera1_ext);
+        POSELIB_CHECK_INDEX(m.cam_id2, camera2_ext);
+        if (!weights.empty()) {
+            POSELIB_CHECK_SAME_SIZE(weights[match_k], m.x1);
+        }
+    }
     if (weights.size() == matches.size()) {
         return refine_generalized_relpose<std::vector<std::vector<double>>>(matches, camera1_ext, camera2_ext, pose,
                                                                             opt, weights);
@@ -495,6 +542,45 @@ BundleStats refine_generalized_relpose(const std::vector<PairwiseMatches> &match
         return refine_generalized_relpose<UniformWeightVectors>(matches, camera1_ext, camera2_ext, pose, opt,
                                                                 UniformWeightVectors());
     }
+}
+
+// Entry point for generalized relpose refinement with camera intrinsics (points in pixels)
+BundleStats refine_generalized_relpose(const std::vector<PairwiseMatches> &matches,
+                                       const std::vector<CameraPose> &camera1_ext, const std::vector<Camera> &cameras1,
+                                       const std::vector<CameraPose> &camera2_ext, const std::vector<Camera> &cameras2,
+                                       CameraPose *pose, const BundleOptions &opt,
+                                       const std::vector<std::vector<double>> &weights) {
+    POSELIB_CHECK_SAME_SIZE(camera1_ext, cameras1);
+    POSELIB_CHECK_SAME_SIZE(camera2_ext, cameras2);
+    for (const PairwiseMatches &m : matches) {
+        POSELIB_CHECK_SAME_SIZE(m.x1, m.x2);
+        POSELIB_CHECK_INDEX(m.cam_id1, cameras1);
+        POSELIB_CHECK_INDEX(m.cam_id2, cameras2);
+    }
+
+    // Undistort the points with the camera intrinsics
+    std::vector<PairwiseMatches> calib_matches = matches;
+    for (PairwiseMatches &m : calib_matches) {
+        for (size_t k = 0; k < m.x1.size(); ++k) {
+            cameras1[m.cam_id1].unproject(m.x1[k], &m.x1[k]);
+            cameras2[m.cam_id2].unproject(m.x2[k], &m.x2[k]);
+        }
+    }
+
+    // Scale the robust loss to the normalized image plane using the mean inverse focal length
+    double scaling_factor = 0;
+    for (size_t k = 0; k < cameras1.size(); ++k) {
+        scaling_factor += 1.0 / cameras1[k].focal();
+    }
+    for (size_t k = 0; k < cameras2.size(); ++k) {
+        scaling_factor += 1.0 / cameras2[k].focal();
+    }
+    scaling_factor /= cameras1.size() + cameras2.size();
+
+    BundleOptions opt_scaled = opt;
+    opt_scaled.loss_scale *= scaling_factor;
+
+    return refine_generalized_relpose(calib_matches, camera1_ext, camera2_ext, pose, opt_scaled, weights);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -510,6 +596,7 @@ BundleStats refine_hybrid_pose(const std::vector<Point2D> &x, const std::vector<
     IterationCallback callback = setup_callback(opt);
 
     PinholeAbsolutePoseRefiner<AbsWeightType> pts_refiner(x, X, weights_abs);
+    // The 2D-2D matches go to the query camera, i.e. cam_id2 = 0 (checked in the entry point below)
     std::vector<CameraPose> camera2_ext = {CameraPose()};
     GeneralizedPinholeRelativePoseRefiner<RelWeightType> rel_refiner(matches_2D_2D, map_ext, camera2_ext, weights_rel);
 
@@ -526,6 +613,19 @@ BundleStats refine_hybrid_pose(const std::vector<Point2D> &x, const std::vector<
                                const std::vector<CameraPose> &map_ext, CameraPose *pose, const BundleOptions &opt,
                                double loss_scale_epipolar, const std::vector<double> &weights_abs,
                                const std::vector<std::vector<double>> &weights_rel) {
+    POSELIB_CHECK_SAME_SIZE(x, X);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights_abs, x);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights_rel, matches_2D_2D);
+    const std::vector<CameraPose> query_ext = {CameraPose()}; // cam_id2 refers to the (single) query camera
+    for (size_t match_k = 0; match_k < matches_2D_2D.size(); ++match_k) {
+        const PairwiseMatches &m = matches_2D_2D[match_k];
+        POSELIB_CHECK_SAME_SIZE(m.x1, m.x2);
+        POSELIB_CHECK_INDEX(m.cam_id1, map_ext);
+        POSELIB_CHECK_INDEX(m.cam_id2, query_ext);
+        if (!weights_rel.empty()) {
+            POSELIB_CHECK_SAME_SIZE(weights_rel[match_k], m.x1);
+        }
+    }
     bool have_abs_weights = weights_abs.size() == x.size();
     bool have_rel_weights = weights_rel.size() == matches_2D_2D.size();
 
@@ -560,6 +660,8 @@ BundleStats bundle_adjust_1D_radial(const std::vector<Point2D> &x, const std::ve
 // Entry point for 1D radial absolute pose refinement (Assumes that the image points are centered)
 BundleStats bundle_adjust_1D_radial(const std::vector<Point2D> &x, const std::vector<Point3D> &X, CameraPose *pose,
                                     const Camera &cam, const BundleOptions &opt, const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x, X);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x);
     if (weights.size() == x.size()) {
         return bundle_adjust_1D_radial<std::vector<double>>(x, X, pose, cam, opt, weights);
     } else {
@@ -589,6 +691,8 @@ BundleStats refine_monodepth_relpose(const std::vector<Point2D> &x1, const std::
                                      MonoDepthTwoViewGeometry *pose, const double scale_reproj,
                                      const double weight_sampson, const BundleOptions &opt, bool refine_shift,
                                      const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2, d1, d2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x1);
     if (weights.size() == x1.size()) {
         return refine_monodepth_relpose<std::vector<double>>(x1, x2, d1, d2, pose, scale_reproj, weight_sampson, opt,
                                                              refine_shift, weights);
@@ -618,6 +722,8 @@ BundleStats refine_monodepth_shared_focal_relpose(const std::vector<Point2D> &x1
                                                   MonoDepthImagePair *image_pair, double scale_reproj,
                                                   double weight_alpha, const BundleOptions &opt,
                                                   const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2, d1, d2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x1);
     if (weights.size() == x1.size()) {
         return refine_monodepth_shared_focal_relpose<std::vector<double>>(x1, x2, d1, d2, image_pair, scale_reproj,
                                                                           weight_alpha, opt, weights);
@@ -648,6 +754,8 @@ BundleStats refine_monodepth_varying_focal_relpose(const std::vector<Point2D> &x
                                                    MonoDepthImagePair *image_pair, double scale_reproj,
                                                    double weight_alpha, const BundleOptions &opt,
                                                    const std::vector<double> &weights) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2, d1, d2);
+    POSELIB_CHECK_SIZE_OR_EMPTY(weights, x1);
     if (weights.size() == x1.size()) {
         return refine_monodepth_varying_focal_relpose<std::vector<double>>(x1, x2, d1, d2, image_pair, scale_reproj,
                                                                            weight_alpha, opt, weights);

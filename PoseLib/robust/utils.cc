@@ -29,6 +29,7 @@
 #include "utils.h"
 
 #include "PoseLib/misc/essential.h"
+#include "PoseLib/misc/input_checks.h"
 
 namespace poselib {
 
@@ -638,6 +639,7 @@ void get_inliers_1D_radial(const CameraPose &pose, const std::vector<Point2D> &x
 
 double normalize_points(std::vector<Eigen::Vector2d> &x1, std::vector<Eigen::Vector2d> &x2, Eigen::Matrix3d &T1,
                         Eigen::Matrix3d &T2, bool normalize_scale, bool normalize_centroid, bool shared_scale) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
 
     T1.setIdentity();
     T2.setIdentity();

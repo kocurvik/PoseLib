@@ -163,6 +163,16 @@ refine_generalized_relpose(const std::vector<PairwiseMatches> &matches, const st
                            const BundleOptions &opt = BundleOptions(),
                            const std::vector<std::vector<double>> &weights = std::vector<std::vector<double>>());
 
+// Generalized relative pose refinement with camera intrinsics. Points in matches are in pixels and are
+// undistorted with cameras1[cam_id1] / cameras2[cam_id2] before refinement.
+// opt.loss_scale is given in pixels (it is rescaled with the mean focal length of all cameras).
+BundleStats
+refine_generalized_relpose(const std::vector<PairwiseMatches> &matches, const std::vector<CameraPose> &camera1_ext,
+                           const std::vector<Camera> &cameras1, const std::vector<CameraPose> &camera2_ext,
+                           const std::vector<Camera> &cameras2, CameraPose *pose,
+                           const BundleOptions &opt = BundleOptions(),
+                           const std::vector<std::vector<double>> &weights = std::vector<std::vector<double>>());
+
 // If you use weights, then both weights_abs and weights_rel needs to be passed!
 BundleStats
 refine_hybrid_pose(const std::vector<Point2D> &x, const std::vector<Point3D> &X,

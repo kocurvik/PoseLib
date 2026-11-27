@@ -28,6 +28,7 @@
 
 #include "robust.h"
 
+#include "PoseLib/misc/input_checks.h"
 #include "PoseLib/robust/utils.h"
 #include "robust/recalibrator.h"
 
@@ -35,6 +36,8 @@ namespace poselib {
 
 RansacStats estimate_absolute_pose(const std::vector<Point2D> &points2D, const std::vector<Point3D> &points3D,
                                    AbsolutePoseOptions opt, Image *image, std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+
     AbsolutePoseOptions opt_scaled = opt;
 
     std::vector<Point2D> points2D_norm(points2D.size());
@@ -130,6 +133,10 @@ RansacStats estimate_generalized_absolute_pose(const std::vector<std::vector<Poi
                                                const std::vector<CameraPose> &camera_ext,
                                                const std::vector<Camera> &cameras, const AbsolutePoseOptions &opt,
                                                CameraPose *pose, std::vector<std::vector<char>> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D, camera_ext, cameras);
+    for (size_t cam_k = 0; cam_k < points2D.size(); ++cam_k) {
+        POSELIB_CHECK_SAME_SIZE(points2D[cam_k], points3D[cam_k]);
+    }
 
     const size_t num_cams = cameras.size();
     AbsolutePoseOptions opt_scaled = opt;
@@ -185,6 +192,8 @@ RansacStats estimate_absolute_pose_pnpl(const std::vector<Point2D> &points2D, co
                                         const std::vector<Line2D> &lines2D, const std::vector<Line3D> &lines3D,
                                         const Camera &camera, const AbsolutePoseOptions &opt, CameraPose *pose,
                                         std::vector<char> *inliers_points, std::vector<char> *inliers_lines) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+    POSELIB_CHECK_SAME_SIZE(lines2D, lines3D);
 
     std::vector<Point2D> points2D_calib(points2D.size());
     for (size_t k = 0; k < points2D.size(); ++k) {
@@ -243,6 +252,8 @@ RansacStats estimate_absolute_pose_pnplf(const std::vector<Point2D> &points2D, c
                                          const std::vector<Line2D> &lines2D, const std::vector<Line3D> &lines3D,
                                          const Camera &camera, const AbsolutePoseOptions &opt, Image *image,
                                          std::vector<char> *inliers_points, std::vector<char> *inliers_lines) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+    POSELIB_CHECK_SAME_SIZE(lines2D, lines3D);
 
     // Unproject through the provided camera: removes the principal point and divides by the initial
     // focal guess (improves numerics). RANSAC then estimates a focal correction with pp = (0, 0).
@@ -309,6 +320,7 @@ RansacStats estimate_absolute_pose_pnplf(const std::vector<Point2D> &points2D, c
 RansacStats estimate_relative_pose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                    const Camera &camera1, const Camera &camera2, const RelativePoseOptions &opt,
                                    CameraPose *pose, std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
 
     const size_t num_pts = x1.size();
     RansacStats stats;
@@ -385,6 +397,8 @@ RansacStats estimate_monodepth_relative_pose(const std::vector<Point2D> &points2
                                              const std::vector<double> &depth_2, const Camera &camera1,
                                              const Camera &camera2, const MonoDepthRelativePoseOptions &opt,
                                              MonoDepthTwoViewGeometry *geometry, std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(points2D_1, points2D_2, depth_1, depth_2);
+
     const size_t num_pts = points2D_1.size();
     std::vector<Point2D> x1_calib(num_pts);
     std::vector<Point2D> x2_calib(num_pts);
@@ -434,6 +448,7 @@ RansacStats estimate_shared_focal_relative_pose(const std::vector<Point2D> &poin
                                                 const std::vector<Point2D> &points2D_2, const Point2D &pp,
                                                 const RelativePoseOptions &opt, ImagePair *image_pair,
                                                 std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(points2D_1, points2D_2);
 
     const size_t num_pts = points2D_1.size();
 
@@ -494,6 +509,8 @@ RansacStats estimate_varying_focal_relative_pose(const std::vector<Point2D> &poi
                                                  const std::vector<Point2D> &points2D_2, const Point2D &pp1,
                                                  const Point2D &pp2, const RelativePoseOptions &opt,
                                                  ImagePair *image_pair, std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(points2D_1, points2D_2);
+
     const size_t num_pts = points2D_1.size();
 
     Eigen::Matrix3d T1, T2;
@@ -555,6 +572,7 @@ RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Poin
                                                           const std::vector<double> &depth_2, const Point2D &pp,
                                                           const MonoDepthRelativePoseOptions &opt,
                                                           MonoDepthImagePair *image_pair, std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(points2D_1, points2D_2, depth_1, depth_2);
 
     const size_t num_pts = points2D_1.size();
 
@@ -621,6 +639,8 @@ RansacStats estimate_varying_focal_monodepth_relative_pose(const std::vector<Poi
                                                            const std::vector<double> &depth_2, const Point2D &pp1,
                                                            const Point2D &pp2, const MonoDepthRelativePoseOptions &opt,
                                                            MonoDepthImagePair *image_pair, std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(points2D_1, points2D_2, depth_1, depth_2);
+
     const size_t num_pts = points2D_1.size();
 
     Eigen::Matrix3d T1, T2;
@@ -684,6 +704,7 @@ RansacStats estimate_varying_focal_monodepth_relative_pose(const std::vector<Poi
 
 RansacStats estimate_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                  const RelativePoseOptions &opt, Eigen::Matrix3d *F, std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
 
     const size_t num_pts = x1.size();
     if (num_pts < 7) {
@@ -737,6 +758,7 @@ RansacStats estimate_fundamental(const std::vector<Point2D> &x1, const std::vect
 RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                     std::vector<double> ks, const RelativePoseOptions &opt,
                                     ProjectiveImagePair *F_cam_pair, std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
 
     const size_t num_pts = x1.size();
     if (num_pts < 10) {
@@ -795,6 +817,7 @@ RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::v
 RansacStats estimate_shared_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                            std::vector<double> ks, const RelativePoseOptions &opt,
                                            ProjectiveImagePair *F_cam_pair, std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
 
     const size_t num_pts = x1.size();
     if (num_pts < 10) {
@@ -852,6 +875,7 @@ RansacStats estimate_shared_rd_fundamental(const std::vector<Point2D> &x1, const
 
 RansacStats estimate_homography(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                 const HomographyOptions &opt, Eigen::Matrix3d *H, std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
 
     const size_t num_pts = x1.size();
     if (num_pts < 4) {
@@ -903,6 +927,13 @@ RansacStats estimate_generalized_relative_pose(const std::vector<PairwiseMatches
                                                const std::vector<CameraPose> &camera2_ext,
                                                const std::vector<Camera> &cameras2, const RelativePoseOptions &opt,
                                                CameraPose *relative_pose, std::vector<std::vector<char>> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(camera1_ext, cameras1);
+    POSELIB_CHECK_SAME_SIZE(camera2_ext, cameras2);
+    for (const PairwiseMatches &m : matches) {
+        POSELIB_CHECK_SAME_SIZE(m.x1, m.x2);
+        POSELIB_CHECK_INDEX(m.cam_id1, cameras1);
+        POSELIB_CHECK_INDEX(m.cam_id2, cameras2);
+    }
 
     std::vector<PairwiseMatches> calib_matches = matches;
     for (PairwiseMatches &m : calib_matches) {
@@ -960,6 +991,15 @@ RansacStats estimate_hybrid_pose(const std::vector<Point2D> &points2D, const std
                                  const std::vector<CameraPose> &map_ext, const std::vector<Camera> &map_cameras,
                                  const HybridPoseOptions &opt, CameraPose *pose, std::vector<char> *inliers_2D_3D,
                                  std::vector<std::vector<char>> *inliers_2D_2D) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+    POSELIB_CHECK_SAME_SIZE(map_ext, map_cameras);
+    // cam_id2 refers to the query camera, which is the only camera on that side
+    const std::vector<Camera> query_cameras = {camera};
+    for (const PairwiseMatches &m : matches2D_2D) {
+        POSELIB_CHECK_SAME_SIZE(m.x1, m.x2);
+        POSELIB_CHECK_INDEX(m.cam_id1, map_cameras);
+        POSELIB_CHECK_INDEX(m.cam_id2, query_cameras);
+    }
 
     // Compute normalized image points
     std::vector<PairwiseMatches> matches_calib = matches2D_2D;
@@ -1030,6 +1070,8 @@ RansacStats estimate_hybrid_pose(const std::vector<Point2D> &points2D, const std
 RansacStats estimate_1D_radial_absolute_pose(const std::vector<Point2D> &points2D, const std::vector<Point3D> &points3D,
                                              const AbsolutePoseOptions &opt, CameraPose *pose,
                                              std::vector<char> *inliers) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+
     if (points2D.size() < 5) {
         // Not possible to generate minimal sample
         return RansacStats();

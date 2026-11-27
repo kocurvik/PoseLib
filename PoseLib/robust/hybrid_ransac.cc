@@ -28,6 +28,7 @@
 
 #include "hybrid_ransac.h"
 
+#include "PoseLib/misc/input_checks.h"
 #include "PoseLib/robust/hybrid_estimators/hybrid_point_line_absolute_pose.h"
 #include "PoseLib/robust/hybrid_estimators/hybrid_point_line_focal_absolute_pose.h"
 #include "PoseLib/robust/hybrid_ransac_impl.h"
@@ -39,6 +40,8 @@ HybridRansacStats hybrid_ransac_pnpl(const std::vector<Point2D> &points2D, const
                                      const std::vector<Line2D> &lines2D, const std::vector<Line3D> &lines3D,
                                      const HybridRansacOptions &opt, CameraPose *pose,
                                      std::vector<char> *inliers_points, std::vector<char> *inliers_lines) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+    POSELIB_CHECK_SAME_SIZE(lines2D, lines3D);
     // Initialize pose
     pose->q << 1.0, 0.0, 0.0, 0.0;
     pose->t.setZero();
@@ -64,6 +67,8 @@ HybridRansacStats hybrid_ransac_pnplf(const std::vector<Point2D> &points2D, cons
                                       const std::vector<Line2D> &lines2D, const std::vector<Line3D> &lines3D,
                                       const HybridRansacOptions &opt, Image *image, std::vector<char> *inliers_points,
                                       std::vector<char> *inliers_lines) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+    POSELIB_CHECK_SAME_SIZE(lines2D, lines3D);
     // Initialize image (SIMPLE_PINHOLE, principal point at (0,0))
     image->pose.q << 1.0, 0.0, 0.0, 0.0;
     image->pose.t.setZero();

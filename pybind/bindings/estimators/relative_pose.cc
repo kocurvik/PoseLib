@@ -355,28 +355,9 @@ std::pair<CameraPose, py::dict> refine_generalized_relative_pose_wrapper(
 
     py::gil_scoped_release release;
 
-    // Compute normalized matches
-    std::vector<PairwiseMatches> calib_matches = matches;
-    for (PairwiseMatches &m : calib_matches) {
-        for (size_t k = 0; k < m.x1.size(); ++k) {
-            cameras1[m.cam_id1].unproject(m.x1[k], &m.x1[k]);
-            cameras2[m.cam_id2].unproject(m.x2[k], &m.x2[k]);
-        }
-    }
-
-    double scaling_factor = 0;
-    for (size_t k = 0; k < cameras1.size(); ++k) {
-        scaling_factor += 1.0 / cameras1[k].focal();
-    }
-    for (size_t k = 0; k < cameras2.size(); ++k) {
-        scaling_factor += 1.0 / cameras2[k].focal();
-    }
-    scaling_factor /= cameras1.size() + cameras2.size();
-
-    bundle_opt.loss_scale *= scaling_factor;
-
     CameraPose refined_pose = initial_pose;
-    BundleStats stats = refine_generalized_relpose(calib_matches, camera1_ext, camera2_ext, &refined_pose, bundle_opt);
+    BundleStats stats = refine_generalized_relpose(matches, camera1_ext, cameras1, camera2_ext, cameras2, &refined_pose,
+                                                   bundle_opt);
 
     py::gil_scoped_acquire acquire;
 

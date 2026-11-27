@@ -29,6 +29,7 @@
 #include "ransac.h"
 
 #include "PoseLib/misc/essential.h"
+#include "PoseLib/misc/input_checks.h"
 #include "PoseLib/robust/bundle.h"
 #include "PoseLib/robust/estimators/absolute_pose.h"
 #include "PoseLib/robust/estimators/homography.h"
@@ -43,6 +44,7 @@ namespace poselib {
 
 RansacStats ransac_pnp(const std::vector<Point2D> &x, const std::vector<Point3D> &X, const AbsolutePoseOptions &opt,
                        CameraPose *best_model, std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x, X);
 
     if (!opt.ransac.score_initial_model) {
         best_model->q << 1.0, 0.0, 0.0, 0.0;
@@ -58,6 +60,7 @@ RansacStats ransac_pnp(const std::vector<Point2D> &x, const std::vector<Point3D>
 
 RansacStats ransac_pnpf(const std::vector<Point2D> &x, const std::vector<Point3D> &X, const AbsolutePoseOptions &opt,
                         Image *best_model, std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x, X);
 
     best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
     best_model->pose.t.setZero();
@@ -76,6 +79,7 @@ RansacStats ransac_pnpf(const std::vector<Point2D> &x, const std::vector<Point3D
 
 RansacStats ransac_pnpfr(const std::vector<Point2D> &x, const std::vector<Point3D> &X, const AbsolutePoseOptions &opt,
                          Image *best_model, std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x, X);
 
     best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
     best_model->pose.t.setZero();
@@ -95,6 +99,10 @@ RansacStats ransac_pnpfr(const std::vector<Point2D> &x, const std::vector<Point3
 RansacStats ransac_gen_pnp(const std::vector<std::vector<Point2D>> &x, const std::vector<std::vector<Point3D>> &X,
                            const std::vector<CameraPose> &camera_ext, const AbsolutePoseOptions &opt,
                            CameraPose *best_model, std::vector<std::vector<char>> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x, X, camera_ext);
+    for (size_t cam_k = 0; cam_k < x.size(); ++cam_k) {
+        POSELIB_CHECK_SAME_SIZE(x[cam_k], X[cam_k]);
+    }
     if (!opt.ransac.score_initial_model) {
         best_model->q << 1.0, 0.0, 0.0, 0.0;
         best_model->t.setZero();
@@ -117,6 +125,8 @@ RansacStats ransac_pnpl(const std::vector<Point2D> &points2D, const std::vector<
                         const std::vector<Line2D> &lines2D, const std::vector<Line3D> &lines3D,
                         const AbsolutePoseOptions &opt, CameraPose *best_model, std::vector<char> *inliers_points,
                         std::vector<char> *inliers_lines) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+    POSELIB_CHECK_SAME_SIZE(lines2D, lines3D);
 
     if (!opt.ransac.score_initial_model) {
         best_model->q << 1.0, 0.0, 0.0, 0.0;
@@ -143,6 +153,8 @@ RansacStats ransac_pnplf(const std::vector<Point2D> &points2D, const std::vector
                          const std::vector<Line2D> &lines2D, const std::vector<Line3D> &lines3D,
                          const AbsolutePoseOptions &opt, Image *best_model, std::vector<char> *inliers_points,
                          std::vector<char> *inliers_lines) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+    POSELIB_CHECK_SAME_SIZE(lines2D, lines3D);
 
     best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
     best_model->pose.t.setZero();
@@ -170,6 +182,7 @@ RansacStats ransac_pnplf(const std::vector<Point2D> &points2D, const std::vector
 
 RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                            const RelativePoseOptions &opt, CameraPose *best_model, std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
     if (!opt.ransac.score_initial_model) {
         best_model->q << 1.0, 0.0, 0.0, 0.0;
         best_model->t.setZero();
@@ -184,6 +197,7 @@ RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
 RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const Camera &camera1,
                            const Camera &camera2, const RelativePoseOptions &opt, CameraPose *best_model,
                            std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
 
     best_model->q << 1.0, 0.0, 0.0, 0.0;
     best_model->t.setZero();
@@ -200,6 +214,7 @@ RansacStats ransac_monodepth_relpose(const std::vector<Point2D> &x1, const std::
                                      const std::vector<double> &d1, const std::vector<double> &d2,
                                      const MonoDepthRelativePoseOptions &opt, MonoDepthTwoViewGeometry *best_model,
                                      std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2, d1, d2);
     best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
     best_model->pose.t.setZero();
     RelativePoseMonoDepthEstimator estimator(opt, x1, x2, d1, d2);
@@ -211,6 +226,7 @@ RansacStats ransac_monodepth_relpose(const std::vector<Point2D> &x1, const std::
 RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                         const RelativePoseOptions &opt, ImagePair *best_model,
                                         std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
     if (!opt.ransac.score_initial_model) {
         best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
         best_model->pose.t.setZero();
@@ -234,6 +250,7 @@ RansacStats ransac_shared_focal_relpose(const std::vector<Point2D> &x1, const st
 RansacStats ransac_varying_focal_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                          const RelativePoseOptions &opt, ImagePair *best_model,
                                          std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
     if (!opt.ransac.score_initial_model) {
         best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
         best_model->pose.t.setZero();
@@ -258,6 +275,7 @@ RansacStats ransac_shared_focal_monodepth_relpose(const std::vector<Point2D> &x1
                                                   const std::vector<double> &d1, const std::vector<double> &d2,
                                                   const MonoDepthRelativePoseOptions &opt,
                                                   MonoDepthImagePair *best_model, std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2, d1, d2);
     best_model->geometry.pose.q << 1.0, 0.0, 0.0, 0.0;
     best_model->geometry.pose.t.setZero();
     best_model->camera1 = Camera(SimplePinholeCameraModel::model_id, std::vector<double>{1.0, 0.0, 0.0}, -1, -1);
@@ -280,6 +298,7 @@ RansacStats ransac_varying_focal_monodepth_relpose(const std::vector<Point2D> &x
                                                    const std::vector<double> &d1, const std::vector<double> &d2,
                                                    const MonoDepthRelativePoseOptions &opt,
                                                    MonoDepthImagePair *best_model, std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2, d1, d2);
     best_model->geometry.pose.q << 1.0, 0.0, 0.0, 0.0;
     best_model->geometry.pose.t.setZero();
     best_model->camera1 = Camera(SimplePinholeCameraModel::model_id, std::vector<double>{1.0, 0.0, 0.0}, -1, -1);
@@ -300,6 +319,7 @@ RansacStats ransac_varying_focal_monodepth_relpose(const std::vector<Point2D> &x
 RansacStats ransac_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                const RelativePoseOptions &opt, Eigen::Matrix3d *best_model,
                                std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
 
     if (!opt.ransac.score_initial_model) {
         best_model->setIdentity();
@@ -317,6 +337,7 @@ RansacStats ransac_rd_fundamental(const std::vector<Point2D> &x1, const std::vec
                                   std::vector<double> &ks, const double min_k, const double max_k,
                                   const RelativePoseOptions &opt, ProjectiveImagePair *best_model,
                                   std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
 
     best_model->F.setIdentity();
     best_model->camera1 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
@@ -335,6 +356,7 @@ RansacStats ransac_shared_rd_fundamental(const std::vector<Point2D> &x1, const s
                                          std::vector<double> &ks, const double min_k, const double max_k,
                                          const RelativePoseOptions &opt, ProjectiveImagePair *best_model,
                                          std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
 
     best_model->F.setIdentity();
     best_model->camera1 = Camera("DIVISION", std::vector<double>{1.0, 1.0, 0.0, 0.0, 0.0}, -1, -1);
@@ -352,6 +374,7 @@ RansacStats ransac_shared_rd_fundamental(const std::vector<Point2D> &x1, const s
 RansacStats ransac_homography(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                               const HomographyOptions &opt, Eigen::Matrix3d *best_model,
                               std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x1, x2);
 
     if (!opt.ransac.score_initial_model) {
         best_model->setIdentity();
@@ -368,6 +391,12 @@ RansacStats ransac_homography(const std::vector<Point2D> &x1, const std::vector<
 RansacStats ransac_gen_relpose(const std::vector<PairwiseMatches> &matches, const std::vector<CameraPose> &camera1_ext,
                                const std::vector<CameraPose> &camera2_ext, const RelativePoseOptions &opt,
                                CameraPose *best_model, std::vector<std::vector<char>> *best_inliers) {
+    for (const PairwiseMatches &m : matches) {
+        POSELIB_CHECK_SAME_SIZE(m.x1, m.x2);
+        POSELIB_CHECK_INDEX(m.cam_id1, camera1_ext);
+        POSELIB_CHECK_INDEX(m.cam_id2, camera2_ext);
+    }
+
     if (!opt.ransac.score_initial_model) {
         best_model->q << 1.0, 0.0, 0.0, 0.0;
         best_model->t.setZero();
@@ -402,6 +431,14 @@ RansacStats ransac_hybrid_pose(const std::vector<Point2D> &points2D, const std::
                                const std::vector<PairwiseMatches> &matches2D_2D, const std::vector<CameraPose> &map_ext,
                                const HybridPoseOptions &opt, CameraPose *best_model, std::vector<char> *inliers_2D_3D,
                                std::vector<std::vector<char>> *inliers_2D_2D) {
+    POSELIB_CHECK_SAME_SIZE(points2D, points3D);
+    const std::vector<CameraPose> query_ext = {CameraPose()}; // cam_id2 refers to the (single) query camera
+    for (const PairwiseMatches &m : matches2D_2D) {
+        POSELIB_CHECK_SAME_SIZE(m.x1, m.x2);
+        POSELIB_CHECK_INDEX(m.cam_id1, map_ext);
+        POSELIB_CHECK_INDEX(m.cam_id2, query_ext);
+    }
+
     if (!opt.ransac.score_initial_model) {
         best_model->q << 1.0, 0.0, 0.0, 0.0;
         best_model->t.setZero();
@@ -440,6 +477,7 @@ RansacStats ransac_hybrid_pose(const std::vector<Point2D> &points2D, const std::
 RansacStats ransac_1D_radial_pnp(const std::vector<Point2D> &x, const std::vector<Point3D> &X,
                                  const AbsolutePoseOptions &opt, CameraPose *best_model,
                                  std::vector<char> *best_inliers) {
+    POSELIB_CHECK_SAME_SIZE(x, X);
 
     if (!opt.ransac.score_initial_model) {
         best_model->q << 1.0, 0.0, 0.0, 0.0;

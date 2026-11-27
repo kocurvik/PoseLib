@@ -119,6 +119,7 @@ set(HEADERS_PUBLIC
     misc/essential.h
     misc/re3q3.h
     misc/decompositions.h
+    misc/input_checks.h
     robust.h
     types.h
     camera_pose.h

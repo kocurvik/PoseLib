@@ -2,6 +2,7 @@
 #include "test.h"
 
 #include <PoseLib/misc/camera_models.h>
+#include <PoseLib/robust/bundle.h>
 #include <PoseLib/robust/optim/generalized_relative.h>
 #include <PoseLib/robust/optim/jacobian_accumulator.h>
 #include <PoseLib/robust/optim/lm_impl.h>
@@ -245,10 +246,40 @@ bool test_gen_relative_pose_refinement() {
     return true;
 }
 
+bool test_gen_relative_pose_refinement_with_cameras() {
+    // Pixel coordinates from distorted cameras, refined with the overload that takes the intrinsics
+    const size_t Ncam1 = 3;
+    const size_t Ncam2 = 2;
+    const size_t N = 10;
+
+    std::vector<CameraPose> cam1_ext;
+    std::vector<CameraPose> cam2_ext;
+    std::vector<Camera> cam1_int = {Camera("SIMPLE_RADIAL", {500.0, 320.0, 240.0, -0.01}, 640, 480)};
+    std::vector<Camera> cam2_int = {Camera("SIMPLE_RADIAL", {600.0, 300.0, 200.0, 0.01}, 600, 400)};
+    std::vector<std::vector<double>> weights;
+    std::vector<PairwiseMatches> matches;
+    CameraPose rel_pose;
+    setup_scene(Ncam1, Ncam2, N, rel_pose, cam1_ext, cam2_ext, cam1_int, cam2_int, matches, weights,
+                "gen_relative_pose_refinement_with_cameras_scene");
+
+    CameraPose pose = rel_pose;
+    pose.q = (pose.q + Eigen::Vector4d(0.0, 0.01, -0.01, 0.0)).normalized();
+    pose.t += Eigen::Vector3d(0.02, -0.01, 0.01);
+
+    BundleOptions bundle_opt;
+    bundle_opt.loss_scale = 2.0; // pixels
+    refine_generalized_relpose(matches, cam1_ext, cam1_int, cam2_ext, cam2_int, &pose, bundle_opt);
+
+    REQUIRE_SMALL((pose.q - rel_pose.q).norm(), 1e-6);
+    REQUIRE_SMALL((pose.t - rel_pose.t).norm(), 1e-6);
+    return true;
+}
+
 } // namespace test::gen_relative
 
 using namespace test::gen_relative;
 std::vector<Test> register_optim_gen_relative_test() {
     return {TEST(test_gen_relative_pose_normal_acc), TEST(test_gen_relative_pose_jacobian),
-            TEST(test_gen_relative_pose_jacobian_varying_cams), TEST(test_gen_relative_pose_refinement)};
+            TEST(test_gen_relative_pose_jacobian_varying_cams), TEST(test_gen_relative_pose_refinement),
+            TEST(test_gen_relative_pose_refinement_with_cameras)};
 }
