@@ -27,6 +27,7 @@ std::vector<Test> register_optim_homography_test();
 std::vector<Test> register_optim_monodepth_relpose_test();
 std::vector<Test> register_recalibrator_test();
 std::vector<Test> register_input_checks_test();
+std::vector<Test> register_bundle_weights_test();
 
 namespace {
 
@@ -194,6 +195,7 @@ int main(int argc, char *argv[]) {
     RUN_TESTS(optim_monodepth_relpose_test);
     RUN_TESTS(recalibrator_test);
     RUN_TESTS(input_checks_test);
+    RUN_TESTS(bundle_weights_test);
 
     std::cout << "Test suite finished (" << passed << " / " << num_tests << " passed, seed = " << opt.seed
               << ", stress = " << opt.stress_repetitions << ")\n\n";

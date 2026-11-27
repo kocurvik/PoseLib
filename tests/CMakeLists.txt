@@ -17,6 +17,7 @@ add_executable(run_tests
     optim_monodepth_relpose_test.cc
     recalibrator_test.cc
     input_checks_test.cc
+    bundle_weights_test.cc
 )
 target_link_libraries(run_tests PRIVATE PoseLib::PoseLib Eigen3::Eigen)
 set_compile_flags(run_tests)
